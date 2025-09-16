@@ -1,6 +1,7 @@
 pub mod expressions;
 pub mod function;
 pub mod traits;
+pub mod typing;
 
 use std::collections::HashMap;
 
@@ -13,14 +14,34 @@ use expressions::Expression;
 
 use traits::{Trait, TraitBuilder};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct PathIdent {
+    pub ident: String,
+    pub template_spec: Vec<Path>,
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Path {
-    pub v: Vec<String>,
+    pub v: Vec<PathIdent>,
+}
+
+impl<I> From<I> for PathIdent
+where
+    I: Into<String>,
+{
+    fn from(value: I) -> Self {
+        let ident = value.into();
+        return PathIdent {
+            ident,
+            template_spec: vec![],
+        };
+    }
 }
 
 impl Path {
-    pub fn add_segment<S: Into<String>>(&mut self, s: S) {
-        self.v.push(s.into());
+    pub fn add_segment<I: Into<PathIdent>>(&mut self, s: I) {
+        let ident = s.into();
+        self.v.push(ident);
     }
 
     pub fn new() -> Self {
@@ -30,7 +51,7 @@ impl Path {
 
 impl<T> From<T> for Path
 where
-    T: Into<String>,
+    T: Into<PathIdent>,
 {
     fn from(value: T) -> Self {
         let s = value.into();
@@ -131,6 +152,17 @@ impl Definition {
 pub struct Import {
     pub c_import: bool,
     pub path: Path,
+}
+
+impl Import {
+    pub fn c_import(path: Path) -> Self {
+        // c imports only have 2 path members
+        assert!(path.v.len() == 2);
+        return Self {
+            c_import: true,
+            path,
+        };
+    }
 }
 
 #[derive(Debug, Clone)]

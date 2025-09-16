@@ -24,7 +24,7 @@ impl BinaryOperator {
         }
         .to_string();
         return Path {
-            v: vec![val, "core".to_string()],
+            v: vec![val.into(), "core".into()],
         };
     }
 }

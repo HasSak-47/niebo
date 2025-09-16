@@ -2,12 +2,14 @@ use std::collections::HashMap;
 
 use super::expressions::{block::Block, *};
 use super::*;
+use crate::ast::typing::TypeName;
 use crate::general::types::*;
 
+#[derive(Debug)]
 pub struct FunctionBuilder {
     pub ident: String,
-    pub ret_ty: Option<Type>,
-    pub params: Vec<(String, Type)>,
+    pub ret_ty: Option<TypeName>,
+    pub params: Vec<(String, TypeName)>,
     pub varidic: bool,
     pub constant: bool,
     pub body: Option<Block>,
@@ -32,8 +34,8 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn set_ret_ty(mut self, ty: Type) -> Self {
-        self.ret_ty = Some(ty);
+    pub fn set_ret_tyname<TyName: Into<TypeName>>(mut self, ty: TyName) -> Self {
+        self.ret_ty = Some(ty.into());
         return self;
     }
 
@@ -47,8 +49,13 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn add_param<S: AsRef<str>>(mut self, ident: S, ty: Type) -> Self {
-        self.params.push((ident.as_ref().to_string(), ty));
+    pub fn add_param<S: AsRef<str>, ITyN: Into<TypeName>>(
+        mut self,
+        ident: S,
+        tyname: ITyN,
+    ) -> Self {
+        self.params
+            .push((ident.as_ref().to_string(), tyname.into()));
         return self;
     }
 
@@ -80,7 +87,7 @@ impl FunctionBuilder {
             constant: self.constant,
             parameters: self.params,
             varidic: self.varidic,
-            return_ty: self.ret_ty.unwrap_or(Type::void()),
+            return_ty: self.ret_ty,
         };
 
         return Definition {
@@ -91,12 +98,12 @@ impl FunctionBuilder {
     }
 }
 
+// since it lives in the AST the types are not yet resolved and are treated as paths
 #[derive(Debug, Clone)]
 pub struct Function {
-    // TODO: add restriction to make only c functions varidic
     pub varidic: bool,
     pub constant: bool,
-    pub return_ty: Type,
-    pub parameters: Vec<(String, Type)>,
+    pub return_ty: Option<TypeName>,
+    pub parameters: Vec<(String, TypeName)>,
     pub body: Block,
 }

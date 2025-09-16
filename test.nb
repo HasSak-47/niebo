@@ -2,23 +2,7 @@ header stdio::printf;
 
 type TestType = int32;
 
-fn test_function<T: Add<T>>(t: T) -> T {
-    return t + t;
-}
-
-trait testTrait<T: Add<T>>{
-    type TestType = int32;
-    
-    fn test_function<T: Add<T>>(t: T) -> T {
-        return t + t;
-    }
-}
-
 fn main() -> i32 {
-    let i = 0;
-    while i < 10 {
-        i++;
-    }
     return 0;
 }
 

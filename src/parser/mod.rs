@@ -1,8 +1,14 @@
 use pest::{Parser, RuleType, iterators::Pair};
 use pest_derive::Parser;
 
-use crate::ast::{
-    self, Definition, Import, Module, Path, expressions::block::Block, function::FunctionBuilder,
+use crate::{
+    ast::{
+        self, Definition, Import, Module, Path, PathIdent,
+        expressions::{Expression, Statement, block::Block, literal::Literal},
+        function::FunctionBuilder,
+        typing::TypeName,
+    },
+    general::types::{PrimitiveType, Type},
 };
 
 #[derive(Parser)]
@@ -32,12 +38,90 @@ struct Token {
     col: usize,
 }
 
+pub fn handle_fn_params<'a>(
+    pair: Pair<'a, Rule>,
+    builder: FunctionBuilder,
+) -> anyhow::Result<FunctionBuilder> {
+    todo!()
+}
+
+pub fn handle_template_def<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<()> {
+    todo!()
+}
+
 pub fn handle_fn_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<FunctionBuilder> {
-    todo!("implement into the fn declaration ast")
+    let mut inner = pair.into_inner().into_iter();
+    let ident = inner.next().unwrap();
+    let mut builder = FunctionBuilder::new(ident.as_str());
+    let next = inner.next().unwrap();
+    match next.as_rule() {
+        Rule::template_def => {
+            handle_template_def(next);
+            builder = handle_fn_params(inner.next().unwrap(), builder)?;
+        }
+        Rule::params => {
+            builder = handle_fn_params(next, builder)?;
+        }
+
+        // return type
+        Rule::type_expr => {
+            builder = builder.set_ret_tyname(handle_type_expression(next)?);
+        }
+
+        un => unreachable!("{next:?}"),
+    }
+
+    return Ok(builder);
+}
+
+pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
+    let mut inner = pair.into_inner();
+    let next = inner.next().unwrap();
+    match next.as_rule() {
+        Rule::return_expression => {
+            let mut expr = next.into_inner();
+            let value = expr.next().and_then(|k| handle_expression(k).ok());
+            return Ok(Expression::return_(value));
+        }
+        Rule::literal_expression => {
+            let literal = next.into_inner().next().unwrap();
+            match literal.as_rule() {
+                Rule::number => {
+                    let literal = Literal::integer(literal.as_str(), None, None);
+                    return Ok(Expression::literal(literal));
+                }
+                Rule::string => {
+                    todo!()
+                }
+                _ => unreachable!(""),
+            }
+        }
+        un => unreachable!("{un:?}"),
+    }
+}
+
+pub fn handle_statement<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statement> {
+    let mut inner = pair.into_inner();
+    let next = inner.next().unwrap();
+    match next.as_rule() {
+        Rule::expression => {
+            return Ok(Statement::Expression(handle_expression(next)?));
+        }
+        Rule::c_import => todo!(),
+        un => unreachable!("{un:?}"),
+    }
+
+    todo!("{pair:?}");
 }
 
 pub fn handle_block_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Block> {
-    todo!("implement into the block definition ast")
+    let inner = pair.into_inner();
+    let mut block = Block::new();
+    for stmt in inner {
+        block.add_statement(handle_statement(stmt)?);
+    }
+
+    return Ok(block);
 }
 
 pub fn handle_fn_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
@@ -51,6 +135,56 @@ pub fn handle_fn_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definit
 
 pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     todo!("implement into the trait definition ast")
+}
+
+pub fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveType> {
+    let mut inner = pair.into_inner();
+    let next = inner.next().unwrap();
+    match next.as_rule() {
+        Rule::int_type => return Ok(PrimitiveType::Int),
+        un => unreachable!(""),
+    }
+    todo!("{:?}", next.as_rule());
+}
+
+pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<TypeName> {
+    let mut inner = pair.into_inner();
+    let ty = inner.next().unwrap();
+    return match ty.as_rule() {
+        Rule::path => Ok(handle_path(ty)?.into()),
+        Rule::primitive_type => Ok(Type::Primitive(handle_primitive_type(ty)?).into()),
+        un => unreachable!("{un:?}"),
+    };
+}
+
+pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PathIdent> {
+    let mut inner = pair.into_inner();
+    let ident = inner.next().unwrap().as_str().to_string();
+    if let Some(tm) = inner.next() {
+        todo!("handle template specialization");
+    }
+
+    return Ok(PathIdent {
+        ident,
+        template_spec: vec![],
+    });
+}
+
+pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Path> {
+    let mut inner = pair.into_inner();
+    let next = inner.peek().unwrap();
+    let mut path = Path::new();
+
+    if let Rule::rel_path = next.as_rule() {
+        todo!("handle relative paths...");
+    }
+
+    let mut path = Path::new();
+    for ident in inner {
+        path.add_segment(handle_path_ident(ident)?);
+    }
+
+    return Ok(path);
 }
 
 pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
@@ -87,6 +221,22 @@ pub fn handle_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition
     todo!()
 }
 
+pub fn handle_c_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
+    let inner = pair.into_inner().next().unwrap();
+    assert_eq!(inner.as_rule(), Rule::path);
+
+    return Ok(Import::c_import(handle_path(inner)?));
+}
+
+pub fn handle_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
+    let inner = pair.into_inner().next().unwrap();
+    return match inner.as_rule() {
+        Rule::c_import => handle_c_imports(inner),
+        Rule::niebo_import => todo!("handle niebo imports..."),
+        _ => unreachable!(),
+    };
+}
+
 pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
     let mut md = Module::new();
     let ts = TokenStream::parse(Rule::module, txt.as_ref())?
@@ -102,7 +252,9 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
             Rule::definitions => {
                 md.definitions.push(handle_definitions(t)?);
             }
-            Rule::import => {}
+            Rule::import => {
+                md.imports.push(handle_imports(t)?);
+            }
             un => unreachable!("{t:?}"),
         }
     }

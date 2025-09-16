@@ -26,12 +26,12 @@ fn find_traits<'a>(cur_path: Path, traits: &mut Vec<(Path, &'a Trait)>, module: 
         match &def.kind {
             DefinitionKind::Trait(t) => {
                 let mut path = cur_path.clone();
-                path.v.push(def.name.clone());
+                path.v.push(def.name.clone().into());
                 traits.push((path, t));
             }
             DefinitionKind::Module(m) => {
                 let mut path = cur_path.clone();
-                path.v.push(def.name.clone());
+                path.v.push(def.name.clone().into());
 
                 find_traits(path, traits, &m);
             }
@@ -70,7 +70,8 @@ impl<'a> IR<'a> {
             match &mut def.kind {
                 DefinitionKind::Function(func) => {
                     let bk = evaluate_block(func.body.clone());
-                    assert_eq!(func.return_ty, bk.ret_ty.unwrap_or(Type::void()));
+                    // assert_eq!(func.return_ty, bk.ret_ty.unwrap_or(Type::void()));
+                    todo!()
                 }
                 _ => {}
             }

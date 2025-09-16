@@ -1,10 +1,10 @@
 module = { SOI ~ stream ~ EOI }
-stream = { (import | definitions )* }
+stream = { (import | definitions)* }
 
 import = { c_import | niebo_import }
 
-c_import     = { "header" ~ path ~ ";" }
-niebo_import = { "use" ~ path ~ ";" }
+c_import      = { "header" ~ path ~ ";" }
+niebo_import  = { "use" ~ path ~ ";" }
 use_statement = { "use" ~ path ~ ";" }
 
 visibility = { "pub" | "module" }
@@ -49,47 +49,48 @@ expression = {
   | match_expression
   | loop_expression
   | return_expression
+  | literal_expression
   | logical_or
 }
 
-if_expression = { "if" ~ expression ~ block ~ ("else" ~ (if_expression | block))? }
+if_expression    = { "if" ~ expression ~ block ~ ("else" ~ (if_expression | block))? }
 while_expression = { "while" ~ expression ~ block }
-for_expression = { "for" ~ identifier ~ "in" ~ expression ~ block }
+for_expression   = { "for" ~ identifier ~ "in" ~ expression ~ block }
 match_expression = { "match" ~ expression ~ "{" ~ match_arm* ~ "}" }
-match_arm = { pattern ~ "=>" ~ (block | expression) ~ ","? }
-pattern = { identifier | number | string | "_" }
+match_arm        = { pattern ~ "=>" ~ (block | expression) ~ ","? }
+pattern          = { identifier | number | string | "_" }
 
-loop_expression = { "loop" ~ block }
-return_expression = { "return" ~ expression? }
-break_statement = { "break" ~ ";" }
+loop_expression    = { "loop" ~ block }
+return_expression  = { "return" ~ expression? }
+break_statement    = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";" }
 
-logical_or = { logical_and ~ ("||" ~ logical_and)* }
-logical_and = { equality ~ ("&&" ~ equality)* }
-equality = { comparison ~ (("==" | "!=") ~ comparison)* }
-comparison = { bitwise_or ~ (("<=" | ">=" | "<" | ">") ~ bitwise_or)* }
-bitwise_or = { bitwise_xor ~ ("|" ~ bitwise_xor)* }
-bitwise_xor = { bitwise_and ~ ("^" ~ bitwise_and)* }
-bitwise_and = { shift ~ ("&" ~ shift)* }
-shift = { additive ~ (("<<" | ">>") ~ additive)* }
-additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
+logical_or     = { logical_and ~ ("||" ~ logical_and)* }
+logical_and    = { equality ~ ("&&" ~ equality)* }
+equality       = { comparison ~ (("==" | "!=") ~ comparison)* }
+comparison     = { bitwise_or ~ (("<=" | ">=" | "<" | ">") ~ bitwise_or)* }
+bitwise_or     = { bitwise_xor ~ ("|" ~ bitwise_xor)* }
+bitwise_xor    = { bitwise_and ~ ("^" ~ bitwise_and)* }
+bitwise_and    = { shift ~ ("&" ~ shift)* }
+shift          = { additive ~ (("<<" | ">>") ~ additive)* }
+additive       = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
 multiplicative = { unary_expression ~ (("*" | "/" | "%") ~ unary_expression)* }
 
-unary_expression = { unary_prefix_operator* ~ postfix_expression }
+unary_expression   = { unary_prefix_operator* ~ postfix_expression }
 postfix_expression = { primary_expression ~ (call_postfix | unary_postfix_operator)* }
 
 call_postfix = { "(" ~ (expression ~ ",")* ~ expression? ~ ","? ~ ")" }
 
-unary_prefix_operator = { "!" | "-" | "+" | "&" | "*" }
+unary_prefix_operator  = { "!" | "-" | "+" | "&" | "*" }
 unary_postfix_operator = { "?" | "++" | "--" }
 
 primary_expression = { block | "(" ~ expression ~ ")" | path | number | string }
 
-let_declaration = { "let" ~ "mut"? ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
+let_declaration  = { "let" ~ "mut"? ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
 const_definition = { "const" ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
 
-params = { (param ~ ",")* ~ param ~ ","? ~ varidic? }
-param  = { identifier ~ ":" ~ type_expr }
+params  = { (param ~ ",")* ~ param ~ ","? ~ varidic? }
+param   = { identifier ~ ":" ~ type_expr }
 varidic = { "..." }
 
 path       =  { rel_path? ~ ident_root ~ ("::" ~ ident_root)* }
@@ -120,30 +121,31 @@ type_expr = {
 }
 
 function_type = { "fn" ~ "(" ~ type_params? ~ ")" ~ ("->" ~ type_expr)? }
-type_params = { (type_expr ~ ",")* ~ type_expr ~ ","? }
+type_params   = { (type_expr ~ ",")* ~ type_expr ~ ","? }
 
-array_type = { "[" ~ type_expr ~ "]" }
-pointer_type = { "*" ~ type_expr }
-mutable_pointer_type = { "*" ~ "mut" ~ type_expr }
-reference_type = { "&" ~ type_expr }
+array_type             = { "[" ~ type_expr ~ "]" }
+pointer_type           = { "*" ~ type_expr }
+mutable_pointer_type   = { "*" ~ "mut" ~ type_expr }
+reference_type         = { "&" ~ type_expr }
 mutable_reference_type = { "&" ~ "mut" ~ type_expr }
 
-struct_type = { "struct" ~ "{" ~ struct_member* ~ "}" }
-union_type = { "union" ~ "{" ~ struct_member* ~ "}" }
-variant_type = { "variant" ~ "{" ~ struct_member* ~ "}" }
+struct_type   = { "struct" ~ "{" ~ struct_member* ~ "}" }
+union_type    = { "union" ~ "{" ~ struct_member* ~ "}" }
+variant_type  = { "variant" ~ "{" ~ struct_member* ~ "}" }
 struct_member = { identifier ~ ":" ~ type_expr ~ ","? }
 
-template_type = { "template" ~ "<" ~ (identifier ~ ",")* ~ identifier ~ ","? ~ ">" }
+template_type  = { "template" ~ "<" ~ (identifier ~ ",")* ~ identifier ~ ","? ~ ">" }
 primitive_type = { int_type | uint_type | float_type | "bool" | "int" | "uint" | "float" | "string" | "void" }
-int_type = { "i" ~ ASCII_DIGIT+ }
-uint_type = { "u" ~ ASCII_DIGIT+ }
-float_type = { "float" ~ ASCII_DIGIT+ }
+int_type       = { "i" ~ ASCII_DIGIT+ }
+uint_type      = { "u" ~ ASCII_DIGIT+ }
+float_type     = { "float" ~ ASCII_DIGIT+ }
+literal_expression = { number | string }
 
-number = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
-int_suffix = { ("i" | "u") ~ ASCII_DIGIT+ }
-float_suffix = { "f" ~ ASCII_DIGIT+ }
-string = @{ "\"" ~ ANY* ~ "\"" }
-symbol = @{ ANY }
+number       = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
+int_suffix   =  { ("i" | "u") ~ ASCII_DIGIT+ }
+float_suffix =  { "f" ~ ASCII_DIGIT+ }
+string       = @{ "\"" ~ ANY* ~ "\"" }
+symbol       = @{ ANY }
 
 identifier_elements = { ASCII_ALPHANUMERIC | "_" }
 
@@ -178,7 +180,8 @@ keyword = {
   | "uint"
   | "float"
   | "string"
-  | "void" }
+  | "void"
+}
 
 COMMENT    = _{ ("/*" ~ ANY* ~ "*/") | ("//" ~ ANY* ~ "\n") }
 WHITESPACE = _{ " " | "\n" | "\t" }
