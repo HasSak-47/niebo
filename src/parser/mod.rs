@@ -61,13 +61,15 @@ pub fn handle_fn_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Functio
         }
         Rule::params => {
             builder = handle_fn_params(next, builder)?;
+            if let Some(s) = inner.next() {
+                builder = builder.set_ret_tyname(handle_type_expression(s)?);
+            }
         }
 
         // return type
         Rule::type_expr => {
             builder = builder.set_ret_tyname(handle_type_expression(next)?);
         }
-
         un => unreachable!("{next:?}"),
     }
 

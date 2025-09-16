@@ -23,8 +23,10 @@ fn main() -> anyhow::Result<()> {
     let mut file = File::open("test.nb")?;
     let mut buf = String::new();
     file.read_to_string(&mut buf)?;
-    let module = parser::parse_module(buf)?;
-    println!("{module:#?}");
+    let mut project = Project::new("test_project", (0, 1, 0));
+    project.root_module = parser::parse_module(buf)?;
+
+    let ir = IR::from_project(project);
 
     return Ok(());
 }

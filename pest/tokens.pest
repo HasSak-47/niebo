@@ -44,21 +44,25 @@ statement = {
 
 expression = {
     if_expression
+  | literal_expression
   | while_expression
   | for_expression
   | match_expression
   | loop_expression
   | return_expression
-  | literal_expression
   | logical_or
+  | call_expression 
 }
 
+// temploral quick solution for a non left recursive call expression
+call_expression  = { expression ~ "(" ~ call_params? ~ ")" }
+call_params      = {(expression ~ ",")* ~ expression ~ ","?}
 if_expression    = { "if" ~ expression ~ block ~ ("else" ~ (if_expression | block))? }
 while_expression = { "while" ~ expression ~ block }
 for_expression   = { "for" ~ identifier ~ "in" ~ expression ~ block }
 match_expression = { "match" ~ expression ~ "{" ~ match_arm* ~ "}" }
 match_arm        = { pattern ~ "=>" ~ (block | expression) ~ ","? }
-pattern          = { identifier | number | string | "_" }
+pattern          = { identifier | path | number | string | "_" }
 
 loop_expression    = { "loop" ~ block }
 return_expression  = { "return" ~ expression? }
@@ -134,11 +138,11 @@ union_type    = { "union" ~ "{" ~ struct_member* ~ "}" }
 variant_type  = { "variant" ~ "{" ~ struct_member* ~ "}" }
 struct_member = { identifier ~ ":" ~ type_expr ~ ","? }
 
-template_type  = { "template" ~ "<" ~ (identifier ~ ",")* ~ identifier ~ ","? ~ ">" }
-primitive_type = { int_type | uint_type | float_type | "bool" | "int" | "uint" | "float" | "string" | "void" }
-int_type       = { "i" ~ ASCII_DIGIT+ }
-uint_type      = { "u" ~ ASCII_DIGIT+ }
-float_type     = { "float" ~ ASCII_DIGIT+ }
+template_type      = { "template" ~ "<" ~ (identifier ~ ",")* ~ identifier ~ ","? ~ ">" }
+primitive_type     = { int_type | uint_type | float_type | "bool" | "int" | "uint" | "float" | "string" | "void" }
+int_type           = { "i" ~ ASCII_DIGIT+ }
+uint_type          = { "u" ~ ASCII_DIGIT+ }
+float_type         = { "float" ~ ASCII_DIGIT+ }
 literal_expression = { number | string }
 
 number       = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
