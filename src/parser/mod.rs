@@ -1,3 +1,5 @@
+pub mod ast;
+
 fn remove_comments(mut code: Vec<String>) -> Vec<String> {
     let mut inside_comment = false;
     for line in &mut code {
@@ -29,10 +31,7 @@ pub enum LiteralToken {
 }
 
 pub enum TokenType {
-    Literal {
-        literal: LiteralToken,
-        specifier: String,
-    },
+    Literal(LiteralToken),
     Identifier(String),
     Punctuation(String),
 }
@@ -43,6 +42,18 @@ pub struct Token {
     val: String,
 }
 
+const SYMBOLS: &[&str] = &[
+    "->", "=>", // arrows
+    "&&", "||", // boolean and or
+    ">>", "<<", // bit shift
+    ">=", "<=", "==", // comparison
+    "<", ">", "(", ")", "[", "]", // brackets
+    "~", "!", "?", // error stuff and negation ig
+    "&", "|", "^", "~", // bit manipulation
+    "+", "-", "*", "/", "%", // algebra
+    ".", ",", ":", ";", "\"", "'", // delimitators and others
+];
+
 pub fn parse(code: String) {
     let mut code = remove_comments(code.lines().map(str::to_string).collect()).join("");
     code = code.replace("\t", " ");
@@ -51,5 +62,16 @@ pub fn parse(code: String) {
         code = code.replace("  ", " ");
     }
 
-    let vals = code.split(" ");
+    let chunks: Vec<_> = code.split(" ").collect();
+    for chunk in chunks {
+        let chars = chunk.char_indices();
+        let mut alpha = true;
+        for (idx, char) in chars {
+            if char.is_alphanumeric() {
+                alpha = false;
+                chunks.insert(idx, element);
+                break;
+            }
+        }
+    }
 }
