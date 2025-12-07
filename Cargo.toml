@@ -7,3 +7,7 @@ edition = "2024"
 anyhow = "1.0.100"
 clap = "4.5.53"
 thiserror = "2.0.17"
+
+[dependencies.inkwell]
+version = "0.7.0"
+features = ["llvm21-1"]
