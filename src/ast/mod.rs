@@ -6,13 +6,13 @@ use inkwell::{
     values::{BasicValue, BasicValueEnum},
 };
 
-pub struct Compiler<'a, 'ctx> {
+pub struct ModuleCompiler<'a, 'ctx> {
     pub context: &'ctx Context,
     pub module: &'a Module<'ctx>,
     pub builder: &'a Builder<'ctx>,
 }
 
-impl<'a, 'ctx> Compiler<'a, 'ctx> {
+impl<'a, 'ctx> ModuleCompiler<'a, 'ctx> {
     pub fn new(
         context: &'ctx Context,
         module: &'a Module<'ctx>,
@@ -52,7 +52,7 @@ pub enum Literal {
 }
 
 impl Literal {
-    pub fn code_gen<'a, 'ctx>(&self, llvm: &'a Compiler<'a, 'ctx>) -> BasicValueEnum<'a> {
+    pub fn code_gen<'a, 'ctx>(&self, llvm: &'a ModuleCompiler<'a, 'ctx>) -> BasicValueEnum<'a> {
         match self {
             Self::Int(n) => llvm
                 .context
@@ -80,7 +80,7 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn code_gen<'a, 'ctx>(&self, llvm: &'a Compiler<'a, 'ctx>) -> BasicValueEnum<'a> {
+    pub fn code_gen<'a, 'ctx>(&self, llvm: &'a ModuleCompiler<'a, 'ctx>) -> BasicValueEnum<'a> {
         match self {
             Self::Literal(lit) => lit.code_gen(llvm),
             _ => todo!(),
@@ -97,7 +97,10 @@ pub enum PrimitiveType {
 }
 
 impl PrimitiveType {
-    pub fn get_basic_type<'a, 'ctx>(&self, llvm: &'a Compiler<'a, 'ctx>) -> BasicTypeEnum<'a> {
+    pub fn get_basic_type<'a, 'ctx>(
+        &self,
+        llvm: &'a ModuleCompiler<'a, 'ctx>,
+    ) -> BasicTypeEnum<'a> {
         match self {
             Self::Int => llvm.context.i64_type().as_basic_type_enum(),
             _ => todo!(),
@@ -106,14 +109,19 @@ impl PrimitiveType {
 }
 
 pub enum Statement {
-    VariableDeclaration {
+    VariableDefinition {
         mutable: bool,
         ident: String,
         ty: PrimitiveType,
         expression: Box<Expression>,
     },
-    Expression(Expression),
     FunctionDeclaration {
+        ident: String,
+        ret_ty: PrimitiveType,
+        params: Vec<(String, PrimitiveType)>,
+    },
+    Expression(Expression),
+    FunctionDefinition {
         ident: String,
         ret_ty: PrimitiveType,
         params: Vec<(String, PrimitiveType)>,
@@ -122,9 +130,9 @@ pub enum Statement {
 }
 
 impl Statement {
-    pub fn code_gen<'a, 'ctx>(&self, llvm: &'a Compiler<'a, 'ctx>) {
+    pub fn code_gen<'a, 'ctx>(&self, llvm: &'a ModuleCompiler<'a, 'ctx>) {
         match self {
-            Self::VariableDeclaration {
+            Self::VariableDefinition {
                 ident,
                 ty,
                 expression,
@@ -138,7 +146,15 @@ impl Statement {
                     .build_store(var, expression.code_gen(llvm))
                     .unwrap();
             }
-            Self::FunctionDeclaration { ident, body, .. } => {
+            Self::FunctionDeclaration {
+                ret_ty,
+                ident,
+                params,
+            } => {
+                let fn_t = llvm.context.void_type().fn_type(&[], false);
+                let fn_v = llvm.module.add_function(ident.as_str(), fn_t, None);
+            }
+            Self::FunctionDefinition { ident, body, .. } => {
                 let fn_t = llvm.context.void_type().fn_type(&[], false);
                 let fn_v = llvm.module.add_function(ident.as_str(), fn_t, None);
                 let entry = llvm.context.append_basic_block(fn_v, "entry");
@@ -146,7 +162,39 @@ impl Statement {
                 for element in body {
                     element.code_gen(llvm);
                 }
+                llvm.builder.build_return(None).unwrap();
             }
+            _ => todo!(),
+        }
+    }
+}
+
+pub enum TypeFFI {
+    Struct { ident: String },
+    Union { ident: String },
+}
+
+pub enum DeclarationFFI {
+    Type(TypeFFI),
+    Global {
+        ident: String,
+        ty: TypeFFI,
+    },
+    Function {
+        ident: String,
+        params: Vec<TypeFFI>,
+        ret_ty: TypeFFI,
+    },
+}
+
+impl DeclarationFFI {
+    pub fn code_gen<'a, 'ctx>(&self, llvm: &'a ModuleCompiler<'a, 'ctx>) {
+        match self {
+            Function { .. } => {
+                let fn_t = llvm.context.void_type().fn_type(&[], false);
+                let fn_v = llvm.module.add_function(ident.as_str(), fn_t, None);
+            }
+
             _ => todo!(),
         }
     }
@@ -154,4 +202,5 @@ impl Statement {
 
 pub struct AST {
     pub sts: Vec<Statement>,
+    pub ident: String,
 }

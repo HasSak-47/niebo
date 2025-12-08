@@ -1,21 +1,13 @@
 mod ast;
+mod lowlevel;
 mod parser;
 
-use std::{
-    fs::File,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::path::Path;
 
 use inkwell::{
     OptimizationLevel,
-    builder::Builder,
     context::Context,
-    execution_engine,
-    module::Module,
-    targets::{
-        CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine, TargetTriple,
-    },
+    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine},
 };
 
 use crate::ast::{Expression, Statement};
@@ -25,23 +17,23 @@ fn main() -> anyhow::Result<()> {
     let module = context.create_module("main");
     let builder = context.create_builder();
 
-    let llvm = ast::Compiler::new(&context, &module, &builder);
+    let llvm = ast::ModuleCompiler::new(&context, &module, &builder);
     let ast = ast::AST {
-        sts: vec![Statement::FunctionDeclaration {
-            ident: "main".to_string(),
+        sts: vec![Statement::FunctionDefinition {
+            ident: "test_function".to_string(),
             params: vec![],
             ret_ty: ast::PrimitiveType::Void,
-            body: vec![Statement::VariableDeclaration {
+            body: vec![Statement::VariableDefinition {
                 mutable: false,
                 ident: "x".to_string(),
                 ty: ast::PrimitiveType::Int,
-                expression: Box::new(Expression::Literal(ast::Literal::Int(10))),
+                expression: Box::new(Expression::Literal(ast::Literal::Int(0x69))),
             }],
         }],
     };
 
     llvm.build_code(&ast);
-    println!("{}", llvm.module.to_string());
+    println!("{}", module.to_string());
 
     Target::initialize_native(&InitializationConfig::default())
         .expect("Failed to initialize native target");
@@ -53,7 +45,7 @@ fn main() -> anyhow::Result<()> {
 
     let cpu = "generic";
     let features = "";
-    let opt = OptimizationLevel::Default;
+    let opt = OptimizationLevel::None;
     let reloc = RelocMode::Default;
     let model = CodeModel::Default;
 
@@ -61,23 +53,10 @@ fn main() -> anyhow::Result<()> {
         .create_target_machine(&target_triple, cpu, features, opt, reloc, model)
         .expect("Could not create target machine");
 
-    // 3. Emit object file
     let obj_path = Path::new("output.o");
     target_machine
         .write_to_file(&module, FileType::Object, obj_path)
         .expect("Failed to write object file");
-
-    // 4. Link to native executable (using system linker via `cc`/`clang`)
-    // Very simple example using `cc`:
-    let status = std::process::Command::new("cc")
-        .arg("output.o")
-        .arg("-o")
-        .arg("output_bin")
-        .status()?;
-
-    if !status.success() {
-        panic!("Linker failed");
-    }
 
     return Ok(());
 }
