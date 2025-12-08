@@ -1,5 +1,3 @@
-pub mod ast;
-
 fn remove_comments(mut code: Vec<String>) -> Vec<String> {
     let mut inside_comment = false;
     for line in &mut code {
