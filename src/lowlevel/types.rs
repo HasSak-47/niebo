@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub enum PrimitiveType {
     Int,
     Uint,
@@ -6,30 +7,37 @@ pub enum PrimitiveType {
     Void,
 }
 
+#[derive(Clone)]
 pub struct StructType {
-    ident: String,
-    members: Vec<(String, Type)>,
+    pub members: Vec<(String, Type)>,
 }
 
+#[derive(Clone)]
 pub struct UnionType {
-    ident: String,
-    members: Vec<(String, Type)>,
+    pub members: Vec<(String, Type)>,
 }
 
+#[derive(Clone)]
 pub struct FunctionType {
-    ident: String,
-    params: Vec<(String, Type)>,
-    ret_ty: Box<Type>,
+    pub params: Vec<(String, Type)>,
+    pub ret_ty: Box<Type>,
 }
 
+#[derive(Clone)]
+pub struct AliasType {
+    pub ident: String,
+    pub ty: Box<Type>,
+}
+
+#[derive(Clone)]
 pub enum Type {
     Primitive(PrimitiveType),
     Struct(StructType),
     Union(UnionType),
+    Alias(AliasType),
     Pointer(Box<Type>),
+    Reference(Box<Type>),
     Function(FunctionType),
 }
 
-impl Type {
-    pub fn get_function_type()
-}
+impl Type {}
