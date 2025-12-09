@@ -384,13 +384,7 @@ impl Statement {
                     .add_function(ident, ty, Some(Linkage::External));
                 let entry = compiler.context.append_basic_block(fv, ident);
                 compiler.builder.position_at_end(entry);
-                let _val = block.code_gen(symbols, compiler);
-                let val = if let Some(_val) = &_val {
-                    Some(&**_val)
-                } else {
-                    None
-                };
-                compiler.builder.build_return(val).unwrap();
+                block.code_gen(symbols, compiler);
             }
             Self::VariableDefinition {
                 ident,

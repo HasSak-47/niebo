@@ -20,9 +20,10 @@ fn main() -> anyhow::Result<()> {
     let context = Context::create();
     let compiler = Compiler::new(&context);
     let repr = Repr::new(vec![
-        FunctionBuilder::new("puts", Type::Primitive(PrimitiveType::Int)).build_declaration(),
-        FunctionBuilder::new("main", Type::Primitive(PrimitiveType::Int))
+        FunctionBuilder::new("puts", Type::Primitive(PrimitiveType::Int))
             .add_param("", Type::Primitive(PrimitiveType::String))
+            .build_declaration(),
+        FunctionBuilder::new("main", Type::Primitive(PrimitiveType::Int))
             .add_statement(Statement::VariableDefinition {
                 mutable: false,
                 ident: "test_var".to_string(),

@@ -70,7 +70,7 @@ impl FunctionType {
                 }
                 PrimitiveType::Int => {
                     return context
-                        .void_type()
+                        .i32_type()
                         .fn_type(params.as_slice(), self.varidic.clone());
                 }
                 _ => todo!(),
