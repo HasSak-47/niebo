@@ -7,7 +7,7 @@ use inkwell::{
 
 use crate::lowlevel::compiler::ModuleCompiler;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum PrimitiveType {
     Int,
     Uint,
@@ -16,17 +16,17 @@ pub enum PrimitiveType {
     Void,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct StructType {
     pub members: Vec<(String, Type)>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct UnionType {
     pub members: Vec<(String, Type)>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FunctionType {
     pub params: Vec<(String, Type)>,
     pub ret_ty: Box<Type>,
@@ -80,13 +80,13 @@ impl FunctionType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AliasType {
     pub ident: String,
     pub ty: Box<Type>,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Type {
     Primitive(PrimitiveType),
     Struct(StructType),

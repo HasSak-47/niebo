@@ -12,6 +12,7 @@ use crate::lowlevel::{
 
 pub struct SymbolRegistry<'ctx> {
     reg: HashMap<String, Symbol<'ctx>>,
+    scope: SymbolScope<'ctx>,
 }
 
 impl<'ctx> SymbolRegistry<'ctx> {
@@ -21,9 +22,73 @@ impl<'ctx> SymbolRegistry<'ctx> {
             namespace.as_ref().to_string(),
             Symbol::Registry(SymbolRegistry {
                 reg: HashMap::new(),
+                scope: SymbolScope::new(),
             }),
         );
-        return Self { reg };
+        return Self {
+            reg,
+            scope: SymbolScope::new(),
+        };
+    }
+
+    pub fn get_symbol<S: AsRef<str>>(&self, ident: S) -> &Symbol<'ctx> {
+        let ident = ident.as_ref();
+        if let Some(s) = self.scope.get_symbol(ident) {
+            return s;
+        }
+
+        for (id, symbol) in &self.reg {
+            if id == ident {
+                return &symbol;
+            }
+        }
+        panic!("symbol not found!");
+    }
+
+    pub fn register_symbol<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+        if let Some(_) = self.reg.insert(ident.as_ref().to_string(), symbol) {
+            panic!("symbol redefined!");
+        }
+    }
+}
+
+pub struct SymbolScope<'ctx> {
+    scope: Vec<HashMap<String, Symbol<'ctx>>>,
+}
+
+impl<'ctx> SymbolScope<'ctx> {
+    pub fn new() -> Self {
+        Self { scope: Vec::new() }
+    }
+
+    pub fn push_scope(&mut self) {
+        self.scope.push(HashMap::new());
+    }
+
+    pub fn pop_scope(&mut self) {
+        self.scope.pop();
+    }
+
+    pub fn register_symbol<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+        let repeat = self
+            .scope
+            .last_mut()
+            .unwrap()
+            .insert(ident.as_ref().to_string(), symbol);
+        if repeat.is_some() {
+            panic!("symbol redefined!");
+        }
+    }
+
+    pub fn get_symbol<S: AsRef<str>>(&self, ident: S) -> Option<&Symbol<'ctx>> {
+        let ident = ident.as_ref();
+        for symbols in self.scope.iter().rev() {
+            if symbols.contains_key(ident) {
+                return Some(&symbols[ident]);
+            }
+        }
+
+        return None;
     }
 }
 
@@ -39,6 +104,7 @@ enum Symbol<'ctx> {
     Registry(SymbolRegistry<'ctx>),
 }
 
+#[derive(Debug, Clone)]
 pub enum BinaryOperator {
     Addition,
     Multiplication,
@@ -52,12 +118,14 @@ pub enum BinaryOperator {
     Xor,
 }
 
+#[derive(Debug, Clone)]
 pub enum UnaryOperator {
     Deref,
     Ref,
     Negation,
 }
 
+#[derive(Debug, Clone)]
 pub enum Operator {
     Binary {
         operands: [Box<Expression>; 2],
@@ -69,6 +137,7 @@ pub enum Operator {
     },
 }
 
+#[derive(Debug, Clone)]
 pub enum Literal {
     Int(u64),
     Uint(u64),
@@ -93,6 +162,7 @@ impl Literal {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BlockExpression {
     local_registry: HashMap<String, Type>,
     ret_ty: Type,
@@ -102,27 +172,32 @@ pub struct BlockExpression {
 impl BlockExpression {
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry,
+        symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
         if self.body.len() == 0 {
             return None;
         }
 
-        symbols.push(build_registry(&self.body));
         if let Type::Primitive(ty) = &self.ret_ty {
             if let PrimitiveType::Void = ty {
                 for stmt in &self.body {
                     stmt.code_gen(symbols, compiler);
                 }
-                symbols.pop();
                 return None;
             }
         }
-        todo!()
+        for stmt in &self.body[0..(self.body.len() - 1)] {
+            stmt.code_gen(symbols, compiler);
+        }
+        if let Statement::Expression(exp) = self.body.last().unwrap() {
+            return exp.code_gen(symbols, compiler);
+        }
+        panic!("no ending expression!");
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Expression {
     Return(Box<Expression>),
     Literal(Literal),
@@ -138,7 +213,7 @@ pub enum Expression {
 impl Expression {
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry,
+        symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
         match self {
@@ -155,20 +230,25 @@ impl Expression {
                 _ => todo!(),
             },
             Self::Identifier(ident) => {
-                for space in symbols.iter().rev() {
-                    for (name, reg) in space {
-                        if *name == *ident {
-                            todo!();
-                        }
-                    }
-                }
-                panic!("symbol {ident} not found");
+                return match symbols.get_symbol(ident) {
+                    Symbol::Symbol { pointer, .. } => Some(Box::new(pointer.unwrap().clone())),
+                    _ => todo!(),
+                };
             }
-            _ => todo!(),
+            Self::Call { operand, params } => {
+                return None;
+            }
+            Self::Return(expr) => {
+                let val = expr.code_gen(symbols, compiler).unwrap();
+                let v = compiler.builder.build_return(Some(&*val)).unwrap();
+                return None;
+            }
+            v => todo!("expression {v:?} not yet implemented"),
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum Statement {
     GlobalVariableDeclaration {
         mutable: bool,
@@ -267,7 +347,7 @@ impl FunctionBuilder {
 impl Statement {
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry,
+        symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) {
         match self {
@@ -333,7 +413,10 @@ impl Statement {
                     )
                     .unwrap();
             }
-            _ => todo!(),
+            Self::Expression(e) => {
+                e.code_gen(symbols, compiler);
+            }
+            v => todo!("statement {v:?} not yet implemented"),
         }
     }
 }

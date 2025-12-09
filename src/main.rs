@@ -33,6 +33,9 @@ fn main() -> anyhow::Result<()> {
                 operand: Box::new(repr::Expression::Identifier("puts".to_string())),
                 params: vec![repr::Expression::Identifier("hello_worl_ptr".to_string())],
             }))
+            .add_statement(Statement::Expression(repr::Expression::Return(Box::new(
+                repr::Expression::Literal(Literal::Int(0x00)),
+            ))))
             .build_definition(),
     ]);
     let module = compiler.new_module(repr, "test_module".into());
