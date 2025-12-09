@@ -1,71 +1,42 @@
 use std::collections::HashMap;
 
-use inkwell::{module::Linkage, values::BasicValue};
+use inkwell::{
+    module::Linkage,
+    values::{BasicValue, FunctionValue, PointerValue},
+};
 
 use crate::lowlevel::{
     compiler::ModuleCompiler,
     types::{FunctionType, PrimitiveType, Type},
 };
 
-#[derive(Clone)]
-pub struct RegistryMember {
-    external: bool,
-    ty: Type,
+pub struct SymbolRegistry<'ctx> {
+    reg: HashMap<String, Symbol<'ctx>>,
 }
 
-pub fn build_registry(statements: &Vec<Statement>) -> HashMap<String, RegistryMember> {
-    let mut registry = HashMap::new();
-
-    for statement in statements {
-        match &statement {
-            Statement::FunctionDefinition {
-                ident,
-                block,
-                params,
-                varidic,
-            } => {
-                if registry.contains_key(ident) {
-                    panic!("redefined symbol");
-                }
-
-                registry.insert(
-                    ident.clone(),
-                    RegistryMember {
-                        external: false,
-                        ty: Type::Function(FunctionType {
-                            params: params.clone(),
-                            ret_ty: Box::new(block.ret_ty.clone()),
-                            varidic: varidic.clone(),
-                        }),
-                    },
-                );
-            }
-            Statement::FunctionDeclaration {
-                ident,
-                ret_ty,
-                params,
-                varidic,
-            } => {
-                if registry.contains_key(ident) {
-                    panic!("redefined symbol");
-                }
-
-                registry.insert(
-                    ident.clone(),
-                    RegistryMember {
-                        external: false,
-                        ty: Type::Function(FunctionType {
-                            params: params.clone(),
-                            ret_ty: Box::new(ret_ty.clone()),
-                            varidic: varidic.clone(),
-                        }),
-                    },
-                );
-            }
-            _ => todo!(),
-        }
+impl<'ctx> SymbolRegistry<'ctx> {
+    pub fn new<S: AsRef<str>>(namespace: S) -> Self {
+        let mut reg = HashMap::new();
+        reg.insert(
+            namespace.as_ref().to_string(),
+            Symbol::Registry(SymbolRegistry {
+                reg: HashMap::new(),
+            }),
+        );
+        return Self { reg };
     }
-    return registry;
+}
+
+enum Symbol<'ctx> {
+    Function {
+        pointer: Option<FunctionValue<'ctx>>,
+        external: bool,
+        ty: Type,
+    },
+    Symbol {
+        pointer: Option<PointerValue<'ctx>>,
+    },
+    Registry(SymbolRegistry<'ctx>),
 }
 
 pub enum BinaryOperator {
@@ -116,7 +87,7 @@ impl Literal {
 
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        symbols: &mut SymbolRegistry,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) {
     }
@@ -131,7 +102,7 @@ pub struct BlockExpression {
 impl BlockExpression {
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        symbols: &mut SymbolRegistry,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
         if self.body.len() == 0 {
@@ -167,7 +138,7 @@ pub enum Expression {
 impl Expression {
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        symbols: &mut SymbolRegistry,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
         match self {
@@ -296,7 +267,7 @@ impl FunctionBuilder {
 impl Statement {
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        symbols: &mut SymbolRegistry,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) {
         match self {
@@ -369,7 +340,6 @@ impl Statement {
 
 pub struct Repr {
     statements: Vec<Statement>,
-    global_registry: HashMap<String, RegistryMember>,
 }
 
 impl Repr {
@@ -381,24 +351,16 @@ impl Repr {
         }
     }
 
-    pub fn build_registry(&mut self) {
-        self.global_registry = build_registry(&self.statements);
-    }
-
     pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {
-        let mut v = Vec::new();
-        v.push(self.global_registry.clone());
+        let mut r = SymbolRegistry::new(&compiler.ident);
         for stmt in &self.statements {
-            stmt.code_gen(&mut v, compiler);
+            stmt.code_gen(&mut r, compiler);
         }
     }
 
     pub fn new(statements: Vec<Statement>) -> Self {
-        let mut s = Self {
-            statements,
-            global_registry: HashMap::new(),
-        };
-        s.build_registry();
+        let mut s = Self { statements };
+        s.validate();
         return s;
     }
 }
