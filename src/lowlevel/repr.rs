@@ -94,12 +94,12 @@ impl<'ctx> SymbolScope<'ctx> {
 
 enum Symbol<'ctx> {
     Function {
-        pointer: Option<FunctionValue<'ctx>>,
+        pointer: FunctionValue<'ctx>,
         external: bool,
         ty: Type,
     },
     Symbol {
-        pointer: Option<PointerValue<'ctx>>,
+        pointer: PointerValue<'ctx>,
     },
     Registry(SymbolRegistry<'ctx>),
 }
@@ -231,11 +231,23 @@ impl Expression {
             },
             Self::Identifier(ident) => {
                 return match symbols.get_symbol(ident) {
-                    Symbol::Symbol { pointer, .. } => Some(Box::new(pointer.unwrap().clone())),
+                    Symbol::Symbol { pointer, .. } => Some(Box::new(pointer.clone())),
                     _ => todo!(),
                 };
             }
             Self::Call { operand, params } => {
+                match &**operand {
+                    Expression::Identifier(ident) => {
+                        let func = symbols.get_symbol(ident);
+                        match func {
+                            Symbol::Function { pointer, .. } => {
+                                compiler.builder.build_call(*pointer, &[], "").unwrap();
+                            }
+                            _ => unreachable!(),
+                        };
+                    }
+                    _ => todo!(),
+                }
                 return None;
             }
             Self::Return(expr) => {
@@ -361,11 +373,20 @@ impl Statement {
                     params: params.clone(),
                     ret_ty: Box::new(ret_ty.clone()),
                     varidic: varidic.clone(),
-                }
-                .build_fn_type(compiler.context);
-                compiler
+                };
+                let llvm_ty = ty.build_fn_type(compiler.context);
+                let val = compiler
                     .module
-                    .add_function(ident, ty, Some(Linkage::External));
+                    .add_function(ident, llvm_ty, Some(Linkage::External));
+
+                symbols.register_symbol(
+                    &ident,
+                    Symbol::Function {
+                        pointer: val,
+                        external: true,
+                        ty: Type::Function(ty),
+                    },
+                );
             }
             Self::FunctionDefinition {
                 ident,
@@ -377,11 +398,20 @@ impl Statement {
                     params: params.clone(),
                     ret_ty: Box::new(block.ret_ty.clone()),
                     varidic: varidic.clone(),
-                }
-                .build_fn_type(compiler.context);
+                };
+                let llvm_ty = ty.build_fn_type(compiler.context);
                 let fv = compiler
                     .module
-                    .add_function(ident, ty, Some(Linkage::External));
+                    .add_function(ident, llvm_ty, Some(Linkage::External));
+                symbols.register_symbol(
+                    &ident,
+                    Symbol::Function {
+                        pointer: fv,
+                        external: false,
+                        ty: Type::Function(ty),
+                    },
+                );
+
                 let entry = compiler.context.append_basic_block(fv, ident);
                 compiler.builder.position_at_end(entry);
                 block.code_gen(symbols, compiler);
