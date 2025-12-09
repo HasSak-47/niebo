@@ -1,11 +1,72 @@
 use std::collections::HashMap;
 
-use inkwell::module::Linkage;
+use inkwell::{module::Linkage, values::BasicValue};
 
 use crate::lowlevel::{
     compiler::ModuleCompiler,
-    types::{FunctionType, Type},
+    types::{FunctionType, PrimitiveType, Type},
 };
+
+#[derive(Clone)]
+pub struct RegistryMember {
+    external: bool,
+    ty: Type,
+}
+
+pub fn build_registry(statements: &Vec<Statement>) -> HashMap<String, RegistryMember> {
+    let mut registry = HashMap::new();
+
+    for statement in statements {
+        match &statement {
+            Statement::FunctionDefinition {
+                ident,
+                block,
+                params,
+                varidic,
+            } => {
+                if registry.contains_key(ident) {
+                    panic!("redefined symbol");
+                }
+
+                registry.insert(
+                    ident.clone(),
+                    RegistryMember {
+                        external: false,
+                        ty: Type::Function(FunctionType {
+                            params: params.clone(),
+                            ret_ty: Box::new(block.ret_ty.clone()),
+                            varidic: varidic.clone(),
+                        }),
+                    },
+                );
+            }
+            Statement::FunctionDeclaration {
+                ident,
+                ret_ty,
+                params,
+                varidic,
+            } => {
+                if registry.contains_key(ident) {
+                    panic!("redefined symbol");
+                }
+
+                registry.insert(
+                    ident.clone(),
+                    RegistryMember {
+                        external: false,
+                        ty: Type::Function(FunctionType {
+                            params: params.clone(),
+                            ret_ty: Box::new(ret_ty.clone()),
+                            varidic: varidic.clone(),
+                        }),
+                    },
+                );
+            }
+            _ => todo!(),
+        }
+    }
+    return registry;
+}
 
 pub enum BinaryOperator {
     Addition,
@@ -52,6 +113,13 @@ impl Literal {
             _ => todo!(),
         }
     }
+
+    pub fn code_gen<'a, 'ctx>(
+        &self,
+        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) {
+    }
 }
 
 pub struct BlockExpression {
@@ -61,10 +129,31 @@ pub struct BlockExpression {
 }
 
 impl BlockExpression {
-    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {}
+    pub fn code_gen<'a, 'ctx>(
+        &self,
+        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
+        if self.body.len() == 0 {
+            return None;
+        }
+
+        symbols.push(build_registry(&self.body));
+        if let Type::Primitive(ty) = &self.ret_ty {
+            if let PrimitiveType::Void = ty {
+                for stmt in &self.body {
+                    stmt.code_gen(symbols, compiler);
+                }
+                symbols.pop();
+                return None;
+            }
+        }
+        todo!()
+    }
 }
 
 pub enum Expression {
+    Return(Box<Expression>),
     Literal(Literal),
     Operator(Operator),
     Identifier(String),
@@ -76,34 +165,36 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {}
-    pub fn get_expression_type(
+    pub fn code_gen<'a, 'ctx>(
         &self,
-        global_idents: HashMap<String, Type>,
-        local_idents: HashMap<String, Type>,
-    ) -> Type {
-        return match self {
-            Self::Literal(literal) => literal.get_expression_type(),
-            Self::Block(block) => block.ret_ty.clone(),
-            Self::Call { operand, .. } => {
-                let ty = operand.get_expression_type(global_idents, local_idents);
-                if let Type::Function(func) = ty {
-                    *func.ret_ty.clone()
-                } else {
-                    panic!("operand is not callable!")
+        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
+        match self {
+            Self::Literal(literal) => match literal {
+                Literal::Int(val) => {
+                    return Some(Box::new(
+                        compiler
+                            .context
+                            .i32_type()
+                            .const_int(*val, true)
+                            .as_basic_value_enum(),
+                    ));
                 }
-            }
+                _ => todo!(),
+            },
             Self::Identifier(ident) => {
-                if local_idents.contains_key(ident) {
-                    local_idents[ident].clone()
-                } else if global_idents.contains_key(ident) {
-                    global_idents[ident].clone()
-                } else {
-                    panic!("found unknown identifier {ident}")
+                for space in symbols.iter().rev() {
+                    for (name, reg) in space {
+                        if *name == *ident {
+                            todo!();
+                        }
+                    }
                 }
+                panic!("symbol {ident} not found");
             }
             _ => todo!(),
-        };
+        }
     }
 }
 
@@ -139,8 +230,75 @@ pub enum Statement {
     },
 }
 
+pub struct FunctionBuilder {
+    ident: String,
+    ret_ty: Type,
+    params: Vec<(String, Type)>,
+    varidic: bool,
+    body: Option<BlockExpression>,
+}
+
+impl FunctionBuilder {
+    pub fn new<S: AsRef<str>>(ident: S, ret_ty: Type) -> Self {
+        Self {
+            ident: ident.as_ref().to_string(),
+            ret_ty,
+            params: Vec::new(),
+            varidic: false,
+            body: None,
+        }
+    }
+
+    pub fn varidic(mut self) -> Self {
+        self.varidic = true;
+        return self;
+    }
+
+    pub fn add_param<S: AsRef<str>>(mut self, ident: S, ty: Type) -> Self {
+        self.params.push((ident.as_ref().to_string(), ty));
+        return self;
+    }
+
+    pub fn add_statement(mut self, stmt: Statement) -> Self {
+        if let Some(body) = &mut self.body {
+            body.body.push(stmt);
+        } else {
+            self.body = Some(BlockExpression {
+                local_registry: HashMap::new(),
+                ret_ty: self.ret_ty.clone(),
+                body: vec![stmt],
+            })
+        }
+
+        return self;
+    }
+    pub fn build_definition(self) -> Statement {
+        assert!(self.body.is_some());
+        Statement::FunctionDefinition {
+            ident: self.ident,
+            block: self.body.unwrap(),
+            params: self.params,
+            varidic: self.varidic,
+        }
+    }
+
+    pub fn build_declaration(self) -> Statement {
+        assert!(self.body.is_none());
+        Statement::FunctionDeclaration {
+            ident: self.ident,
+            ret_ty: self.ret_ty,
+            params: self.params,
+            varidic: self.varidic,
+        }
+    }
+}
+
 impl Statement {
-    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {
+    pub fn code_gen<'a, 'ctx>(
+        &self,
+        symbols: &mut Vec<HashMap<String, RegistryMember>>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) {
         match self {
             Self::FunctionDeclaration {
                 ident,
@@ -170,19 +328,43 @@ impl Statement {
                     varidic: varidic.clone(),
                 }
                 .build_fn_type(compiler.context);
-                compiler
+                let fv = compiler
                     .module
                     .add_function(ident, ty, Some(Linkage::External));
-                block.code_gen(compiler)
+                let entry = compiler.context.append_basic_block(fv, ident);
+                compiler.builder.position_at_end(entry);
+                let _val = block.code_gen(symbols, compiler);
+                let val = if let Some(_val) = &_val {
+                    Some(&**_val)
+                } else {
+                    None
+                };
+                compiler.builder.build_return(val).unwrap();
+            }
+            Self::VariableDefinition {
+                ident,
+                ty,
+                expression,
+                ..
+            } => {
+                let var = compiler
+                    .builder
+                    .build_alloca(ty.to_llvm_basic_type(compiler), ident)
+                    .unwrap();
+                compiler
+                    .builder
+                    .build_store(
+                        var,
+                        expression
+                            .code_gen(symbols, compiler)
+                            .unwrap()
+                            .as_basic_value_enum(),
+                    )
+                    .unwrap();
             }
             _ => todo!(),
         }
     }
-}
-
-pub struct RegistryMember {
-    external: bool,
-    ty: Type,
 }
 
 pub struct Repr {
@@ -191,66 +373,23 @@ pub struct Repr {
 }
 
 impl Repr {
-    pub fn build_registry(&mut self) {
+    pub fn validate(&mut self) {
         for statement in &self.statements {
-            if let Statement::Expression(_) = &statement {}
-
-            match &statement {
-                Statement::Expression(_) => {
-                    panic!("no expressions are allowed in module declaration");
-                }
-                Statement::FunctionDefinition {
-                    ident,
-                    block,
-                    params,
-                    varidic,
-                } => {
-                    if self.global_registry.contains_key(ident) {
-                        panic!("redefined symbol");
-                    }
-
-                    self.global_registry.insert(
-                        ident.clone(),
-                        RegistryMember {
-                            external: false,
-                            ty: Type::Function(FunctionType {
-                                params: params.clone(),
-                                ret_ty: Box::new(block.ret_ty.clone()),
-                                varidic: varidic.clone(),
-                            }),
-                        },
-                    );
-                }
-                Statement::FunctionDeclaration {
-                    ident,
-                    ret_ty,
-                    params,
-                    varidic,
-                } => {
-                    if self.global_registry.contains_key(ident) {
-                        panic!("redefined symbol");
-                    }
-
-                    self.global_registry.insert(
-                        ident.clone(),
-                        RegistryMember {
-                            external: false,
-                            ty: Type::Function(FunctionType {
-                                params: params.clone(),
-                                ret_ty: Box::new(ret_ty.clone()),
-                                varidic: varidic.clone(),
-                            }),
-                        },
-                    );
-                }
-                _ => todo!(),
+            if let Statement::Expression(_) = statement {
+                panic!("no expressions are allowed in module declaration");
             }
         }
     }
 
+    pub fn build_registry(&mut self) {
+        self.global_registry = build_registry(&self.statements);
+    }
+
     pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {
+        let mut v = Vec::new();
+        v.push(self.global_registry.clone());
         for stmt in &self.statements {
-            stmt.code_gen(compiler);
+            stmt.code_gen(&mut v, compiler);
         }
     }
 

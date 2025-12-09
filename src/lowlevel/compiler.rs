@@ -15,7 +15,9 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
         }
     }
 
-    pub fn new_module(&self, repr: Repr, ident: String) -> ModuleCompiler {
+    pub fn new_module(&self, mut repr: Repr, ident: String) -> ModuleCompiler<'a, 'ctx> {
+        repr.validate();
+
         return ModuleCompiler {
             context: self.context,
             module: self.context.create_module(&ident),
@@ -40,5 +42,9 @@ where
 impl<'a, 'ctx> ModuleCompiler<'a, 'ctx> {
     pub fn compile(&self) {
         self.repr.code_gen(self);
+    }
+
+    pub fn get_ll_code(&self) -> String {
+        return self.module.to_string();
     }
 }
