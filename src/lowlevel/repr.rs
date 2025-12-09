@@ -1,6 +1,11 @@
 use std::collections::HashMap;
 
-use crate::lowlevel::types::Type;
+use inkwell::module::Linkage;
+
+use crate::lowlevel::{
+    compiler::ModuleCompiler,
+    types::{FunctionType, Type},
+};
 
 pub enum BinaryOperator {
     Addition,
@@ -50,9 +55,13 @@ impl Literal {
 }
 
 pub struct BlockExpression {
-    variable_registry: Vec<(String, Type)>,
+    local_registry: HashMap<String, Type>,
     ret_ty: Type,
     body: Vec<Statement>,
+}
+
+impl BlockExpression {
+    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {}
 }
 
 pub enum Expression {
@@ -67,6 +76,7 @@ pub enum Expression {
 }
 
 impl Expression {
+    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {}
     pub fn get_expression_type(
         &self,
         global_idents: HashMap<String, Type>,
@@ -112,6 +122,7 @@ pub enum Statement {
         ident: String,
         ret_ty: Type,
         params: Vec<(String, Type)>,
+        varidic: bool,
     },
     Expression(Expression),
     VariableDefinition {
@@ -124,21 +135,131 @@ pub enum Statement {
         ident: String,
         params: Vec<(String, Type)>,
         block: BlockExpression,
+        varidic: bool,
     },
+}
+
+impl Statement {
+    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {
+        match self {
+            Self::FunctionDeclaration {
+                ident,
+                params,
+                ret_ty,
+                varidic,
+            } => {
+                let ty = FunctionType {
+                    params: params.clone(),
+                    ret_ty: Box::new(ret_ty.clone()),
+                    varidic: varidic.clone(),
+                }
+                .build_fn_type(compiler.context);
+                compiler
+                    .module
+                    .add_function(ident, ty, Some(Linkage::External));
+            }
+            Self::FunctionDefinition {
+                ident,
+                params,
+                block,
+                varidic,
+            } => {
+                let ty = FunctionType {
+                    params: params.clone(),
+                    ret_ty: Box::new(block.ret_ty.clone()),
+                    varidic: varidic.clone(),
+                }
+                .build_fn_type(compiler.context);
+                compiler
+                    .module
+                    .add_function(ident, ty, Some(Linkage::External));
+                block.code_gen(compiler)
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+pub struct RegistryMember {
+    external: bool,
+    ty: Type,
 }
 
 pub struct Repr {
     statements: Vec<Statement>,
-    type_registry: HashMap<String, Type>,
-    global_registry: HashMap<String, Type>,
+    global_registry: HashMap<String, RegistryMember>,
 }
 
 impl Repr {
-    fn build_registry(&self) {
+    pub fn build_registry(&mut self) {
         for statement in &self.statements {
-            if let Statement::Expression(_) = &statement {
-                panic!("no expressions are allowed in module declaration");
+            if let Statement::Expression(_) = &statement {}
+
+            match &statement {
+                Statement::Expression(_) => {
+                    panic!("no expressions are allowed in module declaration");
+                }
+                Statement::FunctionDefinition {
+                    ident,
+                    block,
+                    params,
+                    varidic,
+                } => {
+                    if self.global_registry.contains_key(ident) {
+                        panic!("redefined symbol");
+                    }
+
+                    self.global_registry.insert(
+                        ident.clone(),
+                        RegistryMember {
+                            external: false,
+                            ty: Type::Function(FunctionType {
+                                params: params.clone(),
+                                ret_ty: Box::new(block.ret_ty.clone()),
+                                varidic: varidic.clone(),
+                            }),
+                        },
+                    );
+                }
+                Statement::FunctionDeclaration {
+                    ident,
+                    ret_ty,
+                    params,
+                    varidic,
+                } => {
+                    if self.global_registry.contains_key(ident) {
+                        panic!("redefined symbol");
+                    }
+
+                    self.global_registry.insert(
+                        ident.clone(),
+                        RegistryMember {
+                            external: false,
+                            ty: Type::Function(FunctionType {
+                                params: params.clone(),
+                                ret_ty: Box::new(ret_ty.clone()),
+                                varidic: varidic.clone(),
+                            }),
+                        },
+                    );
+                }
+                _ => todo!(),
             }
         }
+    }
+
+    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {
+        for stmt in &self.statements {
+            stmt.code_gen(compiler);
+        }
+    }
+
+    pub fn new(statements: Vec<Statement>) -> Self {
+        let mut s = Self {
+            statements,
+            global_registry: HashMap::new(),
+        };
+        s.build_registry();
+        return s;
     }
 }

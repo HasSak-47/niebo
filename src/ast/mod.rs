@@ -1,3 +1,4 @@
+/*
 use inkwell::{
     builder::Builder,
     context::Context,
@@ -204,3 +205,4 @@ pub struct AST {
     pub sts: Vec<Statement>,
     pub ident: String,
 }
+*/

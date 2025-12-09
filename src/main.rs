@@ -1,18 +1,23 @@
+use inkwell::context::Context;
+
+use crate::lowlevel::{
+    compiler::{self, Compiler},
+    repr::Repr,
+};
+
 mod ast;
 mod lowlevel;
 mod parser;
 
-use std::path::Path;
-
-use inkwell::{
-    OptimizationLevel,
-    context::Context,
-    targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine},
-};
-
-use crate::ast::{Expression, Statement};
-
 fn main() -> anyhow::Result<()> {
+    let context = Context::create();
+    let compiler = Compiler::new(&context);
+    let repr = Repr::new(vec![]);
+    let module = compiler.new_module(repr, "test_module".into());
+    module.compile();
+
+    return Ok(());
+    /*
     let context = Context::create();
     let module = context.create_module("main");
     let builder = context.create_builder();
@@ -59,4 +64,5 @@ fn main() -> anyhow::Result<()> {
         .expect("Failed to write object file");
 
     return Ok(());
+    */
 }
