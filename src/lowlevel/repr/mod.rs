@@ -1,3 +1,4 @@
+pub mod expressions;
 pub mod prelude;
 
 use std::collections::HashMap;
