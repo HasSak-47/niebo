@@ -1,9 +1,4 @@
-use inkwell::{
-    AddressSpace,
-    context::Context,
-    types::{AnyType, BasicType},
-    values::BasicValueEnum,
-};
+use inkwell::{context::Context, types::BasicType, AddressSpace};
 
 use crate::lowlevel::compiler::ModuleCompiler;
 
@@ -109,7 +104,58 @@ impl Type {
         }
     }
 
+    pub fn int() -> Self {
+        Self::Primitive(PrimitiveType::Int)
+    }
+
+    pub fn uint() -> Self {
+        Self::Primitive(PrimitiveType::Uint)
+    }
+
+    pub fn float() -> Self {
+        Self::Primitive(PrimitiveType::Float)
+    }
+
     pub fn string() -> Self {
         Self::Primitive(PrimitiveType::String)
+    }
+
+    pub fn void() -> Self {
+        Self::Primitive(PrimitiveType::Void)
+    }
+
+    pub fn r#struct(members: Vec<(String, Type)>) -> Self {
+        Self::Struct(StructType { members })
+    }
+
+    pub fn union(members: Vec<(String, Type)>) -> Self {
+        Self::Union(UnionType { members })
+    }
+
+    pub fn array(element: Type) -> Self {
+        Self::Array(Box::new(element))
+    }
+
+    pub fn alias(ident: impl Into<String>, ty: Type) -> Self {
+        Self::Alias(AliasType {
+            ident: ident.into(),
+            ty: Box::new(ty),
+        })
+    }
+
+    pub fn pointer(ty: Type) -> Self {
+        Self::Pointer(Box::new(ty))
+    }
+
+    pub fn reference(ty: Type) -> Self {
+        Self::Reference(Box::new(ty))
+    }
+
+    pub fn function(params: Vec<(String, Type)>, ret_ty: Type, varidic: bool) -> Self {
+        Self::Function(FunctionType {
+            params,
+            ret_ty: Box::new(ret_ty),
+            varidic,
+        })
     }
 }

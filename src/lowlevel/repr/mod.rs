@@ -1,4 +1,3 @@
-pub mod expressions;
 pub mod prelude;
 pub mod registry;
 
@@ -6,7 +5,8 @@ use inkwell::{
     AddressSpace,
     module::Linkage,
     values::{
-        ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue,
+        AnyValue, ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue,
+        PointerValue,
     },
 };
 
@@ -49,6 +49,30 @@ pub enum Operator {
     },
 }
 
+impl Operator {
+    pub fn code_gen<'a, 'ctx>(
+        &self,
+        symbols: &mut SymbolRegistry<'ctx>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Option<BasicMetadataValueEnum<'ctx>> {
+        match self {
+            Operator::Binary { operands, operator } => {
+                let a = operands[0].code_gen(symbols, compiler).unwrap();
+                let b = operands[1].code_gen(symbols, compiler).unwrap();
+                match operator {
+                    _ => todo!(),
+                }
+            }
+            Operator::Unary { operand, operator } => {
+                let a = operand.code_gen(symbols, compiler).unwrap();
+                match operator {
+                    _ => todo!(),
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Literal {
     Int(u64),
@@ -68,9 +92,39 @@ impl Literal {
 
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry,
+        _symbols: &mut SymbolRegistry,
         compiler: &ModuleCompiler<'a, 'ctx>,
-    ) {
+    ) -> Option<BasicMetadataValueEnum<'ctx>> {
+        match self {
+            Literal::Int(val) => {
+                return Some(compiler.context.i32_type().const_int(*val, true).into());
+            }
+            Literal::String(string) => {
+                let bytes = string.as_bytes();
+                let mut buf = Vec::with_capacity(bytes.len() + 1);
+                buf.extend(bytes);
+                buf.push(0);
+
+                let char_ty = compiler.context.i8_type();
+                let buf: Vec<_> = buf
+                    .into_iter()
+                    .map(|v| char_ty.const_int(v as u64, false))
+                    .collect();
+
+                let arr_ty = char_ty.array_type(buf.len() as u32);
+                let const_arr = unsafe { ArrayValue::new_const_array(&char_ty, buf.as_slice()) };
+
+                let global =
+                    compiler
+                        .module
+                        .add_global(arr_ty, Some(AddressSpace::default()), "strlit");
+                global.set_initializer(&const_arr);
+                global.set_constant(true);
+
+                Some(global.as_basic_value_enum().into())
+            }
+            _ => todo!(),
+        }
     }
 }
 
@@ -85,7 +139,7 @@ impl BlockExpression {
         &self,
         symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
+    ) -> Option<BasicMetadataValueEnum<'ctx>> {
         if self.body.len() == 0 {
             return None;
         }
@@ -122,64 +176,48 @@ pub enum Expression {
 }
 
 impl Expression {
+    pub fn int(val: i32) -> Expression {
+        return Expression::Literal(Literal::Int(val as u64));
+    }
+
+    pub fn string<S: AsRef<str>>(s: S) -> Expression {
+        let s = s.as_ref().to_string();
+        return Expression::Literal(Literal::String(s));
+    }
+
+    pub fn identifier<S: AsRef<str>>(s: S) -> Expression {
+        let s = s.as_ref().to_string();
+        return Expression::Identifier(s);
+    }
+
+    pub fn return_statement(exp: Expression) -> Statement {
+        Statement::Expression(Expression::Return(Box::new(exp)))
+    }
+
+    pub fn call_statement(operand: Expression, params: Vec<Expression>) -> Statement {
+        Statement::Expression(Expression::Call {
+            operand: Box::new(operand),
+            params,
+        })
+    }
+
     pub fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Option<Box<dyn BasicValue<'ctx> + 'ctx>> {
+    ) -> Option<BasicMetadataValueEnum<'ctx>> {
         match self {
-            Self::Literal(literal) => match literal {
-                Literal::Int(val) => {
-                    return Some(Box::new(
-                        compiler
-                            .context
-                            .i32_type()
-                            .const_int(*val, true)
-                            .as_basic_value_enum(),
-                    ));
-                }
-                Literal::String(string) => {
-                    let bytes = string.as_bytes();
-                    let mut buf = Vec::with_capacity(bytes.len() + 1);
-                    buf.extend(bytes);
-                    buf.push(0);
-
-                    let char_ty = compiler.context.i8_type();
-                    let buf: Vec<_> = buf
-                        .into_iter()
-                        .map(|v| char_ty.const_int(v as u64, false))
-                        .collect();
-
-                    let arr_ty = char_ty.array_type(buf.len() as u32);
-                    let const_arr =
-                        unsafe { ArrayValue::new_const_array(&char_ty, buf.as_slice()) };
-
-                    let global =
-                        compiler
-                            .module
-                            .add_global(arr_ty, Some(AddressSpace::default()), "strlit");
-                    global.set_initializer(&const_arr);
-                    global.set_constant(true);
-
-                    Some(Box::new(global.as_pointer_value()))
-                }
-                _ => todo!(),
-            },
+            Self::Literal(literal) => literal.code_gen(symbols, compiler),
             Self::Identifier(ident) => {
                 return match symbols.get_symbol(ident) {
-                    Symbol::Symbol { pointer, .. } => Some(Box::new(pointer.clone())),
+                    Symbol::Symbol { pointer, .. } => Some(pointer.clone().into()),
                     _ => todo!(),
                 };
             }
             Self::Call { operand, params } => {
                 let params: Vec<BasicMetadataValueEnum> = params
                     .iter()
-                    .map(|v| {
-                        v.code_gen(symbols, compiler)
-                            .unwrap()
-                            .as_basic_value_enum()
-                            .into()
-                    })
+                    .map(|v| v.code_gen(symbols, compiler).unwrap())
                     .collect();
                 match &**operand {
                     Expression::Identifier(ident) => {
@@ -191,7 +229,7 @@ impl Expression {
                                     .build_call(*pointer, params.as_slice(), "")
                                     .unwrap();
                             }
-                            _ => unreachable!(),
+                            _ => todo!(),
                         };
                     }
                     _ => todo!(),
@@ -199,8 +237,11 @@ impl Expression {
                 return None;
             }
             Self::Return(expr) => {
-                let val = expr.code_gen(symbols, compiler).unwrap();
-                compiler.builder.build_return(Some(&*val)).unwrap();
+                let val: BasicValueEnum = expr
+                    .code_gen(symbols, compiler)
+                    .map(|f| f.try_into().unwrap())
+                    .unwrap();
+                compiler.builder.build_return(Some(&val)).unwrap();
                 return None;
             }
             v => todo!("expression {v:?} not yet implemented"),
@@ -303,6 +344,13 @@ impl FunctionBuilder {
 }
 
 impl Statement {
+    pub fn var_define<S: AsRef<str>>(ident: S, ty: Type, expr: Expression) -> Self {
+        return Self::VariableDefinition {
+            ident: ident.as_ref().to_string(),
+            ty,
+            expression: Box::new(expr),
+        };
+    }
     pub fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut SymbolRegistry<'ctx>,
@@ -376,10 +424,10 @@ impl Statement {
                     .builder
                     .build_store(
                         var,
-                        expression
-                            .code_gen(symbols, compiler)
-                            .unwrap()
-                            .as_basic_value_enum(),
+                        TryInto::<BasicValueEnum<'ctx>>::try_into(
+                            expression.code_gen(symbols, compiler).unwrap(),
+                        )
+                        .unwrap(),
                     )
                     .unwrap();
                 symbols.register_symbol(&ident, Symbol::Symbol { pointer: var });

@@ -8,7 +8,7 @@ use inkwell::{
 
 use crate::lowlevel::{
     compiler::Compiler,
-    repr::{self, Expression, FunctionBuilder, Literal, Repr, Statement},
+    repr::{Expression, FunctionBuilder, Repr, Statement},
     types::*,
 };
 
@@ -20,24 +20,28 @@ fn main() -> anyhow::Result<()> {
     let context = Context::create();
     let compiler = Compiler::new(&context);
     let repr = Repr::new(vec![
-        FunctionBuilder::new("puts", Type::Primitive(PrimitiveType::Int))
-            .add_param("", Type::Primitive(PrimitiveType::String))
+        FunctionBuilder::new("scanf", Type::int())
+            .varidic()
+            .add_param("", Type::string())
             .build_declaration(),
-        FunctionBuilder::new("main", Type::Primitive(PrimitiveType::Int))
-            .add_statement(Statement::VariableDefinition {
-                ident: "test_var".to_string(),
-                ty: Type::Primitive(PrimitiveType::Int),
-                expression: Box::new(repr::Expression::Literal(Literal::Int(0x69))),
-            })
-            .add_statement(Statement::Expression(repr::Expression::Call {
-                operand: Box::new(repr::Expression::Identifier("puts".to_string())),
-                params: vec![repr::Expression::Literal(Literal::String(
-                    "hello world".to_string(),
-                ))],
-            }))
-            .add_statement(Statement::Expression(repr::Expression::Return(Box::new(
-                repr::Expression::Literal(Literal::Int(0x00)),
-            ))))
+        FunctionBuilder::new("printf", Type::int())
+            .varidic()
+            .add_param("", Type::string())
+            .build_declaration(),
+        FunctionBuilder::new("main", Type::int())
+            .add_statement(Statement::var_define(
+                "test_var",
+                Type::int(),
+                Expression::int(0x69),
+            ))
+            .add_statement(Expression::call_statement(
+                Expression::identifier("printf"),
+                vec![
+                    Expression::string("hello world %d!\n"),
+                    Expression::Identifier("test_var".to_string()),
+                ],
+            ))
+            .add_statement(Expression::return_statement(Expression::int(0x00)))
             .build_definition(),
     ]);
     let module = compiler.new_module(repr, "test_module".into());
