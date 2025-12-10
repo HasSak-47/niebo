@@ -1,3 +1,4 @@
+pub mod ir;
 pub mod prelude;
 pub mod registry;
 
@@ -217,7 +218,10 @@ impl Expression {
             Self::Call { operand, params } => {
                 let params: Vec<BasicMetadataValueEnum> = params
                     .iter()
-                    .map(|v| v.code_gen(symbols, compiler).unwrap())
+                    .map(|v| {
+                        let p = v.code_gen(symbols, compiler).unwrap();
+                        compiler.builder.build_load(pointee_ty, p, name)
+                    })
                     .collect();
                 match &**operand {
                     Expression::Identifier(ident) => {
