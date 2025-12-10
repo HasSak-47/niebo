@@ -1,8 +1,13 @@
+pub mod prelude;
+
 use std::collections::HashMap;
 
 use inkwell::{
+    AddressSpace,
     module::Linkage,
-    values::{BasicValue, FunctionValue, PointerValue},
+    values::{
+        ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue,
+    },
 };
 
 use crate::lowlevel::{
@@ -42,7 +47,7 @@ impl<'ctx> SymbolRegistry<'ctx> {
                 return &symbol;
             }
         }
-        panic!("symbol not found!");
+        panic!("symbol {ident} not found!");
     }
 
     pub fn register_symbol<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
@@ -92,7 +97,7 @@ impl<'ctx> SymbolScope<'ctx> {
     }
 }
 
-enum Symbol<'ctx> {
+pub enum Symbol<'ctx> {
     Function {
         pointer: FunctionValue<'ctx>,
         external: bool,
@@ -164,7 +169,6 @@ impl Literal {
 
 #[derive(Debug, Clone)]
 pub struct BlockExpression {
-    local_registry: HashMap<String, Type>,
     ret_ty: Type,
     body: Vec<Statement>,
 }
@@ -227,6 +231,31 @@ impl Expression {
                             .as_basic_value_enum(),
                     ));
                 }
+                Literal::String(string) => {
+                    let bytes = string.as_bytes();
+                    let mut buf = Vec::with_capacity(bytes.len() + 1);
+                    buf.extend(bytes);
+                    buf.push(0);
+
+                    let char_ty = compiler.context.i8_type();
+                    let buf: Vec<_> = buf
+                        .into_iter()
+                        .map(|v| char_ty.const_int(v as u64, false))
+                        .collect();
+
+                    let arr_ty = char_ty.array_type(buf.len() as u32);
+                    let const_arr =
+                        unsafe { ArrayValue::new_const_array(&char_ty, buf.as_slice()) };
+
+                    let global =
+                        compiler
+                            .module
+                            .add_global(arr_ty, Some(AddressSpace::default()), "strlit");
+                    global.set_initializer(&const_arr);
+                    global.set_constant(true);
+
+                    Some(Box::new(global.as_pointer_value()))
+                }
                 _ => todo!(),
             },
             Self::Identifier(ident) => {
@@ -236,12 +265,24 @@ impl Expression {
                 };
             }
             Self::Call { operand, params } => {
+                let params: Vec<BasicMetadataValueEnum> = params
+                    .iter()
+                    .map(|v| {
+                        v.code_gen(symbols, compiler)
+                            .unwrap()
+                            .as_basic_value_enum()
+                            .into()
+                    })
+                    .collect();
                 match &**operand {
                     Expression::Identifier(ident) => {
                         let func = symbols.get_symbol(ident);
                         match func {
                             Symbol::Function { pointer, .. } => {
-                                compiler.builder.build_call(*pointer, &[], "").unwrap();
+                                compiler
+                                    .builder
+                                    .build_call(*pointer, params.as_slice(), "")
+                                    .unwrap();
                             }
                             _ => unreachable!(),
                         };
@@ -280,7 +321,6 @@ pub enum Statement {
     },
     Expression(Expression),
     VariableDefinition {
-        mutable: bool,
         ident: String,
         ty: Type,
         expression: Box<Expression>,
@@ -327,7 +367,6 @@ impl FunctionBuilder {
             body.body.push(stmt);
         } else {
             self.body = Some(BlockExpression {
-                local_registry: HashMap::new(),
                 ret_ty: self.ret_ty.clone(),
                 body: vec![stmt],
             })
@@ -436,6 +475,7 @@ impl Statement {
                             .as_basic_value_enum(),
                     )
                     .unwrap();
+                symbols.register_symbol(&ident, Symbol::Symbol { pointer: var });
             }
             Self::Expression(e) => {
                 e.code_gen(symbols, compiler);

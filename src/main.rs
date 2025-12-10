@@ -25,14 +25,15 @@ fn main() -> anyhow::Result<()> {
             .build_declaration(),
         FunctionBuilder::new("main", Type::Primitive(PrimitiveType::Int))
             .add_statement(Statement::VariableDefinition {
-                mutable: false,
                 ident: "test_var".to_string(),
                 ty: Type::Primitive(PrimitiveType::Int),
                 expression: Box::new(repr::Expression::Literal(Literal::Int(0x69))),
             })
             .add_statement(Statement::Expression(repr::Expression::Call {
                 operand: Box::new(repr::Expression::Identifier("puts".to_string())),
-                params: vec![repr::Expression::Identifier("hello_worl_ptr".to_string())],
+                params: vec![repr::Expression::Literal(Literal::String(
+                    "hello world".to_string(),
+                ))],
             }))
             .add_statement(Statement::Expression(repr::Expression::Return(Box::new(
                 repr::Expression::Literal(Literal::Int(0x00)),
