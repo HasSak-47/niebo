@@ -1,3 +1,11 @@
+use std::collections::HashMap;
+
+// usable values
+// - PointerValue
+// - ArrayValue
+// - FunctionValue
+// - BasicMetadataValueEnum
+
 #[derive(Debug, Clone)]
 pub enum LiteralExpression {}
 
@@ -8,7 +16,7 @@ pub enum OperatorExpression {}
 pub enum CallExpression {}
 
 #[derive(Debug, Clone)]
-pub enum BlockExpression {}
+pub struct BlockExpression {}
 
 #[derive(Debug, Clone)]
 pub enum Expression {

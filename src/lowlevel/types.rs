@@ -108,4 +108,8 @@ impl Type {
             _ => todo!(),
         }
     }
+
+    pub fn string() -> Self {
+        Self::Primitive(PrimitiveType::String)
+    }
 }
