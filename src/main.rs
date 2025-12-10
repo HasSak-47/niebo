@@ -67,5 +67,12 @@ fn main() -> anyhow::Result<()> {
         .write_to_file(&module.module, FileType::Object, obj_path)
         .expect("Failed to write object file");
 
+    std::process::Command::new("clang")
+        .args(["output.o"])
+        .status()
+        .unwrap();
+
+    std::process::Command::new("./a.out").status().unwrap();
+
     return Ok(());
 }
