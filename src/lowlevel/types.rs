@@ -1,8 +1,8 @@
-use inkwell::{context::Context, types::BasicType, AddressSpace};
+use inkwell::{AddressSpace, context::Context, types::BasicType};
 
 use crate::lowlevel::compiler::ModuleCompiler;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {
     Int,
     Uint,
@@ -11,17 +11,17 @@ pub enum PrimitiveType {
     Void,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructType {
     pub members: Vec<(String, Type)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnionType {
     pub members: Vec<(String, Type)>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionType {
     pub params: Vec<(String, Type)>,
     pub ret_ty: Box<Type>,
@@ -75,13 +75,13 @@ impl FunctionType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AliasType {
     pub ident: String,
     pub ty: Box<Type>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Primitive(PrimitiveType),
     Struct(StructType),
@@ -100,7 +100,11 @@ impl Type {
     ) -> inkwell::types::BasicTypeEnum<'ctx> {
         match self {
             Self::Primitive(PrimitiveType::Int) => compiler.context.i32_type().as_basic_type_enum(),
-            _ => todo!(),
+            Self::Pointer(_) | Self::Primitive(PrimitiveType::String) => compiler
+                .context
+                .ptr_type(AddressSpace::default())
+                .as_basic_type_enum(),
+            ty => todo!("Type::{ty:?} is not implemented"),
         }
     }
 

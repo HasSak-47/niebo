@@ -1,4 +1,4 @@
-use crate::lowlevel::types::*;
+use crate::lowlevel::{compiler::ModuleCompiler, repr::registry::SymbolRegistry, types::*};
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
@@ -33,6 +33,30 @@ pub enum Operator {
     },
 }
 
+impl Operator {
+    pub fn get_expression_type<'a, 'ctx>(
+        &self,
+        symbols: &SymbolRegistry<'ctx>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Type {
+        return match self {
+            Self::Binary { operands, .. } => {
+                if operands[0].get_expression_type(symbols, compiler)
+                    == operands[1].get_expression_type(symbols, compiler)
+                {
+                    operands[0].get_expression_type(symbols, compiler)
+                } else {
+                    unreachable!()
+                }
+            }
+            Self::Unary { operand, operator } => match operator {
+                UnaryOperator::Ref => Type::pointer(operand.get_expression_type(symbols, compiler)),
+                _ => todo!(),
+            },
+        };
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Literal {
     Int(u64),
@@ -43,7 +67,11 @@ pub enum Literal {
 }
 
 impl Literal {
-    pub fn get_expression_type(&self) -> Type {
+    pub fn get_expression_type<'a, 'ctx>(
+        &self,
+        _symbols: &SymbolRegistry<'ctx>,
+        _compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Type {
         match self {
             Self::Int(_) => Type::int(),
             _ => todo!(),
@@ -53,11 +81,26 @@ impl Literal {
 
 #[derive(Debug, Clone)]
 pub struct BlockExpression {
-    ret_ty: Type,
-    body: Vec<Statement>,
+    pub ret_ty: Type,
+    pub body: Vec<Statement>,
 }
 
-impl BlockExpression {}
+impl BlockExpression {
+    pub fn get_expression_type<'a, 'ctx>(
+        &self,
+        symbols: &SymbolRegistry<'ctx>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Type {
+        if self.body.last().is_none() {
+            return Type::void();
+        }
+
+        if let Statement::Expression(e) = self.body.last().unwrap() {
+            return e.get_expression_type(symbols, compiler);
+        }
+        return Type::void();
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Expression {
@@ -96,6 +139,28 @@ impl Expression {
             operand: Box::new(operand),
             params,
         })
+    }
+
+    pub fn get_expression_type<'a, 'ctx>(
+        &self,
+        symbols: &SymbolRegistry<'ctx>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Type {
+        match self {
+            Self::Literal(l) => l.get_expression_type(symbols, compiler),
+            Self::Block(b) => b.get_expression_type(symbols, compiler),
+            Self::Return(r) => r.get_expression_type(symbols, compiler),
+            Self::Call { operand, .. } => {
+                let ty = operand.get_expression_type(symbols, compiler);
+                match ty {
+                    Type::Function(f) => (*f.ret_ty).clone(),
+                    _ => unreachable!(),
+                }
+            }
+            Self::Identifier(ident) => symbols.get_symbol(ident).get_type().clone(),
+            Self::Operator(op) => op.get_expression_type(symbols, compiler),
+            r => todo!("{r:?} not implemented"),
+        }
     }
 }
 
@@ -190,35 +255,5 @@ impl FunctionBuilder {
             params: self.params,
             varidic: self.varidic,
         }
-    }
-}
-
-impl Statement {
-    pub fn var_define<S: AsRef<str>>(ident: S, ty: Type, expr: Expression) -> Self {
-        return Self::VariableDefinition {
-            ident: ident.as_ref().to_string(),
-            ty,
-            expression: Box::new(expr),
-        };
-    }
-}
-
-pub struct Repr {
-    statements: Vec<Statement>,
-}
-
-impl Repr {
-    pub fn validate(&mut self) {
-        for statement in &self.statements {
-            if let Statement::Expression(_) = statement {
-                panic!("no expressions are allowed in module declaration");
-            }
-        }
-    }
-
-    pub fn new(statements: Vec<Statement>) -> Self {
-        let mut s = Self { statements };
-        s.validate();
-        return s;
     }
 }

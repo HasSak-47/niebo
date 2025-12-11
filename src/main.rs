@@ -8,7 +8,10 @@ use inkwell::{
 
 use crate::lowlevel::{
     compiler::Compiler,
-    repr::{Expression, FunctionBuilder, Repr, Statement},
+    repr::{
+        Repr,
+        ir::{Expression, FunctionBuilder, Statement, UnaryOperator},
+    },
     types::*,
 };
 
@@ -32,13 +35,17 @@ fn main() -> anyhow::Result<()> {
             .add_statement(Statement::var_define(
                 "test_var",
                 Type::int(),
-                Expression::int(0x69),
+                Expression::int(69),
             ))
             .add_statement(Expression::call_statement(
                 Expression::identifier("printf"),
                 vec![
-                    Expression::string("hello world %d!\n"),
-                    Expression::Identifier("test_var".to_string()),
+                    Expression::string("hello world %d @ %p!\n"),
+                    Expression::identifier("test_var"),
+                    Expression::Operator(lowlevel::repr::ir::Operator::Unary {
+                        operator: UnaryOperator::Ref,
+                        operand: Box::new(Expression::identifier("test_var")),
+                    }),
                 ],
             ))
             .add_statement(Expression::return_statement(Expression::int(0x00)))
@@ -46,7 +53,7 @@ fn main() -> anyhow::Result<()> {
     ]);
     let module = compiler.new_module(repr, "test_module".into());
     module.compile();
-    println!("code: {}", module.get_ll_code());
+    println!("{}", module.get_ll_code());
 
     Target::initialize_native(&InitializationConfig::default())
         .expect("Failed to initialize native target");

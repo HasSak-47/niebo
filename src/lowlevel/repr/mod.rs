@@ -15,40 +15,8 @@ use crate::lowlevel::{
     compiler::ModuleCompiler,
     types::{FunctionType, PrimitiveType, Type},
 };
+use ir::*;
 use registry::*;
-
-#[derive(Debug, Clone)]
-pub enum BinaryOperator {
-    Addition,
-    Multiplication,
-    Substraction,
-    Division,
-    Module,
-    BitShitLeft,
-    BitShitRight,
-    Or,
-    And,
-    Xor,
-}
-
-#[derive(Debug, Clone)]
-pub enum UnaryOperator {
-    Deref,
-    Ref,
-    Negation,
-}
-
-#[derive(Debug, Clone)]
-pub enum Operator {
-    Binary {
-        operands: [Box<Expression>; 2],
-        operator: BinaryOperator,
-    },
-    Unary {
-        operand: Box<Expression>,
-        operator: UnaryOperator,
-    },
-}
 
 impl Operator {
     pub fn code_gen<'a, 'ctx>(
@@ -67,6 +35,9 @@ impl Operator {
             Operator::Unary { operand, operator } => {
                 let a = operand.code_gen(symbols, compiler).unwrap();
                 match operator {
+                    UnaryOperator::Ref => {
+                        return Some(a);
+                    }
                     _ => todo!(),
                 }
             }
@@ -74,23 +45,7 @@ impl Operator {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Literal {
-    Int(u64),
-    Uint(u64),
-    Bool(bool),
-    Float(f64),
-    String(String),
-}
-
 impl Literal {
-    pub fn get_expression_type(&self) -> Type {
-        match self {
-            Self::Int(_) => Type::Primitive(super::types::PrimitiveType::Int),
-            _ => todo!(),
-        }
-    }
-
     pub fn code_gen<'a, 'ctx>(
         &self,
         _symbols: &mut SymbolRegistry,
@@ -129,12 +84,6 @@ impl Literal {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct BlockExpression {
-    ret_ty: Type,
-    body: Vec<Statement>,
-}
-
 impl BlockExpression {
     pub fn code_gen<'a, 'ctx>(
         &self,
@@ -163,45 +112,7 @@ impl BlockExpression {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum Expression {
-    Return(Box<Expression>),
-    Literal(Literal),
-    Operator(Operator),
-    Identifier(String),
-    Call {
-        operand: Box<Expression>,
-        params: Vec<Expression>,
-    },
-    Block(BlockExpression),
-}
-
 impl Expression {
-    pub fn int(val: i32) -> Expression {
-        return Expression::Literal(Literal::Int(val as u64));
-    }
-
-    pub fn string<S: AsRef<str>>(s: S) -> Expression {
-        let s = s.as_ref().to_string();
-        return Expression::Literal(Literal::String(s));
-    }
-
-    pub fn identifier<S: AsRef<str>>(s: S) -> Expression {
-        let s = s.as_ref().to_string();
-        return Expression::Identifier(s);
-    }
-
-    pub fn return_statement(exp: Expression) -> Statement {
-        Statement::Expression(Expression::Return(Box::new(exp)))
-    }
-
-    pub fn call_statement(operand: Expression, params: Vec<Expression>) -> Statement {
-        Statement::Expression(Expression::Call {
-            operand: Box::new(operand),
-            params,
-        })
-    }
-
     pub fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut SymbolRegistry<'ctx>,
@@ -216,29 +127,63 @@ impl Expression {
                 };
             }
             Self::Call { operand, params } => {
-                let params: Vec<BasicMetadataValueEnum> = params
-                    .iter()
-                    .map(|v| {
-                        let p = v.code_gen(symbols, compiler).unwrap();
-                        compiler.builder.build_load(pointee_ty, p, name)
-                    })
-                    .collect();
-                match &**operand {
-                    Expression::Identifier(ident) => {
-                        let func = symbols.get_symbol(ident);
-                        match func {
-                            Symbol::Function { pointer, .. } => {
-                                compiler
-                                    .builder
-                                    .build_call(*pointer, params.as_slice(), "")
-                                    .unwrap();
+                let ty = operand.get_expression_type(symbols, compiler);
+                if let Type::Function(func_ty) = ty {
+                    let params: Vec<BasicMetadataValueEnum> = params
+                        .iter()
+                        .enumerate()
+                        .map(|(i, expr)| {
+                            let p = expr.code_gen(symbols, compiler).unwrap();
+                            if let BasicMetadataValueEnum::PointerValue(ptr) = p {
+                                if i >= func_ty.params.len() && func_ty.varidic {
+                                    let ret_ty = expr.get_expression_type(symbols, compiler);
+                                    return compiler
+                                        .builder
+                                        .build_load(ret_ty.to_llvm_basic_type(compiler), ptr, "")
+                                        .unwrap()
+                                        .into();
+                                } else {
+                                    let (name, ty) = &func_ty.params[i];
+                                    match ty {
+                                        Type::Primitive(PrimitiveType::String)
+                                        | Type::Primitive(PrimitiveType::Void)
+                                        | Type::Pointer(_) => return p,
+                                        ty => {
+                                            return compiler
+                                                .builder
+                                                .build_load(
+                                                    ty.to_llvm_basic_type(compiler),
+                                                    ptr,
+                                                    name,
+                                                )
+                                                .unwrap()
+                                                .into();
+                                        }
+                                    }
+                                }
                             }
-                            _ => todo!(),
-                        };
+                            unreachable!("");
+                        })
+                        .collect();
+                    match &**operand {
+                        Expression::Identifier(ident) => {
+                            let func = symbols.get_symbol(ident);
+                            match func {
+                                Symbol::Function { pointer, .. } => {
+                                    compiler
+                                        .builder
+                                        .build_call(*pointer, params.as_slice(), "")
+                                        .unwrap();
+                                }
+                                _ => todo!(),
+                            };
+                        }
+                        _ => todo!(),
                     }
-                    _ => todo!(),
+                    return None;
+                } else {
+                    unreachable!()
                 }
-                return None;
             }
             Self::Return(expr) => {
                 let val: BasicValueEnum = expr
@@ -248,101 +193,10 @@ impl Expression {
                 compiler.builder.build_return(Some(&val)).unwrap();
                 return None;
             }
+            Self::Operator(op) => {
+                return op.code_gen(symbols, compiler);
+            }
             v => todo!("expression {v:?} not yet implemented"),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Statement {
-    GlobalVariableDeclaration {
-        mutable: bool,
-        ident: String,
-        ty: Type,
-    },
-    VariableDeclaration {
-        mutable: bool,
-        ident: String,
-        ty: Type,
-    },
-    FunctionDeclaration {
-        ident: String,
-        ret_ty: Type,
-        params: Vec<(String, Type)>,
-        varidic: bool,
-    },
-    Expression(Expression),
-    VariableDefinition {
-        ident: String,
-        ty: Type,
-        expression: Box<Expression>,
-    },
-    FunctionDefinition {
-        ident: String,
-        params: Vec<(String, Type)>,
-        block: BlockExpression,
-        varidic: bool,
-    },
-}
-
-pub struct FunctionBuilder {
-    ident: String,
-    ret_ty: Type,
-    params: Vec<(String, Type)>,
-    varidic: bool,
-    body: Option<BlockExpression>,
-}
-
-impl FunctionBuilder {
-    pub fn new<S: AsRef<str>>(ident: S, ret_ty: Type) -> Self {
-        Self {
-            ident: ident.as_ref().to_string(),
-            ret_ty,
-            params: Vec::new(),
-            varidic: false,
-            body: None,
-        }
-    }
-
-    pub fn varidic(mut self) -> Self {
-        self.varidic = true;
-        return self;
-    }
-
-    pub fn add_param<S: AsRef<str>>(mut self, ident: S, ty: Type) -> Self {
-        self.params.push((ident.as_ref().to_string(), ty));
-        return self;
-    }
-
-    pub fn add_statement(mut self, stmt: Statement) -> Self {
-        if let Some(body) = &mut self.body {
-            body.body.push(stmt);
-        } else {
-            self.body = Some(BlockExpression {
-                ret_ty: self.ret_ty.clone(),
-                body: vec![stmt],
-            })
-        }
-
-        return self;
-    }
-    pub fn build_definition(self) -> Statement {
-        assert!(self.body.is_some());
-        Statement::FunctionDefinition {
-            ident: self.ident,
-            block: self.body.unwrap(),
-            params: self.params,
-            varidic: self.varidic,
-        }
-    }
-
-    pub fn build_declaration(self) -> Statement {
-        assert!(self.body.is_none());
-        Statement::FunctionDeclaration {
-            ident: self.ident,
-            ret_ty: self.ret_ty,
-            params: self.params,
-            varidic: self.varidic,
         }
     }
 }
@@ -434,7 +288,13 @@ impl Statement {
                         .unwrap(),
                     )
                     .unwrap();
-                symbols.register_symbol(&ident, Symbol::Symbol { pointer: var });
+                symbols.register_symbol(
+                    &ident,
+                    Symbol::Symbol {
+                        ty: ty.clone(),
+                        pointer: var,
+                    },
+                );
             }
             Self::Expression(e) => {
                 e.code_gen(symbols, compiler);

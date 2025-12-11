@@ -90,7 +90,18 @@ pub enum Symbol<'ctx> {
         ty: Type,
     },
     Symbol {
+        ty: Type,
         pointer: PointerValue<'ctx>,
     },
     Registry(SymbolRegistry<'ctx>),
+}
+
+impl<'ctx> Symbol<'ctx> {
+    pub fn get_type(&self) -> Type {
+        match self {
+            Self::Function { ty, .. } => ty.clone(),
+            Self::Symbol { ty, .. } => ty.clone(),
+            _ => unreachable!(),
+        }
+    }
 }
