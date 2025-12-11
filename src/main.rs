@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{fs::File, io::Write, path::Path};
 
 use inkwell::{
     OptimizationLevel,
@@ -23,29 +23,62 @@ fn main() -> anyhow::Result<()> {
     let context = Context::create();
     let compiler = Compiler::new(&context);
     let repr = Repr::new(vec![
-        FunctionBuilder::new("scanf", Type::int())
-            .varidic()
-            .add_param("", Type::string())
-            .build_declaration(),
+        // fn printf
         FunctionBuilder::new("printf", Type::int())
-            .varidic()
             .add_param("", Type::string())
+            .varidic()
             .build_declaration(),
+        // fn scanf
+        FunctionBuilder::new("scanf", Type::int())
+            .add_param("", Type::string())
+            .varidic()
+            .build_declaration(),
+        // fn bar
+        FunctionBuilder::new("bar", Type::void())
+            .add_param("x", Type::int())
+            .add_statement(Expression::call_statement(
+                Expression::identifier("printf"),
+                vec![Expression::string("bar %d"), Expression::identifier("x")],
+            ))
+            .add_statement(Statement::Expression(Expression::Return(None)))
+            .build_definition(),
+        // fn foo
+        FunctionBuilder::new("foo", Type::void())
+            .add_param("x", Type::int())
+            .add_statement(Expression::call_statement(
+                Expression::identifier("printf"),
+                vec![Expression::string("foo %d"), Expression::identifier("x")],
+            ))
+            .add_statement(Statement::Expression(Expression::Return(None)))
+            .build_definition(),
+        // fn main
         FunctionBuilder::new("main", Type::int())
             .add_statement(Statement::var_define(
-                "test_var",
+                "opt",
                 Type::int(),
-                Expression::int(69),
+                Expression::int(0),
+            ))
+            .add_statement(Statement::var_define("x", Type::int(), Expression::int(0)))
+            .add_statement(Expression::call_statement(
+                Expression::identifier("scanf"),
+                vec![
+                    Expression::string("select opt and val %d %d\n"),
+                    Expression::Operator(lowlevel::repr::ir::Operator::Unary {
+                        operator: UnaryOperator::Ref,
+                        operand: Box::new(Expression::identifier("opt")),
+                    }),
+                    Expression::Operator(lowlevel::repr::ir::Operator::Unary {
+                        operator: UnaryOperator::Ref,
+                        operand: Box::new(Expression::identifier("x")),
+                    }),
+                ],
             ))
             .add_statement(Expression::call_statement(
                 Expression::identifier("printf"),
                 vec![
-                    Expression::string("hello world %d @ %p!\n"),
-                    Expression::identifier("test_var"),
-                    Expression::Operator(lowlevel::repr::ir::Operator::Unary {
-                        operator: UnaryOperator::Ref,
-                        operand: Box::new(Expression::identifier("test_var")),
-                    }),
+                    Expression::string("opt %d val %d func %p!\n"),
+                    Expression::identifier("opt"),
+                    Expression::identifier("x"),
                 ],
             ))
             .add_statement(Expression::return_statement(Expression::int(0x00)))
@@ -53,7 +86,10 @@ fn main() -> anyhow::Result<()> {
     ]);
     let module = compiler.new_module(repr, "test_module".into());
     module.compile();
-    println!("{}", module.get_ll_code());
+    let llvmir = module.get_ll_code();
+    println!("{llvmir}");
+    let mut f = File::create("output.ll")?;
+    f.write_all(llvmir.as_bytes())?;
 
     Target::initialize_native(&InitializationConfig::default())
         .expect("Failed to initialize native target");

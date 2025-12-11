@@ -104,7 +104,7 @@ impl BlockExpression {
 
 #[derive(Debug, Clone)]
 pub enum Expression {
-    Return(Box<Expression>),
+    Return(Option<Box<Expression>>),
     Literal(Literal),
     Operator(Operator),
     Identifier(String),
@@ -131,7 +131,7 @@ impl Expression {
     }
 
     pub fn return_statement(exp: Expression) -> Statement {
-        Statement::Expression(Expression::Return(Box::new(exp)))
+        Statement::Expression(Expression::Return(Some(Box::new(exp))))
     }
 
     pub fn call_statement(operand: Expression, params: Vec<Expression>) -> Statement {
@@ -149,7 +149,10 @@ impl Expression {
         match self {
             Self::Literal(l) => l.get_expression_type(symbols, compiler),
             Self::Block(b) => b.get_expression_type(symbols, compiler),
-            Self::Return(r) => r.get_expression_type(symbols, compiler),
+            Self::Return(r) => r
+                .as_ref()
+                .map(|p| p.get_expression_type(symbols, compiler))
+                .unwrap_or(Type::void()),
             Self::Call { operand, .. } => {
                 let ty = operand.get_expression_type(symbols, compiler);
                 match ty {

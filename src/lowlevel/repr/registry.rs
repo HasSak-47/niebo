@@ -1,6 +1,7 @@
 use super::*;
 use std::collections::HashMap;
 
+#[derive(Debug)]
 pub struct SymbolRegistry<'ctx> {
     reg: HashMap<String, Symbol<'ctx>>,
     scope: SymbolScope<'ctx>,
@@ -22,6 +23,13 @@ impl<'ctx> SymbolRegistry<'ctx> {
         };
     }
 
+    pub fn push_scope(&mut self) {
+        self.scope.push_scope();
+    }
+    pub fn pop_scope(&mut self) {
+        self.scope.pop_scope();
+    }
+
     pub fn get_symbol<S: AsRef<str>>(&self, ident: S) -> &Symbol<'ctx> {
         let ident = ident.as_ref();
         if let Some(s) = self.scope.get_symbol(ident) {
@@ -33,16 +41,22 @@ impl<'ctx> SymbolRegistry<'ctx> {
                 return &symbol;
             }
         }
-        panic!("symbol {ident} not found!");
+        panic!("symbol \"{ident}\" not found! {self:#?}");
     }
 
     pub fn register_symbol<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
         if let Some(_) = self.reg.insert(ident.as_ref().to_string(), symbol) {
-            panic!("symbol redefined!");
+            panic!("symbol redefined! {self:#?}");
         }
+    }
+
+    pub fn register_symbol_scope<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+        self.scope
+            .register_symbol(ident.as_ref().to_string(), symbol);
     }
 }
 
+#[derive(Debug)]
 pub struct SymbolScope<'ctx> {
     scope: Vec<HashMap<String, Symbol<'ctx>>>,
 }
@@ -61,13 +75,19 @@ impl<'ctx> SymbolScope<'ctx> {
     }
 
     pub fn register_symbol<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+        if self.scope.len() == 0 {
+            self.scope.push(HashMap::new());
+            self.scope[0].insert(ident.as_ref().to_string(), symbol);
+
+            return;
+        }
         let repeat = self
             .scope
             .last_mut()
             .unwrap()
             .insert(ident.as_ref().to_string(), symbol);
         if repeat.is_some() {
-            panic!("symbol redefined!");
+            panic!("symbol redefined!: {self:#?}");
         }
     }
 
@@ -83,6 +103,7 @@ impl<'ctx> SymbolScope<'ctx> {
     }
 }
 
+#[derive(Debug)]
 pub enum Symbol<'ctx> {
     Function {
         pointer: FunctionValue<'ctx>,
@@ -92,6 +113,10 @@ pub enum Symbol<'ctx> {
     Symbol {
         ty: Type,
         pointer: PointerValue<'ctx>,
+    },
+    SymbolVal {
+        ty: Type,
+        pointer: BasicValueEnum<'ctx>,
     },
     Registry(SymbolRegistry<'ctx>),
 }

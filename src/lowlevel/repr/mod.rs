@@ -121,8 +121,10 @@ impl Expression {
         match self {
             Self::Literal(literal) => literal.code_gen(symbols, compiler),
             Self::Identifier(ident) => {
+                assert!(ident.len() > 0);
                 return match symbols.get_symbol(ident) {
                     Symbol::Symbol { pointer, .. } => Some(pointer.clone().into()),
+                    Symbol::SymbolVal { pointer, .. } => Some(pointer.clone().into()),
                     _ => todo!(),
                 };
             }
@@ -137,6 +139,10 @@ impl Expression {
                             if let BasicMetadataValueEnum::PointerValue(ptr) = p {
                                 if i >= func_ty.params.len() && func_ty.varidic {
                                     let ret_ty = expr.get_expression_type(symbols, compiler);
+                                    if let Type::Pointer(_) = ret_ty {
+                                        return ptr.into();
+                                    }
+
                                     return compiler
                                         .builder
                                         .build_load(ret_ty.to_llvm_basic_type(compiler), ptr, "")
@@ -161,8 +167,9 @@ impl Expression {
                                         }
                                     }
                                 }
+                            } else {
+                                return p;
                             }
-                            unreachable!("");
                         })
                         .collect();
                     match &**operand {
@@ -186,11 +193,15 @@ impl Expression {
                 }
             }
             Self::Return(expr) => {
-                let val: BasicValueEnum = expr
-                    .code_gen(symbols, compiler)
-                    .map(|f| f.try_into().unwrap())
-                    .unwrap();
-                compiler.builder.build_return(Some(&val)).unwrap();
+                if let Some(expr) = expr {
+                    let val: BasicValueEnum = expr
+                        .code_gen(symbols, compiler)
+                        .map(|f| f.try_into().unwrap())
+                        .unwrap();
+                    compiler.builder.build_return(Some(&val)).unwrap();
+                } else {
+                    compiler.builder.build_return(None).unwrap();
+                }
                 return None;
             }
             Self::Operator(op) => {
@@ -255,18 +266,32 @@ impl Statement {
                 let fv = compiler
                     .module
                     .add_function(ident, llvm_ty, Some(Linkage::External));
-                symbols.register_symbol(
+
+                symbols.register_symbol_scope(
                     &ident,
                     Symbol::Function {
                         pointer: fv,
                         external: false,
-                        ty: Type::Function(ty),
+                        ty: Type::Function(ty.clone()),
                     },
                 );
 
+                symbols.push_scope();
+                for (idx, (ident, ty)) in ty.params.iter().enumerate() {
+                    let param = fv.get_nth_param(idx as u32).unwrap();
+                    param.set_name(&ident);
+                    symbols.register_symbol_scope(
+                        &ident,
+                        Symbol::SymbolVal {
+                            ty: ty.clone(),
+                            pointer: param,
+                        },
+                    );
+                }
                 let entry = compiler.context.append_basic_block(fv, ident);
                 compiler.builder.position_at_end(entry);
                 block.code_gen(symbols, compiler);
+                symbols.pop_scope();
             }
             Self::VariableDefinition {
                 ident,
