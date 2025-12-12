@@ -93,7 +93,8 @@ fn main() -> anyhow::Result<()> {
             .add_statement(ExpressionHandler::call_statement(
                 ExpressionHandler::identifier("printf"),
                 vec![
-                    ExpressionHandler::string("opt %d val %d func %p!\n"),
+                    ExpressionHandler::string("%d opt %d val %d\n"),
+                    ExpressionHandler::identifier("r"),
                     ExpressionHandler::identifier("opt"),
                     ExpressionHandler::identifier("x"),
                 ],
@@ -120,7 +121,7 @@ fn main() -> anyhow::Result<()> {
 
     let cpu = "generic";
     let features = "";
-    let opt = OptimizationLevel::None;
+    let opt = OptimizationLevel::Default;
     let reloc = RelocMode::Default;
     let model = CodeModel::Default;
 

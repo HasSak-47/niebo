@@ -47,23 +47,19 @@ pub enum Operator {
 }
 
 impl Operator {
-    pub fn get_expression_type<'a, 'ctx>(
-        &self,
-        symbols: &Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Type {
+    pub fn get_expression_type<'a, 'ctx>(&self, symbols: &Registry<'ctx>) -> Type {
         return match self {
             Self::Binary { operands, .. } => {
-                if operands[0].get_expression_type(symbols, compiler)
-                    == operands[1].get_expression_type(symbols, compiler)
+                if operands[0].get_expression_type(symbols)
+                    == operands[1].get_expression_type(symbols)
                 {
-                    operands[0].get_expression_type(symbols, compiler)
+                    operands[0].get_expression_type(symbols)
                 } else {
                     unreachable!()
                 }
             }
             Self::Unary { operand, operator } => match operator {
-                UnaryOperator::Ref => Type::pointer(operand.get_expression_type(symbols, compiler)),
+                UnaryOperator::Ref => Type::pointer(operand.get_expression_type(symbols)),
                 _ => todo!(),
             },
         };
@@ -80,11 +76,7 @@ pub enum Literal {
 }
 
 impl Literal {
-    pub fn get_expression_type<'a, 'ctx>(
-        &self,
-        _symbols: &Registry<'ctx>,
-        _compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Type {
+    pub fn get_expression_type<'a, 'ctx>(&self, _symbols: &Registry<'ctx>) -> Type {
         match self {
             Self::Int(_) => Type::int(),
             _ => todo!(),
@@ -99,17 +91,13 @@ pub struct BlockExpression {
 }
 
 impl BlockExpression {
-    pub fn get_expression_type<'a, 'ctx>(
-        &self,
-        symbols: &Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Type {
+    pub fn get_expression_type<'a, 'ctx>(&self, symbols: &Registry<'ctx>) -> Type {
         if self.body.last().is_none() {
             return Type::void();
         }
 
         if let Statement::Expression(e) = self.body.last().unwrap() {
-            return e.get_expression_type(symbols, compiler);
+            return e.get_expression_type(symbols);
         }
         return Type::void();
     }
@@ -197,28 +185,24 @@ impl ExpressionHandler {
         return Statement::Expression(Self::call(operand, params));
     }
 
-    pub fn get_inner_type<'a, 'ctx>(
-        &self,
-        symbols: &Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Type {
+    pub fn get_inner_type<'a, 'ctx>(&self, symbols: &Registry<'ctx>) -> Type {
         use ExpressionEnum as ExpEnum;
         match &self.e {
-            ExpEnum::Literal(l) => l.get_expression_type(symbols, compiler),
-            ExpEnum::Block(b) => b.get_expression_type(symbols, compiler),
+            ExpEnum::Literal(l) => l.get_expression_type(symbols),
+            ExpEnum::Block(b) => b.get_expression_type(symbols),
             ExpEnum::Return(r) => r
                 .as_ref()
-                .map(|p| p.get_expression_type(symbols, compiler))
+                .map(|p| p.get_expression_type(symbols))
                 .unwrap_or(Type::void()),
             ExpEnum::Call(Call { operand, .. }) => {
-                let ty = operand.get_expression_type(symbols, compiler);
+                let ty = operand.get_expression_type(symbols);
                 match ty {
                     Type::Function(f) => (*f.ret_ty).clone(),
                     _ => unreachable!(),
                 }
             }
             ExpEnum::Identifier(ident) => symbols.get_symbol(ident).get_type().clone(),
-            ExpEnum::Operator(op) => op.get_expression_type(symbols, compiler),
+            ExpEnum::Operator(op) => op.get_expression_type(symbols),
             r => todo!("{r:?} not implemented"),
         }
     }
@@ -248,28 +232,20 @@ impl ExpressionHandler {
         };
     }
 
-    pub fn validate_and_determine_expression_type<'a, 'ctx>(
-        &mut self,
-        symbols: &Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-    ) {
+    pub fn validate_and_determine_expression_type<'a, 'ctx>(&mut self, symbols: &Registry<'ctx>) {
         if let Some(ty) = &self.ret_ty {
-            let inner = self.get_inner_type(symbols, compiler);
+            let inner = self.get_inner_type(symbols);
             assert_eq!(*ty, inner);
         } else {
-            self.ret_ty = Some(self.get_expression_type(symbols, compiler));
+            self.ret_ty = Some(self.get_expression_type(symbols));
         }
     }
 
-    pub fn get_expression_type<'a, 'ctx>(
-        &self,
-        symbols: &Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Type {
+    pub fn get_expression_type<'a, 'ctx>(&self, symbols: &Registry<'ctx>) -> Type {
         if let Some(ty) = &self.ret_ty {
             return ty.clone();
         }
-        return self.get_inner_type(symbols, compiler);
+        return self.get_inner_type(symbols);
     }
 }
 
@@ -300,9 +276,26 @@ pub enum Statement {
     FunctionDefinition {
         ident: String,
         params: Vec<(String, Type)>,
-        block: BlockExpression,
+        block: ExpressionHandler,
         varidic: bool,
     },
+}
+
+impl Statement {
+    pub fn validate_statement<'ctx>(&mut self, symbols: &Registry<'ctx>) {
+        match self {
+            Self::VariableDefinition { expression, .. } => {
+                expression.validate_and_determine_expression_type(symbols)
+            }
+            Self::FunctionDefinition { block, .. } => {
+                block.validate_and_determine_expression_type(symbols)
+            }
+            Self::Expression(expression) => {
+                expression.validate_and_determine_expression_type(symbols)
+            }
+            _ => {}
+        }
+    }
 }
 
 pub struct FunctionBuilder {
@@ -350,7 +343,10 @@ impl FunctionBuilder {
         assert!(self.body.is_some());
         Statement::FunctionDefinition {
             ident: self.ident,
-            block: self.body.unwrap(),
+            block: ExpressionHandler {
+                e: ExpressionEnum::Block(self.body.unwrap()),
+                ret_ty: Some(self.ret_ty),
+            },
             params: self.params,
             varidic: self.varidic,
         }

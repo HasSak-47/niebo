@@ -25,7 +25,7 @@ pub trait Expression {
         &self,
         symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-        assing_to: Option<Box<Self>>,
+        assign_to: Option<Box<dyn Expression>>,
     ) -> Option<AnyValueEnum<'ctx>>;
 }
 
@@ -34,7 +34,7 @@ impl Expression for Operator {
         &self,
         symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-        _assing_to: Option<Box<Self>>,
+        assign_to: Option<Box<dyn Expression>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         match self {
             Operator::Binary { operands, operator } => {
@@ -64,7 +64,7 @@ impl Expression for Literal {
         &self,
         _symbols: &mut Registry,
         compiler: &ModuleCompiler<'a, 'ctx>,
-        _assing_to: Option<Box<Self>>,
+        assign_to: Option<Box<dyn Expression>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         match self {
             Literal::Int(val) => {
@@ -104,7 +104,7 @@ impl Expression for BlockExpression {
         &self,
         symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-        _assing_to: Option<Box<Self>>,
+        assign_to: Option<Box<dyn Expression>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         if self.body.len() == 0 {
             return None;
@@ -132,8 +132,8 @@ impl Expression for Identifier {
     fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-        assing_to: Option<Box<Self>>,
+        _compiler: &ModuleCompiler<'a, 'ctx>,
+        _assign_to: Option<Box<dyn Expression>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         assert!(self.name.len() > 0);
         let v = match symbols.get_symbol(&self) {
@@ -156,14 +156,13 @@ impl Expression for Call {
         &self,
         symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-        _assing_to: Option<Box<Self>>,
+        _assign_to: Option<Box<dyn Expression>>,
     ) -> Option<AnyValueEnum<'ctx>> {
-        let func_ty =
-            if let Type::Function(func_ty) = self.operand.get_expression_type(symbols, compiler) {
-                func_ty
-            } else {
-                unreachable!()
-            };
+        let func_ty = if let Type::Function(func_ty) = self.operand.get_expression_type(symbols) {
+            func_ty
+        } else {
+            unreachable!()
+        };
         let params: Vec<BasicMetadataValueEnum> = self
             .params
             .iter()
@@ -171,7 +170,7 @@ impl Expression for Call {
             .map(|(i, expr)| {
                 let p = expr.code_gen(symbols, compiler, None).unwrap();
                 if i >= func_ty.params.len() && func_ty.varidic {
-                    let ret_ty = expr.get_expression_type(symbols, compiler);
+                    let ret_ty = expr.get_expression_type(symbols);
                     return ret_ty.build_load(p, "", compiler).try_into().unwrap();
                 } else {
                     let (name, ty) = &func_ty.params[i];
@@ -205,10 +204,10 @@ impl Expression for ExpressionHandler {
         &self,
         symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-        _assing_to: Option<Box<Self>>,
+        assign_to: Option<Box<dyn Expression>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         use ExpressionEnum as ExpEnum;
-        match &self.e {
+        let val = match &self.e {
             ExpEnum::Literal(literal) => literal.code_gen(symbols, compiler, None),
             ExpEnum::Identifier(ident) => ident.code_gen(symbols, compiler, None),
             ExpEnum::Call(call) => call.code_gen(symbols, compiler, None),
@@ -227,7 +226,26 @@ impl Expression for ExpressionHandler {
             ExpEnum::Operator(op) => {
                 return op.code_gen(symbols, compiler, None);
             }
+            ExpEnum::Block(blk) => {
+                return blk.code_gen(symbols, compiler, None);
+            }
             v => todo!("expression {v:?} not yet implemented"),
+        };
+
+        if let Some(expr) = &assign_to {
+            let ptr = expr
+                .code_gen(symbols, compiler, None)
+                .unwrap()
+                .into_pointer_value();
+            let val = val.unwrap();
+            match val {
+                AnyValueEnum::IntValue(val) => {
+                    compiler.builder.build_store(ptr, val).unwrap();
+                }
+                e => todo!("{e:?}"),
+            }
         }
+
+        return val;
     }
 }

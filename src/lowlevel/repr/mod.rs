@@ -4,12 +4,8 @@ pub mod prelude;
 pub mod registry;
 
 use inkwell::{
-    AddressSpace,
     module::Linkage,
-    values::{
-        AnyValue, AnyValueEnum, ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum,
-        FunctionValue, IntValue, PointerValue,
-    },
+    values::{FunctionValue, IntValue, PointerValue},
 };
 
 use crate::lowlevel::{
@@ -67,7 +63,7 @@ impl Statement {
             } => {
                 let ty = FunctionType {
                     params: params.clone(),
-                    ret_ty: Box::new(block.ret_ty.clone()),
+                    ret_ty: Box::new(block.ret_ty.as_ref().unwrap().clone()),
                     varidic: varidic.clone(),
                 };
                 let llvm_ty = ty.build_fn_type(compiler.context);
@@ -111,19 +107,6 @@ impl Statement {
                     .builder
                     .build_alloca(ty.to_llvm_basic_type(compiler), ident)
                     .unwrap();
-                let v = expression
-                    .code_gen(symbols, compiler, None)
-                    .expect(&format!("{expression:?} doesn't return value"));
-
-                match ty {
-                    Type::Primitive(PrimitiveType::Int) => {
-                        compiler
-                            .builder
-                            .build_store::<IntValue>(var, v.try_into().unwrap())
-                            .unwrap();
-                    }
-                    _ => todo!(),
-                }
                 symbols.register_symbol_scope(
                     ident,
                     Symbol::Label {
@@ -131,6 +114,13 @@ impl Statement {
                         pointer: Some(var),
                     },
                 );
+                expression
+                    .code_gen(
+                        symbols,
+                        compiler,
+                        Some(Box::new(ExpressionHandler::identifier(ident))),
+                    )
+                    .expect(&format!("{expression:?} doesn't return value"));
             }
             Self::Expression(e) => {
                 e.code_gen(symbols, compiler, None);
