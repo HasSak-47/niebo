@@ -10,7 +10,7 @@ use inkwell::{
 
 use crate::lowlevel::{
     compiler::ModuleCompiler,
-    repr::registry::{Symbol, SymbolRegistry},
+    repr::registry::{Registry, Symbol},
     types::{PrimitiveType, Type},
 };
 
@@ -23,7 +23,7 @@ pub trait Expression {
 
     fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry<'ctx>,
+        symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
         assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>>;
@@ -32,7 +32,7 @@ pub trait Expression {
 impl Expression for Operator {
     fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry<'ctx>,
+        symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
         _assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>> {
@@ -60,7 +60,7 @@ impl Expression for Operator {
 impl Expression for Literal {
     fn code_gen<'a, 'ctx>(
         &self,
-        _symbols: &mut SymbolRegistry,
+        _symbols: &mut Registry,
         compiler: &ModuleCompiler<'a, 'ctx>,
         _assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>> {
@@ -100,7 +100,7 @@ impl Expression for Literal {
 impl Expression for BlockExpression {
     fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry<'ctx>,
+        symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
         _assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>> {
@@ -129,14 +129,18 @@ impl Expression for BlockExpression {
 impl Expression for Identifier {
     fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry<'ctx>,
+        symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
         assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         assert!(self.name.len() > 0);
-        return match symbols.get_symbol(&self.name) {
-            Symbol::Label { pointer, .. } => Some(pointer.clone().into()),
-            Symbol::Value { pointer, .. } => Some(pointer.clone().into()),
+        return match symbols.get_symbol(&self) {
+            Symbol::Label { pointer, .. } => pointer
+                .as_ref()
+                .and_then(|x| Some(x.clone().as_any_value_enum())),
+            Symbol::Value { pointer, .. } => pointer
+                .as_ref()
+                .and_then(|x| Some(x.clone().as_any_value_enum())),
             _ => todo!(),
         };
     }
@@ -145,7 +149,7 @@ impl Expression for Identifier {
 impl Expression for Call {
     fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry<'ctx>,
+        symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
         _assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>> {
@@ -171,14 +175,14 @@ impl Expression for Call {
             })
             .collect();
         match &self.operand.e {
-            ExpressionEnum::Identifier(Identifier { name, .. }) => {
-                let func = symbols.get_symbol(name);
+            ExpressionEnum::Identifier(ident) => {
+                let func = symbols.get_symbol(ident);
                 match func {
                     Symbol::Function { pointer, .. } => {
                         return Some(
                             compiler
                                 .builder
-                                .build_call(*pointer, params.as_slice(), "")
+                                .build_call(*pointer.as_ref().unwrap(), params.as_slice(), "")
                                 .unwrap()
                                 .as_any_value_enum(),
                         );
@@ -194,7 +198,7 @@ impl Expression for Call {
 impl Expression for ExpressionHandler {
     fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry<'ctx>,
+        symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
         _assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>> {

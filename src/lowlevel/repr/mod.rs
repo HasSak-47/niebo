@@ -30,7 +30,7 @@ impl Statement {
     }
     pub fn code_gen<'a, 'ctx>(
         &self,
-        symbols: &mut SymbolRegistry<'ctx>,
+        symbols: &mut Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) {
         match self {
@@ -51,9 +51,9 @@ impl Statement {
                     .add_function(ident, llvm_ty, Some(Linkage::External));
 
                 symbols.register_symbol(
-                    &ident,
+                    ident,
                     Symbol::Function {
-                        pointer: val,
+                        pointer: Some(val),
                         external: true,
                         ty: Type::Function(ty),
                     },
@@ -76,9 +76,9 @@ impl Statement {
                     .add_function(ident, llvm_ty, Some(Linkage::External));
 
                 symbols.register_symbol_scope(
-                    &ident,
+                    ident,
                     Symbol::Function {
-                        pointer: fv,
+                        pointer: Some(fv),
                         external: false,
                         ty: Type::Function(ty.clone()),
                     },
@@ -89,10 +89,10 @@ impl Statement {
                     let param = fv.get_nth_param(idx as u32).unwrap();
                     param.set_name(&ident);
                     symbols.register_symbol_scope(
-                        &ident,
+                        ident,
                         Symbol::Value {
                             ty: ty.clone(),
-                            pointer: param,
+                            pointer: Some(param),
                         },
                     );
                 }
@@ -115,10 +115,10 @@ impl Statement {
                     .code_gen(symbols, compiler, None)
                     .expect(&format!("{expression:?} doesn't return value"));
                 symbols.register_symbol(
-                    &ident,
+                    ident,
                     Symbol::Label {
                         ty: ty.clone(),
-                        pointer: var,
+                        pointer: None,
                     },
                 );
             }
@@ -144,7 +144,7 @@ impl Repr {
     }
 
     pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {
-        let mut r = SymbolRegistry::new(&compiler.ident);
+        let mut r = Registry::new(&compiler.ident);
         for stmt in &self.statements {
             stmt.code_gen(&mut r, compiler);
         }

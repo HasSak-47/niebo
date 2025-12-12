@@ -1,4 +1,17 @@
-use crate::lowlevel::{compiler::ModuleCompiler, repr::registry::SymbolRegistry, types::*};
+use crate::lowlevel::{compiler::ModuleCompiler, repr::registry::Registry, types::*};
+
+#[derive(Debug, Clone)]
+pub struct Identifier {
+    pub name: String,
+    pub path: Vec<String>,
+}
+
+impl Identifier {
+    fn new<S: Into<String>>(name: S, path: Vec<String>) -> Self {
+        let name = name.into();
+        return Self { name, path };
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
@@ -36,7 +49,7 @@ pub enum Operator {
 impl Operator {
     pub fn get_expression_type<'a, 'ctx>(
         &self,
-        symbols: &SymbolRegistry<'ctx>,
+        symbols: &Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Type {
         return match self {
@@ -69,7 +82,7 @@ pub enum Literal {
 impl Literal {
     pub fn get_expression_type<'a, 'ctx>(
         &self,
-        _symbols: &SymbolRegistry<'ctx>,
+        _symbols: &Registry<'ctx>,
         _compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Type {
         match self {
@@ -88,7 +101,7 @@ pub struct BlockExpression {
 impl BlockExpression {
     pub fn get_expression_type<'a, 'ctx>(
         &self,
-        symbols: &SymbolRegistry<'ctx>,
+        symbols: &Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Type {
         if self.body.last().is_none() {
@@ -99,19 +112,6 @@ impl BlockExpression {
             return e.get_expression_type(symbols, compiler);
         }
         return Type::void();
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Identifier {
-    pub name: String,
-    pub path: Vec<String>,
-}
-
-impl Identifier {
-    fn new<S: Into<String>>(name: S, path: Vec<String>) -> Self {
-        let name = name.into();
-        return Self { name, path };
     }
 }
 
@@ -199,7 +199,7 @@ impl ExpressionHandler {
 
     pub fn get_inner_type<'a, 'ctx>(
         &self,
-        symbols: &SymbolRegistry<'ctx>,
+        symbols: &Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Type {
         use ExpressionEnum as ExpEnum;
@@ -217,10 +217,7 @@ impl ExpressionHandler {
                     _ => unreachable!(),
                 }
             }
-            ExpEnum::Identifier(Identifier { name, .. }) => {
-                println!("{name}");
-                symbols.get_symbol(name).get_type().clone()
-            }
+            ExpEnum::Identifier(ident) => symbols.get_symbol(ident).get_type().clone(),
             ExpEnum::Operator(op) => op.get_expression_type(symbols, compiler),
             r => todo!("{r:?} not implemented"),
         }
@@ -253,7 +250,7 @@ impl ExpressionHandler {
 
     pub fn validate_and_determine_expression_type<'a, 'ctx>(
         &mut self,
-        symbols: &SymbolRegistry<'ctx>,
+        symbols: &Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) {
         if let Some(ty) = &self.ret_ty {
@@ -266,7 +263,7 @@ impl ExpressionHandler {
 
     pub fn get_expression_type<'a, 'ctx>(
         &self,
-        symbols: &SymbolRegistry<'ctx>,
+        symbols: &Registry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Type {
         if let Some(ty) = &self.ret_ty {

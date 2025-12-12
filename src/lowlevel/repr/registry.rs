@@ -3,24 +3,24 @@ use inkwell::values::BasicValueEnum;
 use std::collections::HashMap;
 
 #[derive(Debug)]
-pub struct SymbolRegistry<'ctx> {
-    reg: HashMap<String, Symbol<'ctx>>,
-    scope: SymbolScope<'ctx>,
+pub struct Registry<'ctx> {
+    root: HashMap<String, Symbol<'ctx>>,
+    scope: Scope<'ctx>,
 }
 
-impl<'ctx> SymbolRegistry<'ctx> {
-    pub fn new<S: AsRef<str>>(namespace: S) -> Self {
+impl<'ctx> Registry<'ctx> {
+    pub fn new<S: Into<String>>(namespace: S) -> Self {
         let mut reg = HashMap::new();
         reg.insert(
-            namespace.as_ref().to_string(),
-            Symbol::Module(SymbolRegistry {
-                reg: HashMap::new(),
-                scope: SymbolScope::new(),
+            namespace.into(),
+            Symbol::Module(Registry {
+                root: HashMap::new(),
+                scope: Scope::new(),
             }),
         );
         return Self {
-            reg,
-            scope: SymbolScope::new(),
+            root: reg,
+            scope: Scope::new(),
         };
     }
 
@@ -31,38 +31,41 @@ impl<'ctx> SymbolRegistry<'ctx> {
         self.scope.pop_scope();
     }
 
-    pub fn get_symbol<S: AsRef<str>>(&self, ident: S) -> &Symbol<'ctx> {
-        let ident = ident.as_ref();
+    pub fn get_symbol(&self, ident: &Identifier) -> &Symbol<'ctx> {
+        let mut path = &self.root;
+        for p in ident.path.iter() {
+            if let Symbol::Module(m) = &path[p] {
+                path = &m.root;
+            }
+        }
+
+        if path.contains_key(&ident.name) {
+            return &path[&ident.name];
+        }
         if let Some(s) = self.scope.get_symbol(ident) {
             return s;
         }
 
-        for (id, symbol) in &self.reg {
-            if id == ident {
-                return &symbol;
-            }
-        }
-        panic!("symbol \"{ident}\" not found! {self:#?}");
+        panic!("symbol \"{ident:?}\" not found! {self:#?}");
     }
 
-    pub fn register_symbol<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
-        if let Some(_) = self.reg.insert(ident.as_ref().to_string(), symbol) {
+    pub fn register_symbol<S: Into<String>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+        if let Some(_) = self.root.insert(ident.into(), symbol) {
             panic!("symbol redefined! {self:#?}");
         }
     }
 
-    pub fn register_symbol_scope<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
-        self.scope
-            .register_symbol(ident.as_ref().to_string(), symbol);
+    pub fn register_symbol_scope<S: Into<String>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+        self.scope.register_symbol(ident.into(), symbol);
     }
 }
 
 #[derive(Debug)]
-pub struct SymbolScope<'ctx> {
+pub struct Scope<'ctx> {
     scope: Vec<HashMap<String, Symbol<'ctx>>>,
 }
 
-impl<'ctx> SymbolScope<'ctx> {
+impl<'ctx> Scope<'ctx> {
     pub fn new() -> Self {
         Self { scope: Vec::new() }
     }
@@ -75,25 +78,21 @@ impl<'ctx> SymbolScope<'ctx> {
         self.scope.pop();
     }
 
-    pub fn register_symbol<S: AsRef<str>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+    pub fn register_symbol<S: Into<String>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
         if self.scope.len() == 0 {
             self.scope.push(HashMap::new());
-            self.scope[0].insert(ident.as_ref().to_string(), symbol);
+            self.scope[0].insert(ident.into(), symbol);
 
             return;
         }
-        let repeat = self
-            .scope
-            .last_mut()
-            .unwrap()
-            .insert(ident.as_ref().to_string(), symbol);
+        let repeat = self.scope.last_mut().unwrap().insert(ident.into(), symbol);
         if repeat.is_some() {
             panic!("symbol redefined!: {self:#?}");
         }
     }
 
-    pub fn get_symbol<S: AsRef<str>>(&self, ident: S) -> Option<&Symbol<'ctx>> {
-        let ident = ident.as_ref();
+    pub fn get_symbol(&self, ident: &Identifier) -> Option<&Symbol<'ctx>> {
+        let ident = &ident.name;
         for symbols in self.scope.iter().rev() {
             if symbols.contains_key(ident) {
                 return Some(&symbols[ident]);
@@ -119,7 +118,7 @@ pub enum Symbol<'ctx> {
         ty: Type,
         pointer: Option<BasicValueEnum<'ctx>>,
     },
-    Module(SymbolRegistry<'ctx>),
+    Module(Registry<'ctx>),
 }
 
 impl<'ctx> Symbol<'ctx> {
