@@ -1,5 +1,7 @@
 use inkwell::{builder::Builder, context::Context, module::Module};
 
+use crate::lowlevel::repr::ir::Statement;
+
 use super::repr::Repr;
 
 pub struct Compiler<'a, 'ctx> {
@@ -18,13 +20,15 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
     pub fn new_module(&self, mut repr: Repr, ident: String) -> ModuleCompiler<'a, 'ctx> {
         repr.validate();
 
-        return ModuleCompiler {
+        let module = ModuleCompiler {
             context: self.context,
             module: self.context.create_module(&ident),
             builder: self.context.create_builder(),
             ident,
             repr,
         };
+
+        return module;
     }
 }
 

@@ -1,4 +1,9 @@
-use inkwell::{AddressSpace, context::Context, types::BasicType};
+use inkwell::{
+    AddressSpace,
+    context::Context,
+    types::BasicType,
+    values::{AnyValueEnum, PointerValue},
+};
 
 use crate::lowlevel::compiler::ModuleCompiler;
 
@@ -105,6 +110,29 @@ impl Type {
                 .ptr_type(AddressSpace::default())
                 .as_basic_type_enum(),
             ty => todo!("Type::{ty:?} is not implemented"),
+        }
+    }
+
+    pub fn build_load<'a, 'ctx, S: AsRef<str>>(
+        &self,
+        val: AnyValueEnum<'ctx>,
+        name: S,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> AnyValueEnum<'ctx> {
+        let name = name.as_ref();
+        match self {
+            Type::Primitive(PrimitiveType::String)
+            | Type::Primitive(PrimitiveType::Void)
+            | Type::Pointer(_) => val,
+            ty => {
+                let ptr = val.into_pointer_value();
+                return compiler
+                    .builder
+                    .build_load(ty.to_llvm_basic_type(compiler), ptr, name)
+                    .unwrap()
+                    .try_into()
+                    .unwrap();
+            }
         }
     }
 

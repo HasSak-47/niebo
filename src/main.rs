@@ -10,7 +10,7 @@ use crate::lowlevel::{
     compiler::Compiler,
     repr::{
         Repr,
-        ir::{ExpressionHandler, FunctionBuilder, Operator, Statement, UnaryOperator},
+        ir::{ExpressionHandler, FunctionBuilder, Statement, UnaryOperator},
     },
     types::*,
 };

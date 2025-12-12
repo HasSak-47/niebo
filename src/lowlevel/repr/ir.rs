@@ -218,6 +218,7 @@ impl ExpressionHandler {
                 }
             }
             ExpEnum::Identifier(Identifier { name, .. }) => {
+                println!("{name}");
                 symbols.get_symbol(name).get_type().clone()
             }
             ExpEnum::Operator(op) => op.get_expression_type(symbols, compiler),
@@ -235,6 +236,7 @@ impl ExpressionHandler {
         };
     }
 
+    #[allow(dead_code)]
     pub fn binary_operation(
         operator: BinaryOperator,
         a: ExpressionHandler,

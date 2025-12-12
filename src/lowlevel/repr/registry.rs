@@ -13,7 +13,7 @@ impl<'ctx> SymbolRegistry<'ctx> {
         let mut reg = HashMap::new();
         reg.insert(
             namespace.as_ref().to_string(),
-            Symbol::Registry(SymbolRegistry {
+            Symbol::Module(SymbolRegistry {
                 reg: HashMap::new(),
                 scope: SymbolScope::new(),
             }),
@@ -107,27 +107,27 @@ impl<'ctx> SymbolScope<'ctx> {
 #[derive(Debug)]
 pub enum Symbol<'ctx> {
     Function {
-        pointer: FunctionValue<'ctx>,
+        pointer: Option<FunctionValue<'ctx>>,
         external: bool,
         ty: Type,
     },
-    Symbol {
+    Label {
         ty: Type,
-        pointer: PointerValue<'ctx>,
+        pointer: Option<PointerValue<'ctx>>,
     },
-    SymbolVal {
+    Value {
         ty: Type,
-        pointer: BasicValueEnum<'ctx>,
+        pointer: Option<BasicValueEnum<'ctx>>,
     },
-    Registry(SymbolRegistry<'ctx>),
+    Module(SymbolRegistry<'ctx>),
 }
 
 impl<'ctx> Symbol<'ctx> {
     pub fn get_type(&self) -> Type {
         match self {
             Self::Function { ty, .. } => ty.clone(),
-            Self::Symbol { ty, .. } => ty.clone(),
-            _ => unreachable!(),
+            Self::Label { ty, .. } => ty.clone(),
+            _ => unreachable!("registry has no type"),
         }
     }
 }
