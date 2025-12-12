@@ -1,1 +1,1 @@
-implement well the symbol resolution instead of just searching for its name
+- first validate IR instead of building code assuming it is correct

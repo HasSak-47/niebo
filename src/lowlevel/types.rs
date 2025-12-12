@@ -9,6 +9,7 @@ use crate::lowlevel::compiler::ModuleCompiler;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {
+    Bool,
     Int,
     Uint,
     Float,

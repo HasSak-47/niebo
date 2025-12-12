@@ -107,20 +107,60 @@ impl BlockExpression {
 pub struct Call {
     pub operand: Box<ExpressionHandler>,
     pub params: Vec<ExpressionHandler>,
-    pub store_to: Option<Box<ExpressionHandler>>,
 }
 
 impl Call {
-    fn new(
-        operand: ExpressionHandler,
-        params: Vec<ExpressionHandler>,
-        store_to: Option<Box<ExpressionHandler>>,
-    ) -> Self {
+    fn new(operand: ExpressionHandler, params: Vec<ExpressionHandler>) -> Self {
         return Self {
             operand: Box::new(operand),
             params,
-            store_to,
         };
+    }
+}
+
+pub struct If {
+    pub condition: ExpressionHandler,
+    pub then: ExpressionHandler,
+}
+
+impl If {
+    pub fn new(condition: ExpressionHandler, then: ExpressionHandler) -> Self {
+        return Self { condition, then };
+    }
+
+    pub fn validate_and_determine_expression_type<'ctx>(&mut self, symbols: &mut Registry<'ctx>) {
+        if let Type::Primitive(PrimitiveType::Bool) = self.condition.get_expression_type(symbols) {
+        } else {
+            panic!("if condition is not boolean")
+        }
+
+        self.then.validate_and_determine_expression_type(symbols);
+    }
+}
+
+pub struct ConditionList {
+    pub ifs: Vec<If>,
+    pub e: Option<ExpressionHandler>,
+}
+
+impl ConditionList {
+    pub fn new(condition: ExpressionHandler, then: ExpressionHandler) -> Self {
+        return Self {
+            ifs: vec![If::new(condition, then)],
+            e: None,
+        };
+    }
+
+    pub fn add_if(&mut self, condition: ExpressionHandler, then: ExpressionHandler) {
+        self.ifs.push(If::new(condition, then));
+    }
+
+    pub fn set_else(&mut self, e: ExpressionHandler) {
+        self.e = Some(e);
+    }
+
+    pub fn validate_and_determine_expression_type<'ctx>(&mut self, symbols: &mut Registry<'ctx>) {
+        todo!()
     }
 }
 
@@ -176,7 +216,7 @@ impl ExpressionHandler {
 
     pub fn call(operand: ExpressionHandler, params: Vec<ExpressionHandler>) -> Self {
         return Self {
-            e: ExpressionEnum::Call(Call::new(operand, params, None)),
+            e: ExpressionEnum::Call(Call::new(operand, params)),
             ret_ty: None,
         };
     }
