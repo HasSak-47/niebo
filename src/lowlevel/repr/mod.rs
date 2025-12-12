@@ -1,3 +1,4 @@
+pub mod codegen;
 pub mod ir;
 pub mod prelude;
 pub mod registry;
@@ -6,8 +7,8 @@ use inkwell::{
     AddressSpace,
     module::Linkage,
     values::{
-        AnyValue, ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue,
-        PointerValue,
+        AnyValue, AnyValueEnum, ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum,
+        FunctionValue, PointerValue,
     },
 };
 
@@ -23,7 +24,7 @@ impl Operator {
         &self,
         symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Option<BasicMetadataValueEnum<'ctx>> {
+    ) -> Option<AnyValueEnum<'ctx>> {
         match self {
             Operator::Binary { operands, operator } => {
                 let a = operands[0].code_gen(symbols, compiler).unwrap();
@@ -50,7 +51,7 @@ impl Literal {
         &self,
         _symbols: &mut SymbolRegistry,
         compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Option<BasicMetadataValueEnum<'ctx>> {
+    ) -> Option<AnyValueEnum<'ctx>> {
         match self {
             Literal::Int(val) => {
                 return Some(compiler.context.i32_type().const_int(*val, true).into());
@@ -89,7 +90,7 @@ impl BlockExpression {
         &self,
         symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Option<BasicMetadataValueEnum<'ctx>> {
+    ) -> Option<AnyValueEnum<'ctx>> {
         if self.body.len() == 0 {
             return None;
         }
@@ -112,23 +113,26 @@ impl BlockExpression {
     }
 }
 
-impl Expression {
+impl ExpressionHandler {
     pub fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
-    ) -> Option<BasicMetadataValueEnum<'ctx>> {
-        match self {
-            Self::Literal(literal) => literal.code_gen(symbols, compiler),
-            Self::Identifier(ident) => {
-                assert!(ident.len() > 0);
-                return match symbols.get_symbol(ident) {
+    ) -> Option<AnyValueEnum<'ctx>> {
+        use ExpressionEnum as ExpEnum;
+        match &self.e {
+            ExpEnum::Literal(literal) => literal.code_gen(symbols, compiler),
+            ExpEnum::Identifier(Identifier { name, .. }) => {
+                assert!(name.len() > 0);
+                return match symbols.get_symbol(name) {
                     Symbol::Symbol { pointer, .. } => Some(pointer.clone().into()),
                     Symbol::SymbolVal { pointer, .. } => Some(pointer.clone().into()),
                     _ => todo!(),
                 };
             }
-            Self::Call { operand, params } => {
+            ExpEnum::Call(Call {
+                operand, params, ..
+            }) => {
                 let ty = operand.get_expression_type(symbols, compiler);
                 if let Type::Function(func_ty) = ty {
                     let params: Vec<BasicMetadataValueEnum> = params
@@ -136,24 +140,26 @@ impl Expression {
                         .enumerate()
                         .map(|(i, expr)| {
                             let p = expr.code_gen(symbols, compiler).unwrap();
-                            if let BasicMetadataValueEnum::PointerValue(ptr) = p {
+                            if let AnyValueEnum::PointerValue(ptr) = p {
                                 if i >= func_ty.params.len() && func_ty.varidic {
                                     let ret_ty = expr.get_expression_type(symbols, compiler);
                                     if let Type::Pointer(_) = ret_ty {
-                                        return ptr.into();
+                                        return ptr.try_into().unwrap();
                                     }
 
                                     return compiler
                                         .builder
                                         .build_load(ret_ty.to_llvm_basic_type(compiler), ptr, "")
                                         .unwrap()
-                                        .into();
+                                        .as_basic_value_enum()
+                                        .try_into()
+                                        .unwrap();
                                 } else {
                                     let (name, ty) = &func_ty.params[i];
                                     match ty {
                                         Type::Primitive(PrimitiveType::String)
                                         | Type::Primitive(PrimitiveType::Void)
-                                        | Type::Pointer(_) => return p,
+                                        | Type::Pointer(_) => return p.try_into().unwrap(),
                                         ty => {
                                             return compiler
                                                 .builder
@@ -163,36 +169,39 @@ impl Expression {
                                                     name,
                                                 )
                                                 .unwrap()
-                                                .into();
+                                                .try_into()
+                                                .unwrap();
                                         }
                                     }
                                 }
                             } else {
-                                return p;
+                                return p.try_into().unwrap();
                             }
                         })
                         .collect();
-                    match &**operand {
-                        Expression::Identifier(ident) => {
-                            let func = symbols.get_symbol(ident);
+                    match &operand.e {
+                        ExpressionEnum::Identifier(Identifier { name, .. }) => {
+                            let func = symbols.get_symbol(name);
                             match func {
                                 Symbol::Function { pointer, .. } => {
-                                    compiler
-                                        .builder
-                                        .build_call(*pointer, params.as_slice(), "")
-                                        .unwrap();
+                                    return Some(
+                                        compiler
+                                            .builder
+                                            .build_call(*pointer, params.as_slice(), "")
+                                            .unwrap()
+                                            .as_any_value_enum(),
+                                    );
                                 }
                                 _ => todo!(),
                             };
                         }
                         _ => todo!(),
                     }
-                    return None;
                 } else {
                     unreachable!()
                 }
             }
-            Self::Return(expr) => {
+            ExpEnum::Return(expr) => {
                 if let Some(expr) = expr {
                     let val: BasicValueEnum = expr
                         .code_gen(symbols, compiler)
@@ -204,7 +213,7 @@ impl Expression {
                 }
                 return None;
             }
-            Self::Operator(op) => {
+            ExpEnum::Operator(op) => {
                 return op.code_gen(symbols, compiler);
             }
             v => todo!("expression {v:?} not yet implemented"),
@@ -213,7 +222,7 @@ impl Expression {
 }
 
 impl Statement {
-    pub fn var_define<S: AsRef<str>>(ident: S, ty: Type, expr: Expression) -> Self {
+    pub fn var_define<S: AsRef<str>>(ident: S, ty: Type, expr: ExpressionHandler) -> Self {
         return Self::VariableDefinition {
             ident: ident.as_ref().to_string(),
             ty,
@@ -303,16 +312,9 @@ impl Statement {
                     .builder
                     .build_alloca(ty.to_llvm_basic_type(compiler), ident)
                     .unwrap();
-                compiler
-                    .builder
-                    .build_store(
-                        var,
-                        TryInto::<BasicValueEnum<'ctx>>::try_into(
-                            expression.code_gen(symbols, compiler).unwrap(),
-                        )
-                        .unwrap(),
-                    )
-                    .unwrap();
+                let v = expression
+                    .code_gen(symbols, compiler)
+                    .expect(&format!("{expression:?} doesn't return value"));
                 symbols.register_symbol(
                     &ident,
                     Symbol::Symbol {

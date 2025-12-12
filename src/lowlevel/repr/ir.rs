@@ -24,11 +24,11 @@ pub enum UnaryOperator {
 #[derive(Debug, Clone)]
 pub enum Operator {
     Binary {
-        operands: [Box<Expression>; 2],
+        operands: [Box<ExpressionHandler>; 2],
         operator: BinaryOperator,
     },
     Unary {
-        operand: Box<Expression>,
+        operand: Box<ExpressionHandler>,
         operator: UnaryOperator,
     },
 }
@@ -103,42 +103,163 @@ impl BlockExpression {
 }
 
 #[derive(Debug, Clone)]
-pub enum Expression {
-    Return(Option<Box<Expression>>),
+pub struct Identifier {
+    pub name: String,
+    pub path: Vec<String>,
+}
+
+impl Identifier {
+    fn new<S: Into<String>>(name: S, path: Vec<String>) -> Self {
+        let name = name.into();
+        return Self { name, path };
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Call {
+    pub operand: Box<ExpressionHandler>,
+    pub params: Vec<ExpressionHandler>,
+    pub store_to: Option<Box<ExpressionHandler>>,
+}
+
+impl Call {
+    fn new(
+        operand: ExpressionHandler,
+        params: Vec<ExpressionHandler>,
+        store_to: Option<Box<ExpressionHandler>>,
+    ) -> Self {
+        return Self {
+            operand: Box::new(operand),
+            params,
+            store_to,
+        };
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum ExpressionEnum {
+    Return(Option<Box<ExpressionHandler>>),
     Literal(Literal),
     Operator(Operator),
-    Identifier(String),
-    Call {
-        operand: Box<Expression>,
-        params: Vec<Expression>,
-    },
+    Identifier(Identifier),
+    Call(Call),
     Block(BlockExpression),
 }
 
-impl Expression {
-    pub fn int(val: i32) -> Expression {
-        return Expression::Literal(Literal::Int(val as u64));
+#[derive(Debug, Clone)]
+pub struct ExpressionHandler {
+    pub e: ExpressionEnum,
+    pub ret_ty: Option<Type>,
+}
+
+impl ExpressionHandler {
+    pub fn int(val: i32) -> Self {
+        return Self {
+            e: ExpressionEnum::Literal(Literal::Int(val as u64)),
+            ret_ty: Some(Type::int()),
+        };
     }
 
-    pub fn string<S: AsRef<str>>(s: S) -> Expression {
+    pub fn string<S: AsRef<str>>(s: S) -> Self {
         let s = s.as_ref().to_string();
-        return Expression::Literal(Literal::String(s));
+        return Self {
+            e: ExpressionEnum::Literal(Literal::String(s)),
+            ret_ty: Some(Type::string()),
+        };
     }
 
-    pub fn identifier<S: AsRef<str>>(s: S) -> Expression {
-        let s = s.as_ref().to_string();
-        return Expression::Identifier(s);
+    pub fn identifier<S: Into<String>>(s: S) -> Self {
+        return Self {
+            e: ExpressionEnum::Identifier(Identifier::new(s, vec![])),
+            ret_ty: None,
+        };
     }
 
-    pub fn return_statement(exp: Expression) -> Statement {
-        Statement::Expression(Expression::Return(Some(Box::new(exp))))
+    pub fn return_expression(exp: Option<ExpressionHandler>) -> Self {
+        return Self {
+            e: ExpressionEnum::Return(exp.and_then(|f| Some(Box::new(f)))),
+            ret_ty: None,
+        };
     }
 
-    pub fn call_statement(operand: Expression, params: Vec<Expression>) -> Statement {
-        Statement::Expression(Expression::Call {
-            operand: Box::new(operand),
-            params,
-        })
+    pub fn return_statement(exp: Option<ExpressionHandler>) -> Statement {
+        return Statement::Expression(Self::return_expression(exp));
+    }
+
+    pub fn call(operand: ExpressionHandler, params: Vec<ExpressionHandler>) -> Self {
+        return Self {
+            e: ExpressionEnum::Call(Call::new(operand, params, None)),
+            ret_ty: None,
+        };
+    }
+
+    pub fn call_statement(operand: ExpressionHandler, params: Vec<ExpressionHandler>) -> Statement {
+        return Statement::Expression(Self::call(operand, params));
+    }
+
+    pub fn get_inner_type<'a, 'ctx>(
+        &self,
+        symbols: &SymbolRegistry<'ctx>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) -> Type {
+        use ExpressionEnum as ExpEnum;
+        match &self.e {
+            ExpEnum::Literal(l) => l.get_expression_type(symbols, compiler),
+            ExpEnum::Block(b) => b.get_expression_type(symbols, compiler),
+            ExpEnum::Return(r) => r
+                .as_ref()
+                .map(|p| p.get_expression_type(symbols, compiler))
+                .unwrap_or(Type::void()),
+            ExpEnum::Call(Call { operand, .. }) => {
+                let ty = operand.get_expression_type(symbols, compiler);
+                match ty {
+                    Type::Function(f) => (*f.ret_ty).clone(),
+                    _ => unreachable!(),
+                }
+            }
+            ExpEnum::Identifier(Identifier { name, .. }) => {
+                symbols.get_symbol(name).get_type().clone()
+            }
+            ExpEnum::Operator(op) => op.get_expression_type(symbols, compiler),
+            r => todo!("{r:?} not implemented"),
+        }
+    }
+
+    pub fn unary_operation(operator: UnaryOperator, a: ExpressionHandler) -> Self {
+        return Self {
+            e: ExpressionEnum::Operator(Operator::Unary {
+                operand: Box::new(a),
+                operator,
+            }),
+            ret_ty: None,
+        };
+    }
+
+    pub fn binary_operation(
+        operator: BinaryOperator,
+        a: ExpressionHandler,
+        b: ExpressionHandler,
+    ) -> Self {
+        return Self {
+            e: ExpressionEnum::Operator(Operator::Binary {
+                operands: [Box::new(a), Box::new(b)],
+                operator,
+            }),
+            ret_ty: None,
+        };
+    }
+
+    pub fn validate_and_determine_expression_type<'a, 'ctx>(
+        &mut self,
+        symbols: &SymbolRegistry<'ctx>,
+        compiler: &ModuleCompiler<'a, 'ctx>,
+    ) {
+        if let Some(ty) = &self.ret_ty {
+            let inner = self.get_inner_type(symbols, compiler);
+            assert_eq!(*ty, inner);
+        } else {
+            self.ret_ty = Some(self.get_expression_type(symbols, compiler));
+        }
     }
 
     pub fn get_expression_type<'a, 'ctx>(
@@ -146,24 +267,10 @@ impl Expression {
         symbols: &SymbolRegistry<'ctx>,
         compiler: &ModuleCompiler<'a, 'ctx>,
     ) -> Type {
-        match self {
-            Self::Literal(l) => l.get_expression_type(symbols, compiler),
-            Self::Block(b) => b.get_expression_type(symbols, compiler),
-            Self::Return(r) => r
-                .as_ref()
-                .map(|p| p.get_expression_type(symbols, compiler))
-                .unwrap_or(Type::void()),
-            Self::Call { operand, .. } => {
-                let ty = operand.get_expression_type(symbols, compiler);
-                match ty {
-                    Type::Function(f) => (*f.ret_ty).clone(),
-                    _ => unreachable!(),
-                }
-            }
-            Self::Identifier(ident) => symbols.get_symbol(ident).get_type().clone(),
-            Self::Operator(op) => op.get_expression_type(symbols, compiler),
-            r => todo!("{r:?} not implemented"),
+        if let Some(ty) = &self.ret_ty {
+            return ty.clone();
         }
+        return self.get_inner_type(symbols, compiler);
     }
 }
 
@@ -185,11 +292,11 @@ pub enum Statement {
         params: Vec<(String, Type)>,
         varidic: bool,
     },
-    Expression(Expression),
+    Expression(ExpressionHandler),
     VariableDefinition {
         ident: String,
         ty: Type,
-        expression: Box<Expression>,
+        expression: Box<ExpressionHandler>,
     },
     FunctionDefinition {
         ident: String,

@@ -10,12 +10,11 @@ use crate::lowlevel::{
     compiler::Compiler,
     repr::{
         Repr,
-        ir::{Expression, FunctionBuilder, Statement, UnaryOperator},
+        ir::{ExpressionHandler, FunctionBuilder, Operator, Statement, UnaryOperator},
     },
     types::*,
 };
 
-mod ast;
 mod lowlevel;
 mod parser;
 
@@ -36,52 +35,72 @@ fn main() -> anyhow::Result<()> {
         // fn bar
         FunctionBuilder::new("bar", Type::void())
             .add_param("x", Type::int())
-            .add_statement(Expression::call_statement(
-                Expression::identifier("printf"),
-                vec![Expression::string("bar %d"), Expression::identifier("x")],
+            .add_statement(ExpressionHandler::call_statement(
+                ExpressionHandler::identifier("printf"),
+                vec![
+                    ExpressionHandler::string("bar %d"),
+                    ExpressionHandler::identifier("x"),
+                ],
             ))
-            .add_statement(Statement::Expression(Expression::Return(None)))
+            .add_statement(Statement::Expression(ExpressionHandler::return_expression(
+                None,
+            )))
             .build_definition(),
         // fn foo
         FunctionBuilder::new("foo", Type::void())
             .add_param("x", Type::int())
-            .add_statement(Expression::call_statement(
-                Expression::identifier("printf"),
-                vec![Expression::string("foo %d"), Expression::identifier("x")],
+            .add_statement(ExpressionHandler::call_statement(
+                ExpressionHandler::identifier("printf"),
+                vec![
+                    ExpressionHandler::string("foo %d"),
+                    ExpressionHandler::identifier("x"),
+                ],
             ))
-            .add_statement(Statement::Expression(Expression::Return(None)))
+            .add_statement(Statement::Expression(ExpressionHandler::return_expression(
+                None,
+            )))
             .build_definition(),
         // fn main
         FunctionBuilder::new("main", Type::int())
             .add_statement(Statement::var_define(
                 "opt",
                 Type::int(),
-                Expression::int(0),
+                ExpressionHandler::int(0),
             ))
-            .add_statement(Statement::var_define("x", Type::int(), Expression::int(0)))
-            .add_statement(Expression::call_statement(
-                Expression::identifier("scanf"),
+            .add_statement(Statement::var_define(
+                "x",
+                Type::int(),
+                ExpressionHandler::int(0),
+            ))
+            .add_statement(Statement::var_define(
+                "r",
+                Type::int(),
+                ExpressionHandler::call(
+                    ExpressionHandler::identifier("scanf"),
+                    vec![
+                        ExpressionHandler::string("select opt and val %d %d\n"),
+                        ExpressionHandler::unary_operation(
+                            UnaryOperator::Ref,
+                            ExpressionHandler::identifier("opt"),
+                        ),
+                        ExpressionHandler::unary_operation(
+                            UnaryOperator::Ref,
+                            ExpressionHandler::identifier("x"),
+                        ),
+                    ],
+                ),
+            ))
+            .add_statement(ExpressionHandler::call_statement(
+                ExpressionHandler::identifier("printf"),
                 vec![
-                    Expression::string("select opt and val %d %d\n"),
-                    Expression::Operator(lowlevel::repr::ir::Operator::Unary {
-                        operator: UnaryOperator::Ref,
-                        operand: Box::new(Expression::identifier("opt")),
-                    }),
-                    Expression::Operator(lowlevel::repr::ir::Operator::Unary {
-                        operator: UnaryOperator::Ref,
-                        operand: Box::new(Expression::identifier("x")),
-                    }),
+                    ExpressionHandler::string("opt %d val %d func %p!\n"),
+                    ExpressionHandler::identifier("opt"),
+                    ExpressionHandler::identifier("x"),
                 ],
             ))
-            .add_statement(Expression::call_statement(
-                Expression::identifier("printf"),
-                vec![
-                    Expression::string("opt %d val %d func %p!\n"),
-                    Expression::identifier("opt"),
-                    Expression::identifier("x"),
-                ],
-            ))
-            .add_statement(Expression::return_statement(Expression::int(0x00)))
+            .add_statement(ExpressionHandler::return_statement(Some(
+                ExpressionHandler::int(0x00),
+            )))
             .build_definition(),
     ]);
     let module = compiler.new_module(repr, "test_module".into());
@@ -114,12 +133,14 @@ fn main() -> anyhow::Result<()> {
         .write_to_file(&module.module, FileType::Object, obj_path)
         .expect("Failed to write object file");
 
+    /*
     std::process::Command::new("clang")
         .args(["output.o"])
         .status()
         .unwrap();
 
     std::process::Command::new("./a.out").status().unwrap();
+    */
 
     return Ok(());
 }
