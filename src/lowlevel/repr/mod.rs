@@ -75,7 +75,7 @@ impl Statement {
                     .module
                     .add_function(ident, llvm_ty, Some(Linkage::External));
 
-                symbols.register_symbol_scope(
+                symbols.register_symbol(
                     ident,
                     Symbol::Function {
                         pointer: Some(fv),
@@ -92,7 +92,7 @@ impl Statement {
                         ident,
                         Symbol::Value {
                             ty: ty.clone(),
-                            pointer: Some(param),
+                            value: Some(param),
                         },
                     );
                 }
@@ -114,11 +114,11 @@ impl Statement {
                 let v = expression
                     .code_gen(symbols, compiler, None)
                     .expect(&format!("{expression:?} doesn't return value"));
-                symbols.register_symbol(
+                symbols.register_symbol_scope(
                     ident,
                     Symbol::Label {
                         ty: ty.clone(),
-                        pointer: None,
+                        pointer: Some(var),
                     },
                 );
             }

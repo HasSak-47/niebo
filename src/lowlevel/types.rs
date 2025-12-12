@@ -125,13 +125,18 @@ impl Type {
             | Type::Primitive(PrimitiveType::Void)
             | Type::Pointer(_) => val,
             ty => {
-                let ptr = val.into_pointer_value();
-                return compiler
-                    .builder
-                    .build_load(ty.to_llvm_basic_type(compiler), ptr, name)
-                    .unwrap()
-                    .try_into()
-                    .unwrap();
+                // variables are pointers/labels
+                if let AnyValueEnum::PointerValue(ptr) = val {
+                    return compiler
+                        .builder
+                        .build_load(ty.to_llvm_basic_type(compiler), ptr, name)
+                        .unwrap()
+                        .try_into()
+                        .unwrap();
+                // parameters are values
+                } else {
+                    return val;
+                }
             }
         }
     }

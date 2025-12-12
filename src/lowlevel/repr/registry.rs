@@ -46,7 +46,7 @@ impl<'ctx> Registry<'ctx> {
             return s;
         }
 
-        panic!("symbol \"{ident:?}\" not found! {self:#?}");
+        panic!("symbol \"{ident:?}\" not found!");
     }
 
     pub fn register_symbol<S: Into<String>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
@@ -71,21 +71,25 @@ impl<'ctx> Scope<'ctx> {
     }
 
     pub fn push_scope(&mut self) {
+        println!("scope push");
         self.scope.push(HashMap::new());
     }
 
     pub fn pop_scope(&mut self) {
+        println!("scope pop");
         self.scope.pop();
     }
 
     pub fn register_symbol<S: Into<String>>(&mut self, ident: S, symbol: Symbol<'ctx>) {
+        let ident = ident.into();
+        println!("registered: {ident}");
         if self.scope.len() == 0 {
             self.scope.push(HashMap::new());
-            self.scope[0].insert(ident.into(), symbol);
+            self.scope[0].insert(ident, symbol);
 
             return;
         }
-        let repeat = self.scope.last_mut().unwrap().insert(ident.into(), symbol);
+        let repeat = self.scope.last_mut().unwrap().insert(ident, symbol);
         if repeat.is_some() {
             panic!("symbol redefined!: {self:#?}");
         }
@@ -93,6 +97,7 @@ impl<'ctx> Scope<'ctx> {
 
     pub fn get_symbol(&self, ident: &Identifier) -> Option<&Symbol<'ctx>> {
         let ident = &ident.name;
+        // check in each scope "layer" if the variable is defined there
         for symbols in self.scope.iter().rev() {
             if symbols.contains_key(ident) {
                 return Some(&symbols[ident]);
@@ -116,7 +121,7 @@ pub enum Symbol<'ctx> {
     },
     Value {
         ty: Type,
-        pointer: Option<BasicValueEnum<'ctx>>,
+        value: Option<BasicValueEnum<'ctx>>,
     },
     Module(Registry<'ctx>),
 }
@@ -126,7 +131,38 @@ impl<'ctx> Symbol<'ctx> {
         match self {
             Self::Function { ty, .. } => ty.clone(),
             Self::Label { ty, .. } => ty.clone(),
-            _ => unreachable!("registry has no type"),
+            Self::Value { ty, .. } => ty.clone(),
+            _ => unreachable!("registry {self:?} has no type"),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_scope() {
+        let mut reg = Registry::new("");
+        reg.push_scope();
+        reg.register_symbol_scope(
+            "foo",
+            Symbol::Label {
+                ty: Type::int(),
+                pointer: None,
+            },
+        );
+        reg.register_symbol_scope(
+            "bar",
+            Symbol::Label {
+                ty: Type::int(),
+                pointer: None,
+            },
+        );
+        reg.get_symbol(&Identifier {
+            name: "foo".to_string(),
+            path: vec![],
+        });
+        reg.pop_scope();
     }
 }

@@ -45,7 +45,9 @@ impl Expression for Operator {
                 }
             }
             Operator::Unary { operand, operator } => {
-                let a = operand.code_gen(symbols, compiler, None).unwrap();
+                let a = operand
+                    .code_gen(symbols, compiler, None)
+                    .expect(&format!("{operand:?}"));
                 match operator {
                     UnaryOperator::Ref => {
                         return Some(a);
@@ -134,15 +136,18 @@ impl Expression for Identifier {
         assing_to: Option<Box<Self>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         assert!(self.name.len() > 0);
-        return match symbols.get_symbol(&self) {
+        let v = match symbols.get_symbol(&self) {
             Symbol::Label { pointer, .. } => pointer
                 .as_ref()
                 .and_then(|x| Some(x.clone().as_any_value_enum())),
-            Symbol::Value { pointer, .. } => pointer
+            Symbol::Value { value: pointer, .. } => pointer
                 .as_ref()
                 .and_then(|x| Some(x.clone().as_any_value_enum())),
             _ => todo!(),
-        };
+        }
+        .expect(&format!("{self:?} has no value in registry: {symbols:#?}"));
+
+        return Some(v);
     }
 }
 
