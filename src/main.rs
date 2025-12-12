@@ -78,7 +78,7 @@ fn main() -> anyhow::Result<()> {
                 ExpressionHandler::call(
                     ExpressionHandler::identifier("scanf"),
                     vec![
-                        ExpressionHandler::string("select opt and val %d %d\n"),
+                        ExpressionHandler::string("%d%d"),
                         ExpressionHandler::unary_operation(
                             UnaryOperator::Ref,
                             ExpressionHandler::identifier("opt"),

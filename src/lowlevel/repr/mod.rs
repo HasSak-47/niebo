@@ -8,7 +8,7 @@ use inkwell::{
     module::Linkage,
     values::{
         AnyValue, AnyValueEnum, ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum,
-        FunctionValue, PointerValue,
+        FunctionValue, IntValue, PointerValue,
     },
 };
 
@@ -114,6 +114,16 @@ impl Statement {
                 let v = expression
                     .code_gen(symbols, compiler, None)
                     .expect(&format!("{expression:?} doesn't return value"));
+
+                match ty {
+                    Type::Primitive(PrimitiveType::Int) => {
+                        compiler
+                            .builder
+                            .build_store::<IntValue>(var, v.try_into().unwrap())
+                            .unwrap();
+                    }
+                    _ => todo!(),
+                }
                 symbols.register_symbol_scope(
                     ident,
                     Symbol::Label {
