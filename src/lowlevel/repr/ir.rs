@@ -75,22 +75,51 @@ pub enum Literal {
     String(String),
 }
 
+impl From<bool> for Literal {
+    fn from(value: bool) -> Self {
+        Literal::Bool(value)
+    }
+}
+
+impl From<i64> for Literal {
+    fn from(value: i64) -> Self {
+        Literal::Int(value as u64)
+    }
+}
+
+impl From<u64> for Literal {
+    fn from(value: u64) -> Self {
+        Literal::Uint(value)
+    }
+}
+
 impl Literal {
     pub fn get_expression_type<'a, 'ctx>(&self, _symbols: &Registry<'ctx>) -> Type {
         match self {
             Self::Int(_) => Type::int(),
-            _ => todo!(),
+            Self::Uint(_) => Type::uint(),
+            Self::Bool(_) => Type::bool(),
+            lit => todo!("{lit:?} not implemented"),
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct BlockExpression {
-    pub ret_ty: Type,
     pub body: Vec<Statement>,
 }
 
 impl BlockExpression {
+    pub fn new(body: Vec<Statement>) -> Self {
+        if body.len() == 0 {
+            return Self { body };
+        }
+        if let Statement::Expression(e) = &body.last().unwrap() {
+            return Self { body: body.clone() };
+        }
+
+        return Self { body };
+    }
     pub fn get_expression_type<'a, 'ctx>(&self, symbols: &Registry<'ctx>) -> Type {
         if self.body.last().is_none() {
             return Type::void();
@@ -118,14 +147,24 @@ impl Call {
     }
 }
 
-pub struct If {
-    pub condition: ExpressionHandler,
-    pub then: ExpressionHandler,
+#[derive(Debug, Clone)]
+pub struct Conditional {
+    pub condition: Box<ExpressionHandler>,
+    pub then: Box<ExpressionHandler>,
+    pub els_: Option<Box<ExpressionHandler>>,
 }
 
-impl If {
+impl Conditional {
     pub fn new(condition: ExpressionHandler, then: ExpressionHandler) -> Self {
-        return Self { condition, then };
+        return Self {
+            condition: Box::new(condition),
+            then: Box::new(then),
+            els_: None,
+        };
+    }
+
+    pub fn set_else(&mut self, then: ExpressionHandler) {
+        self.els_ = Some(Box::new(then));
     }
 
     pub fn validate_and_determine_expression_type<'ctx>(&mut self, symbols: &mut Registry<'ctx>) {
@@ -133,34 +172,50 @@ impl If {
         } else {
             panic!("if condition is not boolean")
         }
-
-        self.then.validate_and_determine_expression_type(symbols);
     }
 }
 
-pub struct ConditionList {
-    pub ifs: Vec<If>,
+#[derive(Debug, Clone)]
+pub struct ConditionalBuilder {
+    pub ifs: Vec<Conditional>,
     pub e: Option<ExpressionHandler>,
 }
 
-impl ConditionList {
+impl ConditionalBuilder {
     pub fn new(condition: ExpressionHandler, then: ExpressionHandler) -> Self {
         return Self {
-            ifs: vec![If::new(condition, then)],
+            ifs: vec![Conditional::new(condition, then)],
             e: None,
         };
     }
 
-    pub fn add_if(&mut self, condition: ExpressionHandler, then: ExpressionHandler) {
-        self.ifs.push(If::new(condition, then));
+    pub fn add_if(mut self, condition: ExpressionHandler, then: ExpressionHandler) -> Self {
+        self.ifs.push(Conditional::new(condition, then));
+        self
     }
 
-    pub fn set_else(&mut self, e: ExpressionHandler) {
+    pub fn set_else(mut self, e: ExpressionHandler) -> Self {
         self.e = Some(e);
+        self
     }
 
-    pub fn validate_and_determine_expression_type<'ctx>(&mut self, symbols: &mut Registry<'ctx>) {
-        todo!()
+    pub fn build(mut self) -> ExpressionHandler {
+        let mut last = self.ifs.pop().unwrap();
+        if let Some(e) = self.e {
+            last.set_else(e);
+        }
+        for mut if_ in self.ifs.into_iter().rev() {
+            if_.set_else(ExpressionHandler {
+                e: ExpressionEnum::Condition(last),
+                ret_ty: None,
+            });
+            last = if_;
+        }
+
+        return ExpressionHandler {
+            e: ExpressionEnum::Condition(last),
+            ret_ty: None,
+        };
     }
 }
 
@@ -172,6 +227,7 @@ pub enum ExpressionEnum {
     Identifier(Identifier),
     Call(Call),
     Block(BlockExpression),
+    Condition(Conditional),
 }
 
 #[derive(Debug, Clone)]
@@ -181,10 +237,13 @@ pub struct ExpressionHandler {
 }
 
 impl ExpressionHandler {
-    pub fn int(val: i32) -> Self {
+    pub fn literal<L: Into<Literal>>(literal: L) -> Self {
+        let literal = literal.into();
+        let r = Registry::new("");
+        let ret_ty = Some(literal.get_expression_type(&r));
         return Self {
-            e: ExpressionEnum::Literal(Literal::Int(val as u64)),
-            ret_ty: Some(Type::int()),
+            e: ExpressionEnum::Literal(literal),
+            ret_ty,
         };
     }
 
@@ -287,6 +346,13 @@ impl ExpressionHandler {
         }
         return self.get_inner_type(symbols);
     }
+
+    pub fn new_block(body: Vec<Statement>) -> Self {
+        Self {
+            e: ExpressionEnum::Block(BlockExpression { body }),
+            ret_ty: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -371,10 +437,7 @@ impl FunctionBuilder {
         if let Some(body) = &mut self.body {
             body.body.push(stmt);
         } else {
-            self.body = Some(BlockExpression {
-                ret_ty: self.ret_ty.clone(),
-                body: vec![stmt],
-            })
+            self.body = Some(BlockExpression { body: vec![stmt] })
         }
 
         return self;

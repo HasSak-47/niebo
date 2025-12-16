@@ -14,27 +14,27 @@ use crate::lowlevel::{
     types::{PrimitiveType, Type},
 };
 
-pub trait Expression {
+pub trait CodeGenerator {
     // fn get_expression_type<'a, 'ctx>(
     //     &self,
     //     symbols: &SymbolRegistry<'ctx>,
-    //     compiler: &ModuleCompiler<'a, 'ctx>,
+    //     compiler: &mut ModuleCompiler<'a, 'ctx>,
     // ) -> Type;
 
     fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-        assign_to: Option<Box<dyn Expression>>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>>;
 }
 
-impl Expression for Operator {
+impl CodeGenerator for Operator {
     fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-        assign_to: Option<Box<dyn Expression>>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         match self {
             Operator::Binary { operands, operator } => {
@@ -59,12 +59,12 @@ impl Expression for Operator {
     }
 }
 
-impl Expression for Literal {
+impl CodeGenerator for Literal {
     fn code_gen<'a, 'ctx>(
         &self,
         _symbols: &mut Registry,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-        assign_to: Option<Box<dyn Expression>>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         match self {
             Literal::Int(val) => {
@@ -94,32 +94,44 @@ impl Expression for Literal {
 
                 Some(global.as_basic_value_enum().into())
             }
+            Literal::Uint(u) => {
+                return Some(compiler.context.i32_type().const_int(*u, true).into());
+            }
+            Literal::Bool(b) => {
+                return Some(
+                    compiler
+                        .context
+                        .i32_type()
+                        .const_int(*b as u64, true)
+                        .into(),
+                );
+            }
             _ => todo!(),
         }
     }
 }
 
-impl Expression for BlockExpression {
+impl CodeGenerator for BlockExpression {
     fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-        assign_to: Option<Box<dyn Expression>>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        _assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         if self.body.len() == 0 {
             return None;
         }
 
-        if let Type::Primitive(ty) = &self.ret_ty {
+        if let Type::Primitive(ty) = &self.get_expression_type(symbols) {
             if let PrimitiveType::Void = ty {
                 for stmt in &self.body {
-                    stmt.code_gen(symbols, compiler);
+                    stmt.code_gen(symbols, compiler, None);
                 }
                 return None;
             }
         }
         for stmt in &self.body[0..(self.body.len() - 1)] {
-            stmt.code_gen(symbols, compiler);
+            stmt.code_gen(symbols, compiler, None);
         }
         if let Statement::Expression(exp) = self.body.last().unwrap() {
             return exp.code_gen(symbols, compiler, None);
@@ -128,12 +140,12 @@ impl Expression for BlockExpression {
     }
 }
 
-impl Expression for Identifier {
+impl CodeGenerator for Identifier {
     fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        _compiler: &ModuleCompiler<'a, 'ctx>,
-        _assign_to: Option<Box<dyn Expression>>,
+        _compiler: &mut ModuleCompiler<'a, 'ctx>,
+        _assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         assert!(self.name.len() > 0);
         let v = match symbols.get_symbol(&self) {
@@ -151,12 +163,12 @@ impl Expression for Identifier {
     }
 }
 
-impl Expression for Call {
+impl CodeGenerator for Call {
     fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-        _assign_to: Option<Box<dyn Expression>>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        _assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         let func_ty = if let Type::Function(func_ty) = self.operand.get_expression_type(symbols) {
             func_ty
@@ -199,12 +211,12 @@ impl Expression for Call {
     }
 }
 
-impl Expression for ExpressionHandler {
+impl CodeGenerator for ExpressionHandler {
     fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-        assign_to: Option<Box<dyn Expression>>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>> {
         use ExpressionEnum as ExpEnum;
         let val = match &self.e {
@@ -229,6 +241,9 @@ impl Expression for ExpressionHandler {
             ExpEnum::Block(blk) => {
                 return blk.code_gen(symbols, compiler, None);
             }
+            ExpEnum::Condition(conds) => {
+                return conds.code_gen(symbols, compiler, None);
+            }
             v => todo!("expression {v:?} not yet implemented"),
         };
 
@@ -247,5 +262,95 @@ impl Expression for ExpressionHandler {
         }
 
         return val;
+    }
+}
+
+/*
+impl CodeGenerator for If {
+    fn code_gen<'a, 'ctx>(
+        &self,
+        symbols: &mut Registry<'ctx>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        _assign_to: Option<Box<dyn CodeGenerator>>,
+    ) -> Option<AnyValueEnum<'ctx>> {
+        assert_eq!(self.condition.get_expression_type(symbols), Type::bool());
+        let val = self.condition.code_gen(symbols, compiler, None).unwrap();
+
+        // create blocks of code at the end of the current one
+        let then_block = compiler
+            .context
+            .insert_basic_block_after(*compiler.current_block.last().unwrap(), "");
+        compiler.add_block(then_block.clone());
+        let else_block = compiler
+            .context
+            .insert_basic_block_after(*compiler.current_block.last().unwrap(), "");
+        compiler.add_block(else_block.clone());
+        let continue_block = compiler
+            .context
+            .insert_basic_block_after(*compiler.current_block.last().unwrap(), "");
+        compiler.add_block(continue_block.clone());
+
+        // build conditional
+        compiler
+            .builder
+            .build_conditional_branch(val.into_int_value(), then_block, else_block)
+            .unwrap();
+
+        // move to then
+        compiler.builder.position_at_end(then_block);
+        self.then.code_gen(symbols, compiler, None);
+
+        // move to else
+        compiler.builder.position_at_end(else_block);
+        return None;
+    }
+}
+*/
+
+impl CodeGenerator for Conditional {
+    fn code_gen<'a, 'ctx>(
+        &self,
+        symbols: &mut Registry<'ctx>,
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        _assign_to: Option<Box<dyn CodeGenerator>>,
+    ) -> Option<AnyValueEnum<'ctx>> {
+        let val = self.condition.code_gen(symbols, compiler, None);
+
+        let curr_block = *compiler.current_block.last().unwrap();
+        let then_block = compiler.context.insert_basic_block_after(curr_block, "");
+        let else_block = compiler.context.insert_basic_block_after(then_block, "");
+        let cont_block = compiler.context.insert_basic_block_after(else_block, "");
+
+        compiler
+            .builder
+            .build_conditional_branch(val.unwrap().into_int_value(), then_block, else_block)
+            .unwrap();
+
+        // build then block
+        compiler.builder.position_at_end(then_block);
+        compiler.add_block(then_block);
+        self.then.code_gen(symbols, compiler, None);
+        compiler
+            .builder
+            .build_unconditional_branch(cont_block)
+            .unwrap();
+
+        compiler.remove_block();
+
+        // build else block
+        compiler.builder.position_at_end(else_block);
+        compiler.add_block(else_block);
+        self.then.code_gen(symbols, compiler, None);
+        compiler
+            .builder
+            .build_unconditional_branch(cont_block)
+            .unwrap();
+
+        compiler.remove_block();
+
+        compiler.builder.position_at_end(cont_block);
+        compiler.add_block(cont_block);
+
+        return None;
     }
 }

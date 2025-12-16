@@ -5,14 +5,14 @@ pub mod registry;
 
 use inkwell::{
     module::Linkage,
-    values::{FunctionValue, IntValue, PointerValue},
+    values::{AnyValueEnum, FunctionValue, IntValue, PointerValue},
 };
 
 use crate::lowlevel::{
     compiler::ModuleCompiler,
     types::{FunctionType, PrimitiveType, Type},
 };
-use codegen::Expression;
+use codegen::CodeGenerator;
 use ir::*;
 use registry::*;
 
@@ -24,11 +24,16 @@ impl Statement {
             expression: Box::new(expr),
         };
     }
-    pub fn code_gen<'a, 'ctx>(
+}
+
+impl CodeGenerator for Statement {
+    fn code_gen<'a, 'ctx>(
         &self,
         symbols: &mut Registry<'ctx>,
-        compiler: &ModuleCompiler<'a, 'ctx>,
-    ) {
+        compiler: &mut ModuleCompiler<'a, 'ctx>,
+        assign_to: Option<Box<dyn CodeGenerator>>,
+    ) -> Option<AnyValueEnum<'ctx>> {
+        assert!(assign_to.is_none());
         match self {
             Self::FunctionDeclaration {
                 ident,
@@ -67,10 +72,9 @@ impl Statement {
                     varidic: varidic.clone(),
                 };
                 let llvm_ty = ty.build_fn_type(compiler.context);
-                let fv = compiler
-                    .module
-                    .add_function(ident, llvm_ty, Some(Linkage::External));
+                let fv = compiler.module.add_function(ident, llvm_ty, None);
 
+                // register function in global namespace
                 symbols.register_symbol(
                     ident,
                     Symbol::Function {
@@ -80,7 +84,9 @@ impl Statement {
                     },
                 );
 
+                // create new scope
                 symbols.push_scope();
+                // add parameters to scope
                 for (idx, (ident, ty)) in ty.params.iter().enumerate() {
                     let param = fv.get_nth_param(idx as u32).unwrap();
                     param.set_name(&ident);
@@ -92,7 +98,9 @@ impl Statement {
                         },
                     );
                 }
+                // create code block
                 let entry = compiler.context.append_basic_block(fv, ident);
+                compiler.add_block(entry);
                 compiler.builder.position_at_end(entry);
                 block.code_gen(symbols, compiler, None);
                 symbols.pop_scope();
@@ -127,6 +135,8 @@ impl Statement {
             }
             v => todo!("statement {v:?} not yet implemented"),
         }
+
+        return None;
     }
 }
 
@@ -143,10 +153,10 @@ impl Repr {
         }
     }
 
-    pub fn code_gen<'a, 'ctx>(&self, compiler: &ModuleCompiler<'a, 'ctx>) {
+    pub fn code_gen<'a, 'ctx>(&self, compiler: &mut ModuleCompiler<'a, 'ctx>) {
         let mut r = Registry::new(&compiler.ident);
         for stmt in &self.statements {
-            stmt.code_gen(&mut r, compiler);
+            stmt.code_gen(&mut r, compiler, None);
         }
     }
 

@@ -10,7 +10,10 @@ use crate::lowlevel::{
     compiler::Compiler,
     repr::{
         Repr,
-        ir::{ExpressionHandler, FunctionBuilder, Statement, UnaryOperator},
+        ir::{
+            BlockExpression, Conditional, ConditionalBuilder, ExpressionHandler, FunctionBuilder,
+            Statement, UnaryOperator,
+        },
     },
     types::*,
 };
@@ -21,7 +24,7 @@ mod parser;
 fn main() -> anyhow::Result<()> {
     let context = Context::create();
     let compiler = Compiler::new(&context);
-    let repr = Repr::new(vec![
+    let mut repr = Repr::new(vec![
         // fn printf
         FunctionBuilder::new("printf", Type::int())
             .add_param("", Type::string())
@@ -62,16 +65,20 @@ fn main() -> anyhow::Result<()> {
             .build_definition(),
         // fn main
         FunctionBuilder::new("main", Type::int())
+            // let opt : int= 0;
             .add_statement(Statement::var_define(
                 "opt",
                 Type::int(),
-                ExpressionHandler::int(0),
+                ExpressionHandler::literal(0u64),
             ))
+            // let x : int= 0;
             .add_statement(Statement::var_define(
                 "x",
                 Type::int(),
-                ExpressionHandler::int(0),
+                ExpressionHandler::literal(0u64),
             ))
+            // let r : int = 0;
+            // r = scanf(...)
             .add_statement(Statement::var_define(
                 "r",
                 Type::int(),
@@ -90,6 +97,22 @@ fn main() -> anyhow::Result<()> {
                     ],
                 ),
             ))
+            // if true
+            .add_statement(Statement::Expression(
+                ConditionalBuilder::new(
+                    ExpressionHandler::identifier("opt"),
+                    ExpressionHandler::call(
+                        ExpressionHandler::identifier("printf"),
+                        vec![ExpressionHandler::string("true\n")],
+                    ),
+                )
+                .set_else(ExpressionHandler::call(
+                    ExpressionHandler::identifier("printf"),
+                    vec![ExpressionHandler::string("false\n")],
+                ))
+                .build(),
+            ))
+            // printf(...)
             .add_statement(ExpressionHandler::call_statement(
                 ExpressionHandler::identifier("printf"),
                 vec![
@@ -100,12 +123,13 @@ fn main() -> anyhow::Result<()> {
                 ],
             ))
             .add_statement(ExpressionHandler::return_statement(Some(
-                ExpressionHandler::int(0x00),
+                ExpressionHandler::literal(0i64),
             )))
             .build_definition(),
     ]);
-    let module = compiler.new_module(repr, "test_module".into());
-    module.compile();
+    let mut module = compiler.new_module("test_module".into());
+    repr.validate();
+    module.compile(&repr);
     let llvmir = module.get_ll_code();
     println!("{llvmir}");
     let mut f = File::create("output.ll")?;

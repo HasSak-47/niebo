@@ -154,6 +154,10 @@ impl Type {
         Self::Primitive(PrimitiveType::Float)
     }
 
+    pub fn bool() -> Self {
+        Self::Primitive(PrimitiveType::Bool)
+    }
+
     pub fn string() -> Self {
         Self::Primitive(PrimitiveType::String)
     }
