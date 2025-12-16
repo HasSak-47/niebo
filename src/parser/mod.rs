@@ -1,3 +1,4 @@
+pub mod lowlevel;
 fn remove_comments(mut code: Vec<String>) -> Vec<String> {
     let mut inside_comment = false;
     for line in &mut code {
@@ -81,11 +82,7 @@ pub fn split_simbols<S: AsRef<str>>(code: S) {
     println!("{chunks:?}");
 }
 
-pub fn take_function<S: AsRef<str>>(code: S) {
-    let code = code.as_ref();
-}
-
-pub fn parse(code: String) {
+pub fn clean_up(code: String) {
     let mut code = remove_comments(code.lines().map(str::to_string).collect()).join(" ");
     code = code.replace("\t", " ");
     code = code.replace("\n", " ");
