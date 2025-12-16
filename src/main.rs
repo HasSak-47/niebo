@@ -10,10 +10,7 @@ use crate::lowlevel::{
     compiler::Compiler,
     repr::{
         Repr,
-        ir::{
-            BlockExpression, Conditional, ConditionalBuilder, ExpressionHandler, FunctionBuilder,
-            Statement, UnaryOperator,
-        },
+        ir::{ConditionalBuilder, ExpressionHandler, FunctionBuilder, Statement, UnaryOperator},
     },
     types::*,
 };
@@ -100,12 +97,13 @@ fn main() -> anyhow::Result<()> {
             // if true
             .add_statement(Statement::Expression(
                 ConditionalBuilder::new(
-                    ExpressionHandler::identifier("opt"),
+                    ExpressionHandler::literal(true),
                     ExpressionHandler::call(
                         ExpressionHandler::identifier("printf"),
                         vec![ExpressionHandler::string("true\n")],
                     ),
                 )
+                // else
                 .set_else(ExpressionHandler::call(
                     ExpressionHandler::identifier("printf"),
                     vec![ExpressionHandler::string("false\n")],

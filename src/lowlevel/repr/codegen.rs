@@ -1,10 +1,8 @@
 use super::ir::*;
 use inkwell::{
     AddressSpace,
-    module::Linkage,
     values::{
         AnyValue, AnyValueEnum, ArrayValue, BasicMetadataValueEnum, BasicValue, BasicValueEnum,
-        FunctionValue, PointerValue,
     },
 };
 
@@ -175,6 +173,7 @@ impl CodeGenerator for Call {
         } else {
             unreachable!()
         };
+        // build parameter loading
         let params: Vec<BasicMetadataValueEnum> = self
             .params
             .iter()
@@ -244,6 +243,7 @@ impl CodeGenerator for ExpressionHandler {
             ExpEnum::Condition(conds) => {
                 return conds.code_gen(symbols, compiler, None);
             }
+            #[allow(unreachable_patterns)]
             v => todo!("expression {v:?} not yet implemented"),
         };
 
@@ -265,48 +265,6 @@ impl CodeGenerator for ExpressionHandler {
     }
 }
 
-/*
-impl CodeGenerator for If {
-    fn code_gen<'a, 'ctx>(
-        &self,
-        symbols: &mut Registry<'ctx>,
-        compiler: &mut ModuleCompiler<'a, 'ctx>,
-        _assign_to: Option<Box<dyn CodeGenerator>>,
-    ) -> Option<AnyValueEnum<'ctx>> {
-        assert_eq!(self.condition.get_expression_type(symbols), Type::bool());
-        let val = self.condition.code_gen(symbols, compiler, None).unwrap();
-
-        // create blocks of code at the end of the current one
-        let then_block = compiler
-            .context
-            .insert_basic_block_after(*compiler.current_block.last().unwrap(), "");
-        compiler.add_block(then_block.clone());
-        let else_block = compiler
-            .context
-            .insert_basic_block_after(*compiler.current_block.last().unwrap(), "");
-        compiler.add_block(else_block.clone());
-        let continue_block = compiler
-            .context
-            .insert_basic_block_after(*compiler.current_block.last().unwrap(), "");
-        compiler.add_block(continue_block.clone());
-
-        // build conditional
-        compiler
-            .builder
-            .build_conditional_branch(val.into_int_value(), then_block, else_block)
-            .unwrap();
-
-        // move to then
-        compiler.builder.position_at_end(then_block);
-        self.then.code_gen(symbols, compiler, None);
-
-        // move to else
-        compiler.builder.position_at_end(else_block);
-        return None;
-    }
-}
-*/
-
 impl CodeGenerator for Conditional {
     fn code_gen<'a, 'ctx>(
         &self,
@@ -314,7 +272,9 @@ impl CodeGenerator for Conditional {
         compiler: &mut ModuleCompiler<'a, 'ctx>,
         _assign_to: Option<Box<dyn CodeGenerator>>,
     ) -> Option<AnyValueEnum<'ctx>> {
-        let val = self.condition.code_gen(symbols, compiler, None);
+        let ret_ty = self.condition.get_expression_type(symbols);
+        assert_eq!(ret_ty, Type::bool());
+        let val = self.condition.code_gen(symbols, compiler, None).unwrap();
 
         let curr_block = *compiler.current_block.last().unwrap();
         let then_block = compiler.context.insert_basic_block_after(curr_block, "");
@@ -323,7 +283,7 @@ impl CodeGenerator for Conditional {
 
         compiler
             .builder
-            .build_conditional_branch(val.unwrap().into_int_value(), then_block, else_block)
+            .build_conditional_branch(val.into_int_value(), then_block, else_block)
             .unwrap();
 
         // build then block
