@@ -1,11 +1,11 @@
-use crate::repr::{
+use crate::ast::{
     Definition, Expression, ExpressionKind, Literal, Project, function::FunctionBuilder,
     types::Type,
 };
 
+mod ast;
 mod lowlevel;
 mod parser;
-mod repr;
 
 fn main() -> anyhow::Result<()> {
     let mut project = Project::new("test_project", (0, 0, 0));

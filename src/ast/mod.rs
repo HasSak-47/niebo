@@ -2,14 +2,12 @@ pub mod expressions;
 pub mod function;
 pub mod types;
 
-use std::collections::HashMap;
-
 use anyhow::{Result, anyhow};
 
 use function::*;
 use types::*;
 
-use crate::repr::expressions::{
+use expressions::{
     ExpressionTrait,
     operations::{BinaryOperation, UnaryOperation},
 };

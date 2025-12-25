@@ -1,5 +1,5 @@
 pub mod operations;
-use crate::repr::Expression;
+use super::Expression;
 
 use super::types::*;
 
