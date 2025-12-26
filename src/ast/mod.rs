@@ -1,5 +1,6 @@
 pub mod expressions;
 pub mod function;
+pub mod traits;
 pub mod types;
 
 use anyhow::{Result, anyhow};
@@ -26,18 +27,53 @@ enum Statement {
 }
 
 #[derive(Debug, Clone)]
-pub enum Literal {
+pub enum LiteralInfo {
     Integer {
         signed: Option<bool>,
         precision: Option<u64>,
-        negative: bool,
-        value: u64,
     },
+
+    String,
 
     Float {
         precision: Option<u64>,
-        value: f64,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct Literal {
+    info: LiteralInfo,
+    data: String,
+}
+
+impl Literal {
+    pub fn string<S: Into<String>>(value: S) -> Self {
+        let value = value.into();
+        return Literal {
+            info: LiteralInfo::String,
+            data: value,
+        };
+    }
+
+    pub fn float<S: Into<String>>(value: S, precision: Option<u64>) -> Self {
+        let value = value.into();
+        return Literal {
+            info: LiteralInfo::Float { precision },
+            data: value,
+        };
+    }
+
+    pub fn integer<S: Into<String>>(
+        value: S,
+        signed: Option<bool>,
+        precision: Option<u64>,
+    ) -> Self {
+        let value = value.into();
+        return Literal {
+            info: LiteralInfo::Integer { signed, precision },
+            data: value,
+        };
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -110,13 +146,7 @@ pub enum Visibility {
 pub struct Variable {
     mutable: bool,
     value: Expression,
-    ty: Type,
-}
-
-#[derive(Debug, Clone)]
-pub struct Trait {
-    // DefinitionKind::Module and DefinitionKind::Trait not allowed
-    inner_definitions: Vec<Definition>,
+    ty: Option<Type>,
 }
 
 #[derive(Debug, Clone)]
@@ -174,7 +204,7 @@ impl Definition {
             kind: DefinitionKind::Variable(Variable {
                 mutable: false,
                 value: value,
-                ty,
+                ty: Some(ty),
             }),
             visibility: Visibility::Private,
             name: ident.into(),
@@ -189,14 +219,11 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn add_function<S: Into<String>>(&mut self, name: S, f: Function) {
-        let d = Definition {
-            kind: f.into(),
-            name: name.into(),
-            visibility: Visibility::Public,
-        };
-
-        self.definitions.push(d);
+    pub fn add_function(&mut self, f: TraitBuilder) {
+        self.definitions.push(f.build_def());
+    }
+    pub fn add_function(&mut self, f: FunctionBuilder) {
+        self.definitions.push(f.build_def());
     }
 }
 

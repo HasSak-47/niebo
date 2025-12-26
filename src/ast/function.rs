@@ -1,19 +1,23 @@
+use std::collections::HashMap;
+
 use super::expressions::*;
 use super::types::*;
 use super::*;
 
 pub struct FunctionBuilder {
-    ident: String,
-    ret_ty: Type,
-    params: Vec<(String, Type)>,
-    varidic: bool,
-    constant: bool,
-    body: Option<Block>,
+    pub ident: String,
+    pub ret_ty: Type,
+    pub params: Vec<(String, Type)>,
+    pub varidic: bool,
+    pub constant: bool,
+    pub body: Option<Block>,
+    pub visibility: Visibility,
 }
 
 impl FunctionBuilder {
     pub fn new<S: AsRef<str>>(ident: S, ret_ty: Type) -> Self {
         Self {
+            visibility: Visibility::Private,
             constant: false,
             ident: ident.as_ref().to_string(),
             ret_ty,
@@ -52,15 +56,21 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn build_def(mut self) -> Function {
+    pub fn build_def(self) -> Definition {
         assert!(self.body.is_none());
         let body = self.body.unwrap();
-        Function {
+        let f = Function {
             body,
             constant: self.constant,
             parameters: self.params,
             varidic: self.varidic,
-        }
+        };
+
+        return Definition {
+            kind: DefinitionKind::Function(f),
+            visibility: self.visibility,
+            name: self.ident,
+        };
     }
 }
 
