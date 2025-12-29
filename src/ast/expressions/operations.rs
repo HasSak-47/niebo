@@ -1,5 +1,4 @@
-use super::*;
-use anyhow::{Result, anyhow};
+use super::Expression;
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
@@ -24,12 +23,27 @@ pub enum UnaryOperator {
 
 #[derive(Debug, Clone)]
 pub struct UnaryOperation {
-    operator: BinaryOperator,
-    operand: Expression,
+    pub operator: UnaryOperator,
+    pub operand: Expression,
 }
 
 #[derive(Debug, Clone)]
 pub struct BinaryOperation {
-    operator: BinaryOperator,
-    operands: [Expression; 2],
+    pub operator: BinaryOperator,
+    pub operands: [Expression; 2],
+}
+
+impl UnaryOperation {
+    pub fn new(operator: UnaryOperator, operand: Expression) -> Self {
+        Self { operator, operand }
+    }
+}
+
+impl BinaryOperation {
+    pub fn new(operator: BinaryOperator, left: Expression, right: Expression) -> Self {
+        Self {
+            operator,
+            operands: [left, right],
+        }
+    }
 }

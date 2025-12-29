@@ -57,6 +57,7 @@ into_definition!(Trait);
 #[derive(Debug, Clone)]
 pub enum DefinitionKind {
     Variable(Variable),
+    Type(Type),
     TypeAlias(Path),
     Function(Function),
     Module(Module),
