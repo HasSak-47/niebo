@@ -6,7 +6,7 @@ use super::*;
 
 pub struct FunctionBuilder {
     pub ident: String,
-    pub ret_ty: Type,
+    pub ret_ty: Option<Type>,
     pub params: Vec<(String, Type)>,
     pub varidic: bool,
     pub constant: bool,
@@ -15,16 +15,21 @@ pub struct FunctionBuilder {
 }
 
 impl FunctionBuilder {
-    pub fn new<S: AsRef<str>>(ident: S, ret_ty: Type) -> Self {
+    pub fn new<S: AsRef<str>>(ident: S) -> Self {
         Self {
             visibility: Visibility::Private,
             constant: false,
             ident: ident.as_ref().to_string(),
-            ret_ty,
+            ret_ty: None,
             params: Vec::new(),
             varidic: false,
             body: None,
         }
+    }
+
+    pub fn set_ret_ty(mut self, ty: Type) -> Self {
+        self.ret_ty = Some(ty);
+        return self;
     }
 
     pub fn set_constant(mut self) -> Self {
