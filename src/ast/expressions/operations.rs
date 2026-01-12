@@ -1,3 +1,5 @@
+use crate::ast::Path;
+
 use super::Expression;
 
 #[derive(Debug, Clone)]
@@ -12,6 +14,19 @@ pub enum BinaryOperator {
     Or,
     And,
     Xor,
+}
+
+impl BinaryOperator {
+    pub fn into_path(&self) -> Path {
+        let val = match self {
+            BinaryOperator::Addition => "add",
+            _ => todo!(),
+        }
+        .to_string();
+        return Path {
+            v: vec![val, "core".to_string()],
+        };
+    }
 }
 
 #[derive(Debug, Clone)]

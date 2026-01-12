@@ -31,6 +31,11 @@ pub struct FunctionType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Template {
+    pub restrictions: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
     Primitive(PrimitiveType),
     Struct(StructType),
@@ -42,6 +47,7 @@ pub enum Type {
     Reference(Box<Type>),
     MutableReference(Box<Type>),
     Function(FunctionType),
+    Template(Template),
 }
 
 impl Type {

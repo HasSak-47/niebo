@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use super::expressions::*;
-use super::types::*;
+use super::expressions::{block::Block, *};
 use super::*;
+use crate::general::types::*;
 
 pub struct FunctionBuilder {
     pub ident: String,
@@ -47,6 +47,10 @@ impl FunctionBuilder {
         return self;
     }
 
+    /**
+    adds a definition to the function body e.j.
+    let x = 10;
+    */
     pub fn add_definition(self, dec: Definition) -> Self {
         self.add_statement(Statement::Definition(dec))
     }
@@ -55,20 +59,23 @@ impl FunctionBuilder {
         if let Some(body) = &mut self.body {
             body.add_statement(stmt);
         } else {
-            self.body = Some(Block::new())
+            let mut body = Block::new();
+            body.add_statement(stmt);
+            self.body = Some(body);
         }
 
         return self;
     }
 
     pub fn build_def(self) -> Definition {
-        assert!(self.body.is_none());
+        assert!(self.body.is_some());
         let body = self.body.unwrap();
         let f = Function {
             body,
             constant: self.constant,
             parameters: self.params,
             varidic: self.varidic,
+            return_ty: self.ret_ty.unwrap_or(Type::void()),
         };
 
         return Definition {
@@ -84,7 +91,7 @@ pub struct Function {
     // TODO: add restriction to make only c functions varidic
     varidic: bool,
     constant: bool,
-    // return_ty: Type,
+    return_ty: Type,
     parameters: Vec<(String, Type)>,
     body: Block,
 }

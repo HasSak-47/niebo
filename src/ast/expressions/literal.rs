@@ -47,3 +47,16 @@ impl Literal {
         };
     }
 }
+
+impl<T> From<T> for Literal
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        let value = value.into();
+        return Self {
+            info: LiteralInfo::String,
+            data: value,
+        };
+    }
+}

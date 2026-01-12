@@ -1,23 +1,31 @@
 pub mod expressions;
 pub mod function;
 pub mod traits;
-pub mod types;
+
+use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
 
+use crate::general::types::*;
 use function::*;
-use types::*;
 
-use expressions::{
-    Expression,
-    operations::{BinaryOperation, UnaryOperation},
-};
+use expressions::Expression;
 
 use traits::{Trait, TraitBuilder};
 
 #[derive(Debug, Clone)]
 pub struct Path {
-    v: Vec<String>,
+    pub v: Vec<String>,
+}
+
+impl<T> From<T> for Path
+where
+    T: Into<String>,
+{
+    fn from(value: T) -> Self {
+        let s = value.into();
+        return Self { v: vec![s] };
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -66,9 +74,9 @@ pub enum DefinitionKind {
 
 #[derive(Debug, Clone)]
 pub struct Definition {
-    kind: DefinitionKind,
-    visibility: Visibility,
-    name: String,
+    pub kind: DefinitionKind,
+    pub visibility: Visibility,
+    pub name: String,
 }
 
 impl Definition {
@@ -90,8 +98,14 @@ impl Definition {
 }
 
 #[derive(Debug, Clone)]
+pub struct Import {
+    c_import: bool,
+    path: Path,
+}
+
+#[derive(Debug, Clone)]
 pub struct Module {
-    pub imports: Vec<Path>,
+    pub imports: Vec<Import>,
     pub definitions: Vec<Definition>,
 }
 
@@ -102,15 +116,30 @@ impl Module {
     pub fn add_function(&mut self, f: FunctionBuilder) {
         self.definitions.push(f.build_def());
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct Registry {}
+    pub fn add_c_import<P: Into<Path>>(&mut self, path: P) {
+        let path = path.into();
+        // everything in c is at root!
+        assert!(path.v.len() == 1);
+
+        self.imports.push(Import {
+            c_import: true,
+            path,
+        });
+    }
+
+    pub fn add_import(&mut self, path: Path) {
+        self.imports.push(Import {
+            c_import: false,
+            path,
+        });
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Project {
     pub root_module: Module,
-    pub registry: Registry,
+    pub external_modules: HashMap<String, Module>,
     pub name: String,
     pub version: (usize, usize, usize),
 }
@@ -122,7 +151,7 @@ impl Project {
                 imports: vec![],
                 definitions: vec![],
             },
-            registry: Registry {},
+            external_modules: HashMap::new(),
             name: name.into(),
             version,
         };

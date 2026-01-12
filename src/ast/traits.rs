@@ -30,5 +30,5 @@ impl TraitBuilder {
 
 #[derive(Debug, Clone)]
 pub struct Trait {
-    functions: HashMap<String, Function>,
+    pub functions: HashMap<String, Function>,
 }

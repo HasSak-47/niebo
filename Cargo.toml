@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.100"
+clang = "2.0.0"
 clap = "4.5.53"
 thiserror = "2.0.17"
 

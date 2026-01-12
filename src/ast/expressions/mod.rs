@@ -5,19 +5,25 @@ pub mod literal;
 pub mod loops;
 pub mod operations;
 
-use crate::ast::{
-    Definition, Path,
-    expressions::block::Block,
-    expressions::call::Call,
-    expressions::conditional::Conditional,
-    expressions::literal::Literal,
-    expressions::loops::{LoopExpression, WhileLoop},
-    expressions::operations::{BinaryOperation, UnaryOperation},
+use crate::{
+    ast::{
+        Definition, Import, Path,
+        expressions::{
+            block::Block,
+            call::Call,
+            conditional::Conditional,
+            literal::Literal,
+            loops::{LoopExpression, WhileLoop},
+            operations::{BinaryOperation, UnaryOperation},
+        },
+    },
+    general::types::Type,
 };
 
 #[derive(Debug, Clone)]
 pub enum Statement {
     // DefinitionKind::Module and DefinitionKind::Trait not allowed
+    Import(Import),
     Definition(Definition),
     Expression(Expression),
     Use(Path),
@@ -34,17 +40,19 @@ pub enum ExpressionKind {
     BinaryOperation(BinaryOperation),
     UnaryOperation(UnaryOperation),
     Call(Call),
-    Return(Expression),
+    Return(Option<Expression>),
 }
 
 #[derive(Debug, Clone)]
 pub struct Expression {
     pub kind: Box<ExpressionKind>,
+    pub ret_ty: Option<Type>,
 }
 
 impl Expression {
     pub fn new(kind: ExpressionKind) -> Self {
         Self {
+            ret_ty: None,
             kind: Box::new(kind),
         }
     }
@@ -65,11 +73,14 @@ impl Expression {
         Self::new(ExpressionKind::While(while_loop))
     }
 
-    pub fn literal(literal: Literal) -> Self {
+    pub fn literal<L: Into<Literal>>(literal: L) -> Self {
+        let literal = literal.into();
+
         Self::new(ExpressionKind::Literal(literal))
     }
 
-    pub fn identifier(path: Path) -> Self {
+    pub fn identifier<P: Into<Path>>(path: P) -> Self {
+        let path = path.into();
         Self::new(ExpressionKind::Identifier(path))
     }
 
@@ -81,11 +92,11 @@ impl Expression {
         Self::new(ExpressionKind::UnaryOperation(operation))
     }
 
-    pub fn call(call: Call) -> Self {
-        Self::new(ExpressionKind::Call(call))
+    pub fn call(called: Expression, params: Vec<Expression>) -> Self {
+        Self::new(ExpressionKind::Call(Call::new(called, params)))
     }
 
-    pub fn return_(value: Expression) -> Self {
+    pub fn return_(value: Option<Expression>) -> Self {
         Self::new(ExpressionKind::Return(value))
     }
 }
