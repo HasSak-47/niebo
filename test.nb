@@ -1,0 +1,5 @@
+header stdio::printf;
+
+
+fn main() { return 0; }
+

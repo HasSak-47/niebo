@@ -1,92 +1,47 @@
-pub mod lowlevel;
-fn remove_comments(mut code: Vec<String>) -> Vec<String> {
-    let mut inside_comment = false;
-    for line in &mut code {
-        if inside_comment {
-            if let Some(indx) = line.find("*/") {
-                *line = line.split_off(indx);
-                inside_comment = false;
-            } else {
-                continue;
+use pest::Parser;
+use pest_derive::Parser;
+
+use crate::ast::{self, Import, Module, Path};
+
+#[derive(Parser)]
+#[grammar = "./pest/language.pest"]
+struct PestParser {}
+
+pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
+    let mut md = Module::new();
+
+    let parser = PestParser::parse(Rule::module, txt.as_ref())?;
+    let mut iter = parser.into_iter();
+    let nxt = iter.next().unwrap().into_inner();
+    for item in nxt {
+        match item.as_rule() {
+            Rule::import => {
+                let mut inner = item.into_inner().into_iter();
+                let import_kind = inner.next().unwrap();
+
+                match import_kind.as_rule() {
+                    Rule::c_import => {
+                        let mut iter = import_kind.into_inner().into_iter();
+                        let header = iter.next().unwrap();
+                        let function = iter.next().unwrap();
+                        let mut path = Path::default();
+                        path.add_segment(header.as_str());
+                        path.add_segment(function.as_str());
+                        md.add_c_import(path);
+                    }
+                    Rule::niebo_import => {}
+                    un => unreachable!("reached: {un:?}"),
+                }
             }
-        }
-        if let Some(indx) = line.find("/*") {
-            line.truncate(indx);
-            inside_comment = true;
-            continue;
-        }
-        if let Some(indx) = line.find("//") {
-            line.truncate(indx);
-        }
-    }
-
-    return code;
-}
-
-pub enum LiteralToken {
-    String,
-    Char,
-    Number,
-}
-
-pub enum TokenType {
-    Literal(LiteralToken),
-    Identifier(String),
-    Punctuation(String),
-}
-
-pub struct Token {
-    token: TokenType,
-    pos: (usize, usize),
-    val: String,
-}
-
-const SYMBOLS: &[&str] = &[
-    "...", "..", // ranges
-    "->", "=>", // arrows
-    "&&", "||", // boolean and or
-    ">>", "<<", // bit shift
-    ">=", "<=", "==", // comparison
-    "{", "}", "<", ">", "(", ")", "[", "]", // brackets
-    "~", "!", "?", // error stuff and negation ig
-    "&", "|", "^", "~", // bit manipulation
-    "+", "-", "*", "/", "%", // algebra
-    ".", ",", ":", ";", "\"", "'", // delimitators and others
-];
-
-pub fn split_simbols<S: AsRef<str>>(code: S) {
-    let mut current_str = code.as_ref();
-    let mut chunks = Vec::new();
-    loop {
-        if current_str.is_empty() {
-            break;
-        }
-        println!("{current_str:?}");
-
-        let mut splits = Vec::new();
-        for symbol in SYMBOLS {
-            if let Some(at) = current_str.find(symbol) {
-                splits.push((at, symbol.len()));
+            Rule::fn_declaration => {
+                let inner = item.into_inner();
+                println!("{inner:?}");
             }
+            Rule::var_declaration => {}
+            un => unreachable!("reached: {un:?}"),
         }
-
-        splits.sort_by(|a, b| a.0.cmp(&b.0));
-        let (prev, after) = current_str.split_at(splits[0].0 + splits[0].1);
-        let (prev, symbol) = prev.split_at(splits[0].0);
-        if !prev.is_empty() {
-            chunks.push(prev);
-        }
-        chunks.push(symbol);
-        current_str = after;
     }
-    println!("{chunks:?}");
-}
+    println!("{md:?}");
 
-pub fn clean_up(code: String) {
-    let mut code = remove_comments(code.lines().map(str::to_string).collect()).join(" ");
-    code = code.replace("\t", " ");
-    code = code.replace("\n", " ");
-    while code.contains("  ") {
-        code = code.replace("  ", " ");
-    }
+    return Ok(md);
 }

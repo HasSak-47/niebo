@@ -13,7 +13,7 @@ use expressions::Expression;
 
 use traits::{Trait, TraitBuilder};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Path {
     pub v: Vec<String>,
 }
@@ -107,10 +107,10 @@ impl Definition {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct Import {
-    c_import: bool,
-    path: Path,
+    pub c_import: bool,
+    pub path: Path,
 }
 
 #[derive(Debug, Clone)]
@@ -120,6 +120,12 @@ pub struct Module {
 }
 
 impl Module {
+    pub fn new() -> Self {
+        return Self {
+            imports: vec![],
+            definitions: vec![],
+        };
+    }
     pub fn add_trait(&mut self, t: TraitBuilder) {
         self.definitions.push(t.build_def());
     }
@@ -129,8 +135,8 @@ impl Module {
 
     pub fn add_c_import<P: Into<Path>>(&mut self, path: P) {
         let path = path.into();
-        // everything in c is at root!
-        assert!(path.v.len() == 1);
+        // everything in c has the format header::name
+        assert!(path.v.len() == 2);
 
         self.imports.push(Import {
             c_import: true,

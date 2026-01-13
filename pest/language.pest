@@ -1,0 +1,65 @@
+
+module = { SOI ~ (import | fn_declaration )* ~ EOI}
+
+import = {(c_import | niebo_import) ~ ";"}
+c_import = {"header" ~ name ~ "::" ~ name}
+niebo_import = {"use" ~  path}
+
+path = { (name ~ "::")* ~ name}
+
+var_declaration = {
+    "let" ~  name ~ (":" ~ path)? ~ "=" ~ expression
+}
+
+fn_declaration = {
+"fn" ~ name ~ "("~  params ~ ")" ~ ("->" ~ path)? ~ "{" ~ (statement ~ ";")* ~ "}"
+}
+
+params = { ((param ~ ",")* ~ param ~ ","?)?}
+
+return_statement = { "return" ~ expression }
+
+statement = {
+    import |  declaration | return_statement
+}
+
+block_expression = {"{" ~ ((statement | expression) ~ ";")*  ~ "}"}
+
+declaration = {
+    var_declaration | fn_declaration
+}
+
+expression = {
+   while_expression | conditional_expression | call_expression |  unary_operation | binary_operation | literal
+}
+
+while_expression = {
+    "while" ~"("~ expression ~")" ~ block_expression
+}
+
+conditional_expression = {
+    "if" ~ expression  ~ block_expression ~ "else" ~ block_expression
+}
+
+
+call_expression = {
+    path ~ "(" ~ params ~ ")"
+}
+
+unary_operator = {"!" | "?"}
+binary_operator = { "+" | "-" | "*" | "/" | ">>" | "<<" | "==" | "!=" | "<=" | ">=" | "<" | ">"}
+
+unary_operation = { expression ~ unary_operator}
+binary_operation = { expression ~ binary_operator ~ expression}
+
+literal = {
+    string | number
+}
+
+param = {name ~ ":" ~ path }
+
+name = ${ASCII_ALPHA ~ ASCII_ALPHANUMERIC*}
+number = ${ ASCII_DIGIT* ~ ("." ~ ASCII_DIGIT*)? }
+string = ${ "\"" ~ ANY* ~ "\""}
+
+WHITESPACE = _{" " | "\n" | "\t"}
