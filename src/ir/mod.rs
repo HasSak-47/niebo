@@ -1,5 +1,6 @@
 use crate::ast::expressions::operations::BinaryOperator;
 use crate::ir::core::create_core_module;
+
 use crate::{
     ast::{
         DefinitionKind, Module, Path, Project,
@@ -222,7 +223,9 @@ fn evaluate_expression(expression: Expression) -> Expression {
         ExpressionKind::Identifier(_) => {
             todo!()
         }
-        ExpressionKind::Call(call) => call.called.ret_ty.unwrap(),
+        ExpressionKind::Call(_) => {
+            todo!()
+        }
         ExpressionKind::Return(_) => {
             todo!()
         }
