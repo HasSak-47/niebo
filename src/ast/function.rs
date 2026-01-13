@@ -89,9 +89,9 @@ impl FunctionBuilder {
 #[derive(Debug, Clone)]
 pub struct Function {
     // TODO: add restriction to make only c functions varidic
-    varidic: bool,
-    constant: bool,
-    return_ty: Type,
-    parameters: Vec<(String, Type)>,
-    body: Block,
+    pub varidic: bool,
+    pub constant: bool,
+    pub return_ty: Type,
+    pub parameters: Vec<(String, Type)>,
+    pub body: Block,
 }

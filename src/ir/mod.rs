@@ -1,9 +1,20 @@
-use crate::ast::expressions::Statement;
-use crate::ast::traits::Trait;
-use crate::ast::{DefinitionKind, Module, Project};
+use crate::ast::expressions::operations::BinaryOperator;
+use crate::ir::core::create_core_module;
+use crate::{
+    ast::{
+        DefinitionKind, Module, Path, Project,
+        expressions::{
+            Expression, ExpressionKind, Statement, block::Block, conditional::Conditional,
+            loops::LoopExpression, operations::UnaryOperator,
+        },
+        traits::Trait,
+    },
+    general::types::Type,
+};
 
 pub mod core;
 
+#[derive(Debug)]
 pub struct IR<'a> {
     project: Project,
     traits: Vec<(Path, &'a Trait)>,
@@ -36,7 +47,7 @@ impl<'a> IR<'a> {
         let mut traits = Vec::new();
         let path = Path::from(p.name.clone());
 
-        let ir = Self {
+        let mut ir = Self {
             project: p,
             traits: Vec::new(),
         };
@@ -45,19 +56,118 @@ impl<'a> IR<'a> {
             find_traits(Path::from(name), &mut traits, module);
         }
 
+        // de sugar_module
+        for def in &mut ir.project.root_module.definitions {
+            match &mut def.kind {
+                DefinitionKind::Function(func) => desugar_block(&mut func.body),
+                _ => {}
+            }
+        }
+
+        // evaluate all expressions
+        for def in &mut ir.project.root_module.definitions {
+            match &mut def.kind {
+                DefinitionKind::Function(func) => {
+                    let bk = evaluate_block(func.body.clone());
+                    assert_eq!(func.return_ty, bk.ret_ty.unwrap_or(Type::void()));
+                }
+                _ => {}
+            }
+        }
+
         return ir;
     }
 }
 
-use crate::ir::core::create_core_module;
-use crate::{
-    ast::{
-        Path,
-        expressions::{Expression, ExpressionKind, block::Block, conditional::Conditional},
-    },
-    general::types::Type,
-};
+pub fn desugar_block(exp: &mut Block) {
+    for stmt in &mut exp.statements {
+        match stmt {
+            Statement::Expression(exp) => desugar_expression(exp),
+            _ => {}
+        }
+    }
+}
+pub fn desugar_expression(exp: &mut Expression) {
+    match &mut *exp.kind {
+        ExpressionKind::Block(blk) => desugar_block(blk),
+        ExpressionKind::While(wloop) => {
+            let negated_condition =
+                Expression::unary_operation(UnaryOperator::Negation, wloop.condition.clone());
 
+            let mut break_block = Block::new();
+            break_block.add_statement(Statement::Break);
+            let oposite_if = Conditional::new(negated_condition, Expression::block(break_block));
+
+            let mut body = Block::new();
+            body.add_statement(Statement::Expression(Expression::if_(oposite_if)));
+            body.add_statement(Statement::Expression(wloop.then.clone()));
+
+            let lp = LoopExpression::new(Expression::block(body));
+
+            *exp = Expression::loop_(lp);
+            desugar_expression(exp);
+        }
+        ExpressionKind::BinaryOperation(oper) => {
+            let mut operan_path = Path::new();
+            operan_path.add_segment("core");
+            operan_path.add_segment("op");
+            let (tr, func) = match oper.operator {
+                BinaryOperator::Addition => ("Add", "add"),
+                _ => todo!(),
+            };
+
+            operan_path.add_segment(tr);
+            operan_path.add_segment(func);
+
+            *exp = Expression::call(
+                Expression::identifier(operan_path),
+                vec![oper.operands[0].clone(), oper.operands[1].clone()],
+            );
+        }
+
+        ExpressionKind::UnaryOperation(oper) => {
+            let mut operan_path = Path::new();
+            operan_path.add_segment("core");
+            operan_path.add_segment("op");
+            let (tr, func) = match oper.operator {
+                UnaryOperator::Negation => ("Neg", "neg"),
+                _ => todo!(),
+            };
+
+            operan_path.add_segment(tr);
+            operan_path.add_segment(func);
+
+            *exp = Expression::call(
+                Expression::identifier(operan_path),
+                vec![oper.operand.clone()],
+            );
+        }
+        ExpressionKind::If(if_) => {
+            desugar_expression(&mut if_.condition);
+            desugar_expression(&mut if_.then);
+        }
+
+        ExpressionKind::Call(call) => {
+            desugar_expression(&mut call.called);
+            for param in &mut call.parameters {
+                desugar_expression(param);
+            }
+        }
+
+        _ => {}
+    };
+}
+
+pub fn desugar_module(md: &mut Module) {
+    for def in &mut md.definitions {
+        match &mut def.kind {
+            DefinitionKind::Function(func) => desugar_block(&mut func.body),
+            _ => {}
+        }
+    }
+}
+
+/* determine return type for conditional expression */
 pub fn evaluate_conditional(mut condition: Conditional) -> Expression {
     condition.condition = evaluate_expression(condition.condition);
     condition.then = evaluate_expression(condition.then);
@@ -69,6 +179,7 @@ pub fn evaluate_conditional(mut condition: Conditional) -> Expression {
     };
 }
 
+/* determine return type for block expression */
 pub fn evaluate_block(mut block: Block) -> Expression {
     if let Some(s) = block.statements.pop() {
         match s {
@@ -97,6 +208,7 @@ pub fn evaluate_block(mut block: Block) -> Expression {
     }
 }
 
+/* determine return type for any valid expression */
 fn evaluate_expression(expression: Expression) -> Expression {
     let new_expr = match *expression.kind {
         ExpressionKind::Block(block) => evaluate_block(block),
@@ -110,9 +222,7 @@ fn evaluate_expression(expression: Expression) -> Expression {
         ExpressionKind::Identifier(_) => {
             todo!()
         }
-        ExpressionKind::Call(_) => {
-            todo!()
-        }
+        ExpressionKind::Call(call) => call.called.ret_ty.unwrap(),
         ExpressionKind::Return(_) => {
             todo!()
         }

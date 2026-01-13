@@ -18,6 +18,16 @@ pub struct Path {
     pub v: Vec<String>,
 }
 
+impl Path {
+    pub fn add_segment<S: Into<String>>(&mut self, s: S) {
+        self.v.push(s.into());
+    }
+
+    pub fn new() -> Self {
+        Self { v: vec![] }
+    }
+}
+
 impl<T> From<T> for Path
 where
     T: Into<String>,

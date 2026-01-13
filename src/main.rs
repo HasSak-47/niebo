@@ -1,7 +1,10 @@
 use crate::{
     ast::{
         Definition, Project,
-        expressions::{Expression, ExpressionKind, Statement, call::Call, literal::Literal},
+        expressions::{
+            Expression, ExpressionKind, Statement, call::Call, literal::Literal,
+            operations::BinaryOperator,
+        },
         function::FunctionBuilder,
     },
     ir::IR,
@@ -10,7 +13,6 @@ use crate::{
 mod ast;
 mod general;
 mod ir;
-mod lowlevel;
 mod parser;
 
 fn main() -> anyhow::Result<()> {
@@ -31,12 +33,23 @@ fn main() -> anyhow::Result<()> {
                 Expression::identifier("printf"),
                 vec![
                     Expression::literal("test_string %d"),
-                    Expression::identifier("x"),
+                    Expression::binary_operation(
+                        BinaryOperator::Addition,
+                        Expression::identifier("x"),
+                        Expression::from_literal(Literal {
+                            data: "10".to_string(),
+                            info: ast::expressions::literal::LiteralInfo::Integer {
+                                signed: None,
+                                precision: None,
+                            },
+                        }),
+                    ),
                 ],
             ))),
     );
 
     let ir = IR::from_project(project);
+    println!("{ir:#?}");
 
     return Ok(());
 }

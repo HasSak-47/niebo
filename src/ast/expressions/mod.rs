@@ -14,7 +14,7 @@ use crate::{
             conditional::Conditional,
             literal::Literal,
             loops::{LoopExpression, WhileLoop},
-            operations::{BinaryOperation, UnaryOperation},
+            operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
     },
     general::types::Type,
@@ -26,6 +26,8 @@ pub enum Statement {
     Import(Import),
     Definition(Definition),
     Expression(Expression),
+    Break,
+    Continue,
     Use(Path),
 }
 
@@ -50,6 +52,12 @@ pub struct Expression {
 }
 
 impl Expression {
+    pub fn from_literal(l: Literal) -> Self {
+        return Expression {
+            kind: Box::new(ExpressionKind::Literal(l)),
+            ret_ty: None,
+        };
+    }
     pub fn new(kind: ExpressionKind) -> Self {
         Self {
             ret_ty: None,
@@ -84,12 +92,18 @@ impl Expression {
         Self::new(ExpressionKind::Identifier(path))
     }
 
-    pub fn binary_operation(operation: BinaryOperation) -> Self {
-        Self::new(ExpressionKind::BinaryOperation(operation))
+    pub fn binary_operation(operation: BinaryOperator, a: Expression, b: Expression) -> Self {
+        Self::new(ExpressionKind::BinaryOperation(BinaryOperation {
+            operator: operation,
+            operands: [a, b],
+        }))
     }
 
-    pub fn unary_operation(operation: UnaryOperation) -> Self {
-        Self::new(ExpressionKind::UnaryOperation(operation))
+    pub fn unary_operation(operator: UnaryOperator, operand: Expression) -> Self {
+        return Self::new(ExpressionKind::UnaryOperation(UnaryOperation {
+            operator: operator,
+            operand: operand,
+        }));
     }
 
     pub fn call(called: Expression, params: Vec<Expression>) -> Self {

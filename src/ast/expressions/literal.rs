@@ -14,8 +14,8 @@ pub enum LiteralInfo {
 
 #[derive(Debug, Clone)]
 pub struct Literal {
-    info: LiteralInfo,
-    data: String,
+    pub info: LiteralInfo,
+    pub data: String,
 }
 
 impl Literal {

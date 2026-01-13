@@ -11,6 +11,30 @@ fn create_operation_module() -> Module {
             functions: HashMap::new(),
         }),
     });
+
+    definitions.push(Definition {
+        name: "Mul".to_string(),
+        visibility: crate::ast::Visibility::Public,
+        kind: DefinitionKind::Trait(Trait {
+            functions: HashMap::new(),
+        }),
+    });
+
+    definitions.push(Definition {
+        name: "Sub".to_string(),
+        visibility: crate::ast::Visibility::Public,
+        kind: DefinitionKind::Trait(Trait {
+            functions: HashMap::new(),
+        }),
+    });
+
+    definitions.push(Definition {
+        name: "Div".to_string(),
+        visibility: crate::ast::Visibility::Public,
+        kind: DefinitionKind::Trait(Trait {
+            functions: HashMap::new(),
+        }),
+    });
     let m = Module {
         imports: vec![],
         definitions,
