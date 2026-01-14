@@ -1,0 +1,61 @@
+module = { SOI ~ stream ~ EOI }
+stream = {  ( import | definitions | keyword | number | string | path | symbol )*  }
+
+import = {
+    c_import | niebo_import
+}
+
+c_import = { "header" ~ path ~ ";"}
+niebo_import = { "use" ~ path ~ ";"}
+
+// cannot define a function without causing a stack overflow
+definitions = {
+    fn_declaration | type_definition | trait_definition
+}
+
+trait_definition = {"trait" ~ identifier ~ template_def? ~ "{" ~ trait_body* ~ "}"}
+trait_body       = { (type_declaration | fn_declaration) ~ ";" }
+
+
+type_declaration = { "type" ~ identifier ~ ";"}
+type_definition  = { "type" ~ identifier ~ "=" ~ path ~ ";"}
+
+fn_declaration = {"fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ path)?}
+
+params = { (param ~ ",")* ~ param ~ ","? }
+param  = { identifier ~ ":" ~ path }
+
+path          =  { rel_path? ~ ident_root ~ ("::" ~ ident_root)* }
+rel_path      =  { "global::" | (("super" | "crate") ~ "::")+ }
+ident_root    =  { identifier ~ template_spec?} 
+identifier    = @{ ASCII_ALPHA ~ identifier_elements* }
+
+template_spec  = { "<" ~ ((path~ ",")* ~ path~ ","?)? ~ ">"}
+
+template_def  = {"<" ~ (template_ident ~ ",") ~ template_ident ~ ","? }
+template_ident = {identifier ~ ":" ~ (path ~ "+")* ~ path}
+
+
+number     = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)? }
+string     = @{ "\"" ~ ANY* ~ "\"" }
+symbol     = @{ ANY }
+
+identifier_elements = { ASCII_ALPHANUMERIC | "_" }
+
+
+keyword = {
+    "type" |
+    "fn" |
+    "trait" |
+    "for" |
+    "while" |
+    "if" |
+    "else" |
+    "use" |
+    "header" |
+    "return"
+}
+
+
+COMMENT    = _{ ("/*" ~ ANY* ~ "*/") | ("//" ~ ANY* ~ "\n") }
+WHITESPACE = _{ " " | "\n" | "\t" }

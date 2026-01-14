@@ -1,5 +1,21 @@
 header stdio::printf;
 
 
-fn main() { return 0; }
+type TestType = int32;
+
+fn test_function<T: Add<T>>(t: T) -> T {
+    return t + t;
+}
+
+trait testTrait<T: Add<T>>{
+    type TestType = int32;
+    
+    fn test_function<T: Add<T>>(t: T) -> T {
+        return t + t;
+    }
+}
+
+fn main() -> i32 {
+    return 0;
+}
 

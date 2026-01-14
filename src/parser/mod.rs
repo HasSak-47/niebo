@@ -1,47 +1,77 @@
-use pest::Parser;
+use pest::{Parser, RuleType, iterators::Pair};
 use pest_derive::Parser;
 
 use crate::ast::{self, Import, Module, Path};
 
 #[derive(Parser)]
-#[grammar = "./pest/language.pest"]
-struct PestParser {}
+#[grammar = "./pest/tokens.pest"]
+struct TokenStream;
+
+#[derive(Debug, Default)]
+struct Identifier {
+    path: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+enum TokenKind {
+    Identifier(Identifier),
+    Number,
+    #[default]
+    Symbol,
+}
+
+#[derive(Debug, Default)]
+struct Token {
+    kind: TokenKind,
+    start: usize,
+    end: usize,
+
+    line: usize,
+    col: usize,
+}
+
+pub fn print_token<'a, T: RuleType>(t: Pair<'a, T>, depth: usize, max: usize) {
+    println!("{:\t>depth$}'{}':{:?}", "", t.as_str(), t.as_rule());
+    if depth > max {
+        return;
+    }
+    for t in t.into_inner() {
+        print_token(t, depth + 1, max);
+    }
+}
 
 pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
-    let mut md = Module::new();
-
-    let parser = PestParser::parse(Rule::module, txt.as_ref())?;
-    let mut iter = parser.into_iter();
-    let nxt = iter.next().unwrap().into_inner();
-    for item in nxt {
-        match item.as_rule() {
-            Rule::import => {
-                let mut inner = item.into_inner().into_iter();
-                let import_kind = inner.next().unwrap();
-
-                match import_kind.as_rule() {
-                    Rule::c_import => {
-                        let mut iter = import_kind.into_inner().into_iter();
-                        let header = iter.next().unwrap();
-                        let function = iter.next().unwrap();
-                        let mut path = Path::default();
-                        path.add_segment(header.as_str());
-                        path.add_segment(function.as_str());
-                        md.add_c_import(path);
-                    }
-                    Rule::niebo_import => {}
-                    un => unreachable!("reached: {un:?}"),
-                }
-            }
-            Rule::fn_declaration => {
-                let inner = item.into_inner();
-                println!("{inner:?}");
-            }
-            Rule::var_declaration => {}
-            un => unreachable!("reached: {un:?}"),
-        }
+    let md = Module::new();
+    let ts = TokenStream::parse(Rule::module, txt.as_ref())?;
+    for t in ts.into_iter().next().unwrap().into_inner() {
+        print_token(t, 0, 3);
     }
-    println!("{md:?}");
 
     return Ok(md);
+}
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_params() -> anyhow::Result<()> {
+        TokenStream::parse(Rule::ident_root, "a: A, b: B, c: B")?;
+        TokenStream::parse(Rule::ident_root, "a: A<T>, b: B, c: B<T: S<T>>")?;
+
+        return Ok(());
+    }
+
+    #[test]
+    fn test_idents() -> anyhow::Result<()> {
+        TokenStream::parse(Rule::stream, "")?;
+        TokenStream::parse(Rule::ident_root, "test_ident<T: A<T>, U: B>")?;
+        TokenStream::parse(Rule::ident_root, "test_ident")?;
+
+        TokenStream::parse(Rule::fn_declaration, "fn test_ident(t: T, u: U) -> U")?;
+        TokenStream::parse(
+            Rule::fn_declaration,
+            "fn test_ident<T: A<T>, U: B>(t: T, u: U) -> U",
+        )?;
+        return Ok(());
+    }
 }
