@@ -105,6 +105,19 @@ impl Definition {
             name: ident.into(),
         });
     }
+
+    pub fn variable_with_mut<S: Into<String>>(
+        ident: S,
+        value: Expression,
+        ty: Option<Type>,
+        mutable: bool,
+    ) -> Result<Definition> {
+        return Ok(Self {
+            kind: DefinitionKind::Variable(Variable { mutable, value, ty }),
+            visibility: Visibility::Private,
+            name: ident.into(),
+        });
+    }
 }
 
 #[derive(Debug, Default, Clone)]

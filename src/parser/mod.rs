@@ -44,7 +44,7 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
     let md = Module::new();
     let ts = TokenStream::parse(Rule::module, txt.as_ref())?;
     for t in ts.into_iter().next().unwrap().into_inner() {
-        print_token(t, 0, 3);
+        print_token(t, 0, 1);
     }
 
     return Ok(md);

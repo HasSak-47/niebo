@@ -1,8 +1,0 @@
-- validate IR before codegen instead of assuming it is correct
-- build out IR validation for return types/params (functions, blocks, return expressions)
-- implement codegen + type inference for binary/unary ops beyond `ref`
-- finish condition expressions (if/else) in both validation and codegen paths
-- lower the rest of the type system (bool/uint/float/struct/array/pointer/ref) to LLVM, including params
-- generate unique names for string literal globals to avoid collisions
-- replace the hardcoded `main` repr with a parser/lexer pipeline that emits the IR
-- add tests around scope registry, type inference, and a basic codegen smoke run

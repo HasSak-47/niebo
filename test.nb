@@ -1,6 +1,5 @@
 header stdio::printf;
 
-
 type TestType = int32;
 
 fn test_function<T: Add<T>>(t: T) -> T {
