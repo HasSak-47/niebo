@@ -1,61 +1,113 @@
 module = { SOI ~ stream ~ EOI }
-stream = {  ( import | definitions | keyword | number | string | path | symbol )*  }
+stream = { (import | definitions | keyword | number | string | path | symbol)* }
 
-import = {
-    c_import | niebo_import
-}
+import = { c_import | niebo_import }
 
-c_import = { "header" ~ path ~ ";"}
-niebo_import = { "use" ~ path ~ ";"}
+c_import     = { "header" ~ path ~ ";" }
+niebo_import = { "use" ~ path ~ ";" }
 
-// cannot define a function without causing a stack overflow
 definitions = {
-    fn_declaration | type_definition | trait_definition
+    fn_definition
+  | fn_declaration
+  | type_definition
+  | const_definition
+  | trait_definition
 }
 
-trait_definition = {"trait" ~ identifier ~ template_def? ~ "{" ~ trait_body* ~ "}"}
-trait_body       = { (type_declaration | fn_declaration) ~ ";" }
+trait_definition = { "trait" ~ identifier ~ template_def? ~ "{" ~ trait_body* ~ "}" }
+trait_body       = {
+    type_definition
+  | fn_definition
+  | type_declaration ~ ";"
+  | fn_declaration ~ ";"
+}
 
+type_declaration = { "type" ~ identifier }
+type_definition  = { type_declaration ~ "=" ~ path ~ ";" }
 
-type_declaration = { "type" ~ identifier ~ ";"}
-type_definition  = { "type" ~ identifier ~ "=" ~ path ~ ";"}
+fn_declaration = { "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ path)? }
+fn_definition  = { fn_declaration ~ block }
 
-fn_declaration = {"fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ path)?}
+block = { "{" ~ statement* ~ "}" }
+
+statement = {
+    import
+  | let_declaration
+  | const_definition
+  | fn_declaration ~ ";"
+  | expression ~ ";"?
+}
+
+expression = {
+    if_expression
+  | while_expression
+  | for_expression
+  | match_expression
+  | binary_expression
+  | unary_expression
+  | primary_expression
+}
+
+if_expression = { "if" ~ expression ~ block ~ ("else" ~ (if_expression | block))? }
+while_expression = { "while" ~ expression ~ block }
+for_expression = { "for" ~ identifier ~ "in" ~ expression ~ block }
+match_expression = { "match" ~ expression ~ "{" ~ match_arm* ~ "}" }
+match_arm = { pattern ~ "=>" ~ (block | expression) ~ ","? }
+pattern = { identifier | number | string | "_" }
+
+binary_expression = { unary_expression ~ (binary_operator ~ unary_expression)+ }
+unary_expression = { unary_prefix_operator* ~ primary_expression ~ unary_postfix_operator* }
+
+binary_operator = {
+    "==" | "!=" | "<=" | ">=" | "<" | ">"
+  | "&&" | "||"
+  | "+" | "-" | "*" | "/" | "%"
+  | "&" | "|" | "^"
+  | "<<" | ">>"
+}
+
+unary_prefix_operator = { "!" | "-" | "+" | "&" | "*" }
+unary_postfix_operator = { "?" | "++" | "--" }
+
+primary_expression = { block | "(" ~ expression ~ ")" | path | number | string }
+
+let_declaration = { "let" ~ identifier ~ (":" ~ path)? ~ "=" ~ expression ~ ";" }
+const_definition = { "const" ~ identifier ~ (":" ~ path)? ~ "=" ~ expression ~ ";" }
 
 params = { (param ~ ",")* ~ param ~ ","? }
 param  = { identifier ~ ":" ~ path }
 
-path          =  { rel_path? ~ ident_root ~ ("::" ~ ident_root)* }
-rel_path      =  { "global::" | (("super" | "crate") ~ "::")+ }
-ident_root    =  { identifier ~ template_spec?} 
-identifier    = @{ ASCII_ALPHA ~ identifier_elements* }
+path       =  { rel_path? ~ ident_root ~ ("::" ~ ident_root)* }
+rel_path   =  { "global::" | (("super" | "crate") ~ "::")+ }
+ident_root =  { identifier ~ template_spec? }
+identifier = @{ (ASCII_ALPHA | "_") ~ identifier_elements* }
 
-template_spec  = { "<" ~ ((path~ ",")* ~ path~ ","?)? ~ ">"}
+template_spec = { "<" ~ (path ~ ",")* ~ path ~ ","? ~ ">" }
 
-template_def  = {"<" ~ (template_ident ~ ",") ~ template_ident ~ ","? }
-template_ident = {identifier ~ ":" ~ (path ~ "+")* ~ path}
+template_def   = { "<" ~ (template_ident ~ ",")* ~ template_ident ~ ","? ~ ">" }
+template_ident = { identifier ~ ":" ~ (path ~ "+")* ~ path }
 
-
-number     = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)? }
-string     = @{ "\"" ~ ANY* ~ "\"" }
-symbol     = @{ ANY }
+number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)? }
+string = @{ "\"" ~ ANY* ~ "\"" }
+symbol = @{ ANY }
 
 identifier_elements = { ASCII_ALPHANUMERIC | "_" }
 
-
 keyword = {
-    "type" |
-    "fn" |
-    "trait" |
-    "for" |
-    "while" |
-    "if" |
-    "else" |
-    "use" |
-    "header" |
-    "return"
-}
-
+    "type"
+  | "fn"
+  | "trait"
+  | "let"
+  | "const"
+  | "for"
+  | "in"
+  | "while"
+  | "if"
+  | "else"
+  | "match"
+  | "use"
+  | "header"
+  | "return" }
 
 COMMENT    = _{ ("/*" ~ ANY* ~ "*/") | ("//" ~ ANY* ~ "\n") }
 WHITESPACE = _{ " " | "\n" | "\t" }

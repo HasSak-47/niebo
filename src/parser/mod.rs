@@ -54,6 +54,23 @@ mod test {
     use super::*;
 
     #[test]
+    fn test_functions() -> anyhow::Result<()> {
+        TokenStream::parse(
+            Rule::fn_definition,
+            "fn main() -> i32 {
+    let i = 0;
+    while i < 10 {
+        i++;
+    }
+    return 0;
+}",
+        )?;
+        TokenStream::parse(Rule::ident_root, "a: A<T>, b: B, c: B<T: S<T>>")?;
+
+        return Ok(());
+    }
+
+    #[test]
     fn test_params() -> anyhow::Result<()> {
         TokenStream::parse(Rule::ident_root, "a: A, b: B, c: B")?;
         TokenStream::parse(Rule::ident_root, "a: A<T>, b: B, c: B<T: S<T>>")?;
@@ -62,15 +79,36 @@ mod test {
     }
 
     #[test]
+    fn test_traits() -> anyhow::Result<()> {
+        TokenStream::parse(
+            Rule::definitions,
+            "trait TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfn func() -> Type;\n}",
+        )?;
+
+        TokenStream::parse(
+            Rule::trait_definition,
+            "trait testTrait<T: Add<T>>{
+    type TestType = int32;
+    
+    fn test_function<T: Add<T>>(t: T) -> T ;
+}",
+        )?;
+
+        return Ok(());
+    }
+    #[test]
     fn test_idents() -> anyhow::Result<()> {
         TokenStream::parse(Rule::stream, "")?;
         TokenStream::parse(Rule::ident_root, "test_ident<T: A<T>, U: B>")?;
         TokenStream::parse(Rule::ident_root, "test_ident")?;
 
-        TokenStream::parse(Rule::fn_declaration, "fn test_ident(t: T, u: U) -> U")?;
         TokenStream::parse(
             Rule::fn_declaration,
-            "fn test_ident<T: A<T>, U: B>(t: T, u: U) -> U",
+            "fn test_fn_declaration(t: T, u: U) -> U",
+        )?;
+        TokenStream::parse(
+            Rule::fn_declaration,
+            "fn test_fn_declaration_template<T: global::A<T> >(t: T, u: U) -> U",
         )?;
         return Ok(());
     }

@@ -16,6 +16,10 @@ trait testTrait<T: Add<T>>{
 }
 
 fn main() -> i32 {
+    let i = 0;
+    while i < 10 {
+        i++;
+    }
     return 0;
 }
 
