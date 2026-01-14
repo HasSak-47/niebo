@@ -5,14 +5,13 @@ import = { c_import | niebo_import }
 
 c_import     = { "header" ~ path ~ ";" }
 niebo_import = { "use" ~ path ~ ";" }
+use_statement = { "use" ~ path ~ ";" }
 
-definitions = {
-    fn_definition
-  | fn_declaration
-  | type_definition
-  | const_definition
-  | trait_definition
-}
+visibility = { "pub" | "module" }
+
+definitions = { definition }
+
+definition = { visibility? ~ (fn_definition | fn_declaration | type_definition | const_definition | trait_definition | module_definition) }
 
 trait_definition = { "trait" ~ identifier ~ template_def? ~ "{" ~ trait_body* ~ "}" }
 trait_body       = {
@@ -23,18 +22,23 @@ trait_body       = {
 }
 
 type_declaration = { "type" ~ identifier }
-type_definition  = { type_declaration ~ "=" ~ path ~ ";" }
+type_definition  = { type_declaration ~ "=" ~ type_expr ~ ";" }
 
-fn_declaration = { "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ path)? }
+fn_declaration = { "const"? ~ "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
 fn_definition  = { fn_declaration ~ block }
+
+module_definition = { "mod" ~ identifier ~ (";" | ("{" ~ stream ~ "}")) }
 
 block = { "{" ~ statement* ~ "}" }
 
 statement = {
-    import
+    c_import
+  | use_statement
   | let_declaration
   | const_definition
   | fn_declaration ~ ";"
+  | break_statement
+  | continue_statement
   | expression ~ ";"?
 }
 
@@ -43,9 +47,9 @@ expression = {
   | while_expression
   | for_expression
   | match_expression
-  | binary_expression
-  | unary_expression
-  | primary_expression
+  | loop_expression
+  | return_expression
+  | logical_or
 }
 
 if_expression = { "if" ~ expression ~ block ~ ("else" ~ (if_expression | block))? }
@@ -55,27 +59,38 @@ match_expression = { "match" ~ expression ~ "{" ~ match_arm* ~ "}" }
 match_arm = { pattern ~ "=>" ~ (block | expression) ~ ","? }
 pattern = { identifier | number | string | "_" }
 
-binary_expression = { unary_expression ~ (binary_operator ~ unary_expression)+ }
-unary_expression = { unary_prefix_operator* ~ primary_expression ~ unary_postfix_operator* }
+loop_expression = { "loop" ~ block }
+return_expression = { "return" ~ expression? }
+break_statement = { "break" ~ ";" }
+continue_statement = { "continue" ~ ";" }
 
-binary_operator = {
-    "==" | "!=" | "<=" | ">=" | "<" | ">"
-  | "&&" | "||"
-  | "+" | "-" | "*" | "/" | "%"
-  | "&" | "|" | "^"
-  | "<<" | ">>"
-}
+logical_or = { logical_and ~ ("||" ~ logical_and)* }
+logical_and = { equality ~ ("&&" ~ equality)* }
+equality = { comparison ~ (("==" | "!=") ~ comparison)* }
+comparison = { bitwise_or ~ (("<=" | ">=" | "<" | ">") ~ bitwise_or)* }
+bitwise_or = { bitwise_xor ~ ("|" ~ bitwise_xor)* }
+bitwise_xor = { bitwise_and ~ ("^" ~ bitwise_and)* }
+bitwise_and = { shift ~ ("&" ~ shift)* }
+shift = { additive ~ (("<<" | ">>") ~ additive)* }
+additive = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
+multiplicative = { unary_expression ~ (("*" | "/" | "%") ~ unary_expression)* }
+
+unary_expression = { unary_prefix_operator* ~ postfix_expression }
+postfix_expression = { primary_expression ~ (call_postfix | unary_postfix_operator)* }
+
+call_postfix = { "(" ~ (expression ~ ",")* ~ expression? ~ ","? ~ ")" }
 
 unary_prefix_operator = { "!" | "-" | "+" | "&" | "*" }
 unary_postfix_operator = { "?" | "++" | "--" }
 
 primary_expression = { block | "(" ~ expression ~ ")" | path | number | string }
 
-let_declaration = { "let" ~ identifier ~ (":" ~ path)? ~ "=" ~ expression ~ ";" }
-const_definition = { "const" ~ identifier ~ (":" ~ path)? ~ "=" ~ expression ~ ";" }
+let_declaration = { "let" ~ "mut"? ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
+const_definition = { "const" ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
 
-params = { (param ~ ",")* ~ param ~ ","? }
-param  = { identifier ~ ":" ~ path }
+params = { (param ~ ",")* ~ param ~ ","? ~ varidic? }
+param  = { identifier ~ ":" ~ type_expr }
+varidic = { "..." }
 
 path       =  { rel_path? ~ ident_root ~ ("::" ~ ident_root)* }
 rel_path   =  { "global::" | (("super" | "crate") ~ "::")+ }
@@ -87,7 +102,46 @@ template_spec = { "<" ~ (path ~ ",")* ~ path ~ ","? ~ ">" }
 template_def   = { "<" ~ (template_ident ~ ",")* ~ template_ident ~ ","? ~ ">" }
 template_ident = { identifier ~ ":" ~ (path ~ "+")* ~ path }
 
-number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT*)? }
+type_expr = {
+    primitive_type
+  | path
+  | identifier
+  | function_type
+  | array_type
+  | mutable_pointer_type
+  | pointer_type
+  | mutable_reference_type
+  | reference_type
+  | struct_type
+  | union_type
+  | variant_type
+  | template_type
+  | "(" ~ type_expr ~ ")"
+}
+
+function_type = { "fn" ~ "(" ~ type_params? ~ ")" ~ ("->" ~ type_expr)? }
+type_params = { (type_expr ~ ",")* ~ type_expr ~ ","? }
+
+array_type = { "[" ~ type_expr ~ "]" }
+pointer_type = { "*" ~ type_expr }
+mutable_pointer_type = { "*" ~ "mut" ~ type_expr }
+reference_type = { "&" ~ type_expr }
+mutable_reference_type = { "&" ~ "mut" ~ type_expr }
+
+struct_type = { "struct" ~ "{" ~ struct_member* ~ "}" }
+union_type = { "union" ~ "{" ~ struct_member* ~ "}" }
+variant_type = { "variant" ~ "{" ~ struct_member* ~ "}" }
+struct_member = { identifier ~ ":" ~ type_expr ~ ","? }
+
+template_type = { "template" ~ "<" ~ (identifier ~ ",")* ~ identifier ~ ","? ~ ">" }
+primitive_type = { int_type | uint_type | float_type | "bool" | "int" | "uint" | "float" | "string" | "void" }
+int_type = { "i" ~ ASCII_DIGIT+ }
+uint_type = { "u" ~ ASCII_DIGIT+ }
+float_type = { "float" ~ ASCII_DIGIT+ }
+
+number = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
+int_suffix = { ("i" | "u") ~ ASCII_DIGIT+ }
+float_suffix = { "f" ~ ASCII_DIGIT+ }
 string = @{ "\"" ~ ANY* ~ "\"" }
 symbol = @{ ANY }
 
@@ -95,19 +149,36 @@ identifier_elements = { ASCII_ALPHANUMERIC | "_" }
 
 keyword = {
     "type"
+  | "mod"
   | "fn"
   | "trait"
   | "let"
   | "const"
+  | "mut"
+  | "pub"
+  | "module"
   | "for"
   | "in"
   | "while"
   | "if"
   | "else"
+  | "loop"
   | "match"
   | "use"
   | "header"
-  | "return" }
+  | "break"
+  | "continue"
+  | "return"
+  | "struct"
+  | "union"
+  | "variant"
+  | "template"
+  | "bool"
+  | "int"
+  | "uint"
+  | "float"
+  | "string"
+  | "void" }
 
 COMMENT    = _{ ("/*" ~ ANY* ~ "*/") | ("//" ~ ANY* ~ "\n") }
 WHITESPACE = _{ " " | "\n" | "\t" }
