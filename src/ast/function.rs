@@ -27,6 +27,11 @@ impl FunctionBuilder {
         }
     }
 
+    pub fn set_body(mut self, body: Block) -> Self {
+        self.body = Some(body);
+        return self;
+    }
+
     pub fn set_ret_ty(mut self, ty: Type) -> Self {
         self.ret_ty = Some(ty);
         return self;

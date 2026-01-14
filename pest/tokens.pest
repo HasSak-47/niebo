@@ -1,5 +1,5 @@
 module = { SOI ~ stream ~ EOI }
-stream = { (import | definitions | keyword | number | string | path | symbol)* }
+stream = { (import | definitions )* }
 
 import = { c_import | niebo_import }
 
@@ -22,7 +22,7 @@ trait_body       = {
 }
 
 type_declaration = { "type" ~ identifier }
-type_definition  = { type_declaration ~ "=" ~ type_expr ~ ";" }
+type_definition  = { type_declaration ~ "=" ~ path ~ ";" }
 
 fn_declaration = { "const"? ~ "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
 fn_definition  = { fn_declaration ~ block }

@@ -90,6 +90,13 @@ pub struct Definition {
 }
 
 impl Definition {
+    pub fn type_def<S: Into<String>>(ident: S, path: Path, visibility: Visibility) -> Self {
+        return Self {
+            name: ident.into(),
+            kind: DefinitionKind::TypeAlias(path),
+            visibility,
+        };
+    }
     pub fn variable<S: Into<String>>(
         ident: S,
         value: Expression,
