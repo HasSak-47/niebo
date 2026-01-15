@@ -3,26 +3,53 @@ pub mod function;
 pub mod traits;
 pub mod typing;
 
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::{Result, anyhow};
 
-use crate::general::types::*;
+use crate::{ast::typing::TypeName, general::types::*};
 use function::*;
 
 use expressions::Expression;
 
 use traits::{Trait, TraitBuilder};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct PathIdent {
     pub ident: String,
     pub template_spec: Vec<Path>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+impl Debug for PathIdent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.template_spec.len() > 0 {
+            let mut template = String::new();
+            for spec in &self.template_spec {
+                template += &format!("{spec:?}, ");
+            }
+            write!(f, "{}<{template}>", self.ident)
+        } else {
+            write!(f, "{}", self.ident)
+        }
+    }
+}
+
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct Path {
     pub v: Vec<PathIdent>,
+}
+
+impl Debug for Path {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.v.iter();
+        if let Some(s) = iter.next() {
+            write!(f, "{s:?}")?;
+        }
+        for segment in iter {
+            write!(f, "::{segment:?}")?;
+        }
+        return Ok(());
+    }
 }
 
 impl<I> From<I> for PathIdent
@@ -70,7 +97,7 @@ pub enum Visibility {
 pub struct Variable {
     mutable: bool,
     value: Expression,
-    ty: Option<Type>,
+    ty: Option<TypeName>,
 }
 
 #[derive(Debug, Clone)]
@@ -118,28 +145,31 @@ impl Definition {
             visibility,
         };
     }
-    pub fn variable<S: Into<String>>(
+    pub fn variable<S: Into<String>, T: Into<TypeName>>(
         ident: S,
         value: Expression,
-        ty: Option<Type>,
+        mutable: bool,
+        ty: Option<T>,
     ) -> Result<Definition> {
         return Ok(Self {
             kind: DefinitionKind::Variable(Variable {
-                mutable: false,
+                mutable: mutable,
                 value: value,
-                ty: ty,
+                ty: ty.and_then(|k| Some(k.into())),
             }),
             visibility: Visibility::Private,
             name: ident.into(),
         });
     }
 
-    pub fn variable_with_mut<S: Into<String>>(
+    pub fn variable_with_mut<S: Into<String>, T: Into<TypeName>>(
         ident: S,
         value: Expression,
-        ty: Option<Type>,
+        ty: Option<T>,
         mutable: bool,
     ) -> Result<Definition> {
+        let ty = ty.and_then(|t| Some(t.into()));
+
         return Ok(Self {
             kind: DefinitionKind::Variable(Variable { mutable, value, ty }),
             visibility: Visibility::Private,

@@ -113,9 +113,10 @@ pub fn desugar_expression(exp: &mut Expression) {
             let mut operan_path = Path::new();
             operan_path.add_segment("core");
             operan_path.add_segment("op");
-            let (tr, func) = match oper.operator {
+            let (tr, func) = match &oper.operator {
                 BinaryOperator::Addition => ("Add", "add"),
-                _ => todo!(),
+                BinaryOperator::Lesser => ("Less", "less"),
+                oper => todo!("{oper:?}"),
             };
 
             operan_path.add_segment(tr);
@@ -198,14 +199,14 @@ pub fn evaluate_block(mut block: Block) -> Expression {
             _ => {
                 return Expression {
                     kind: Box::new(ExpressionKind::Block(block)),
-                    ret_ty: Some(Type::void()),
+                    ret_ty: None,
                 };
             }
         }
     } else {
         return Expression {
             kind: Box::new(ExpressionKind::Block(block)),
-            ret_ty: Some(Type::void()),
+            ret_ty: None,
         };
     }
 }

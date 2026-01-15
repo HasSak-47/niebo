@@ -16,6 +16,7 @@ use crate::{
             loops::{LoopExpression, WhileLoop},
             operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
+        typing::TypeName,
     },
     general::types::Type,
 };
@@ -43,15 +44,22 @@ pub enum ExpressionKind {
     UnaryOperation(UnaryOperation),
     Call(Call),
     Return(Option<Expression>),
+    Assignment(Expression, Expression),
 }
 
 #[derive(Debug, Clone)]
 pub struct Expression {
     pub kind: Box<ExpressionKind>,
-    pub ret_ty: Option<Type>,
+    pub ret_ty: Option<TypeName>,
 }
 
 impl Expression {
+    pub fn assignment(var: Expression, value: Expression) -> Self {
+        return Self {
+            kind: Box::new(ExpressionKind::Assignment(var, value)),
+            ret_ty: None,
+        };
+    }
     pub fn from_literal(l: Literal) -> Self {
         return Expression {
             kind: Box::new(ExpressionKind::Literal(l)),

@@ -4,16 +4,27 @@ use super::Expression;
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
+    // boolean operations
+    Greater,
+    Lesser,
+    GreaterOrEqual,
+    LesserOrEqual,
+    Equal,
+    NotEqual,
+
+    // arithmetic operations
     Addition,
     Multiplication,
     Substraction,
     Division,
     Module,
+
+    // bitwise operations
     BitShitLeft,
     BitShitRight,
-    Or,
-    And,
-    Xor,
+    BitwiseOr,
+    BitwiseAnd,
+    BitwiseXor,
 }
 
 impl BinaryOperator {

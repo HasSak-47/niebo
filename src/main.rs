@@ -25,8 +25,7 @@ fn main() -> anyhow::Result<()> {
     file.read_to_string(&mut buf)?;
     let mut project = Project::new("test_project", (0, 1, 0));
     project.root_module = parser::parse_module(buf)?;
-
-    let ir = IR::from_project(project);
+    println!("{:#?}", project.root_module);
 
     return Ok(());
 }

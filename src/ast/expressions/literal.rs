@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 #[derive(Debug, Clone)]
 pub enum LiteralInfo {
     Integer {
@@ -12,10 +14,16 @@ pub enum LiteralInfo {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Literal {
     pub info: LiteralInfo,
     pub data: String,
+}
+
+impl Debug for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "lit: ({})", self.data)
+    }
 }
 
 impl Literal {

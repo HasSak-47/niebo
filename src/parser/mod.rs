@@ -3,8 +3,13 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        self, Definition, Import, Module, Path, PathIdent,
-        expressions::{Expression, Statement, block::Block, literal::Literal},
+        self, Definition, Import, Module, Path, PathIdent, Variable,
+        expressions::{
+            Expression, Statement,
+            block::Block,
+            literal::Literal,
+            operations::{BinaryOperation, BinaryOperator},
+        },
         function::FunctionBuilder,
         typing::TypeName,
     },
@@ -76,44 +81,151 @@ pub fn handle_fn_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Functio
     return Ok(builder);
 }
 
+pub fn handle_assignment_expression_postfix<'a>(
+    prefix: Expression,
+    pair: Pair<'a, Rule>,
+) -> anyhow::Result<Expression> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::assignment_expression_postfix,
+        "a non Rule::assignment_expression_postfix reached handle_assigment_operation_postfix"
+    );
+    let mut inner = pair.into_inner();
+    return Ok(Expression::assignment(
+        prefix,
+        handle_expression(inner.next().unwrap())?,
+    ));
+}
+
+pub fn handle_call_expression_postfix<'a>(
+    prefix: Expression,
+    pair: Pair<'a, Rule>,
+) -> anyhow::Result<Expression> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::call_postfix,
+        "a non Rule::call_postfix reached handle_call_expression_postfix"
+    );
+    let inner = pair.into_inner().next().unwrap().into_inner();
+    let mut params = Vec::new();
+    for innr in inner {
+        params.push(handle_expression(innr)?);
+    }
+
+    return Ok(Expression::call(prefix, params));
+}
+
+pub fn handle_binary_expression_postfix<'a>(
+    prefix: Expression,
+    pair: Pair<'a, Rule>,
+) -> anyhow::Result<Expression> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::binary_expression_postfix,
+        "a non Rule::binary_expression_postfix reached handle_binary_expression_postfix"
+    );
+
+    let mut inner = pair.into_inner();
+    let oper = inner.next().unwrap();
+    let operator = match &oper.as_rule() {
+        Rule::boolean_leq => BinaryOperator::LesserOrEqual,
+        Rule::boolean_le => BinaryOperator::Lesser,
+        Rule::arithmetic_add => BinaryOperator::Addition,
+        un => unreachable!("{un:?}"),
+    };
+    let exp = handle_expression(oper.into_inner().next().unwrap())?;
+
+    return Ok(Expression::binary_operation(operator, prefix, exp));
+}
+
 pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
     let mut inner = pair.into_inner();
     let next = inner.next().unwrap();
-    match next.as_rule() {
+    let prefix = match next.as_rule() {
         Rule::return_expression => {
             let mut expr = next.into_inner();
             let value = expr.next().and_then(|k| handle_expression(k).ok());
-            return Ok(Expression::return_(value));
+            Expression::return_(value)
         }
         Rule::literal_expression => {
             let literal = next.into_inner().next().unwrap();
             match literal.as_rule() {
                 Rule::number => {
                     let literal = Literal::integer(literal.as_str(), None, None);
-                    return Ok(Expression::literal(literal));
+                    Expression::literal(literal)
                 }
                 Rule::string => {
-                    todo!()
+                    let literal = Literal::string(literal.as_str());
+                    Expression::literal(literal)
                 }
                 _ => unreachable!(""),
             }
         }
+        Rule::path => Expression::identifier(handle_path(next)?),
+        Rule::block_expression => Expression::block(handle_block_definition(next)?),
         un => unreachable!("{un:?}"),
+    };
+    let postfix = inner.next();
+    if let None = postfix {
+        return Ok(prefix);
     }
+
+    let postfix = postfix.unwrap().into_inner().next().unwrap();
+    return Ok(match postfix.as_rule() {
+        Rule::binary_expression_postfix => handle_binary_expression_postfix(prefix, postfix)?,
+        Rule::call_postfix => handle_call_expression_postfix(prefix, postfix)?,
+        Rule::assignment_expression_postfix => {
+            handle_assignment_expression_postfix(prefix, postfix)?
+        }
+        Rule::call_postfix | Rule::postfix_unary_operator => {
+            todo!("{:?}", postfix.as_rule())
+        }
+        un => unreachable!("{un:?}"),
+    });
+}
+
+pub fn handle_let_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statement> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::let_declaration,
+        "non let_declaration reached handle_let_declaration!"
+    );
+
+    let mut inner = pair.into_inner();
+
+    let mutable = if let Rule::mutable_modifier = inner.peek().unwrap().as_rule() {
+        inner.next();
+        true
+    } else {
+        false
+    };
+
+    let ident = inner.next().unwrap().as_str();
+    let expr = handle_expression(inner.next().unwrap())?;
+
+    let var = Definition::variable::<&str, Path>(ident, expr, mutable, None)?;
+
+    return Ok(Statement::Definition(var));
 }
 
 pub fn handle_statement<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statement> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::statement,
+        "non statement reached handle_statement!"
+    );
     let mut inner = pair.into_inner();
-    let next = inner.next().unwrap();
-    match next.as_rule() {
-        Rule::expression => {
-            return Ok(Statement::Expression(handle_expression(next)?));
-        }
-        Rule::c_import => todo!(),
-        un => unreachable!("{un:?}"),
-    }
 
-    todo!("{pair:?}");
+    let next = inner.next().unwrap();
+    return Ok(match next.as_rule() {
+        Rule::expression => Statement::Expression(handle_expression(next)?),
+        Rule::let_declaration => handle_let_declaration(next)?,
+        Rule::import
+        | Rule::const_definition
+        | Rule::break_statement
+        | Rule::continue_statement => todo!(),
+        un => unreachable!("{un:?}"),
+    });
 }
 
 pub fn handle_block_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Block> {

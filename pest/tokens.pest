@@ -25,85 +25,94 @@ type_declaration = { "type" ~ identifier }
 type_definition  = { type_declaration ~ "=" ~ path ~ ";" }
 
 fn_declaration = { "const"? ~ "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
-fn_definition  = { fn_declaration ~ block }
+fn_definition  = { fn_declaration ~ block_expression }
 
 module_definition = { "mod" ~ identifier ~ (";" | ("{" ~ stream ~ "}")) }
 
-block = { "{" ~ statement* ~ "}" }
+block_expression = { "{" ~ statement* ~ "}" }
 
 statement = {
-    c_import
+    import
   | use_statement
   | let_declaration
   | const_definition
-  | fn_declaration ~ ";"
   | break_statement
   | continue_statement
   | expression ~ ";"?
 }
 
 expression = {
-    if_expression
-  | literal_expression
-  | while_expression
-  | for_expression
-  | match_expression
-  | loop_expression
-  | return_expression
-  | assignment_expression
-  | operation_expression
+    (if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression | return_expression | block_expression | prefix_unary_operation_expression | path) ~ expression_postfix?
 }
 
-operation_expression = {
-    binary_expression | unary_expression
-}
+prefix_unary_operation_expression = { prefix_unary_operator ~ expression }
+prefix_unary_operator             = { "-" | "!" | "++" | "--" | "*" | "&" }
 
-call_params      = { (expression ~ ",")* ~ expression ~ ","? }
-if_expression    = { "if" ~ expression ~ block ~ ("else" ~ (if_expression | block))? }
-while_expression = { "while" ~ expression ~ block }
-for_expression   = { "for" ~ identifier ~ "in" ~ expression ~ block }
+if_expression    = { "if" ~ expression ~ block_expression ~ ("else" ~ (if_expression | block_expression))? }
+while_expression = { "while" ~ expression ~ "do" ~ block_expression }
+for_expression   = { "for" ~ identifier ~ "in" ~ expression ~ block_expression }
 match_expression = { "match" ~ expression ~ "{" ~ match_arm* ~ "}" }
-match_arm        = { pattern ~ "=>" ~ (block | expression) ~ ","? }
+match_arm        = { pattern ~ "=>" ~ (block_expression | expression) ~ ","? }
 pattern          = { identifier | path | number | string | "_" }
 
-loop_expression    = { "loop" ~ block }
+loop_expression    = { "loop" ~ block_expression }
 return_expression  = { "return" ~ expression? }
 break_statement    = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";" }
 
-assignment_expression = { expression ~ "=" ~ expression }
-
-binary_expression = {
-    logical_or | logical_and | logical_eq | logical_neq |
-    bitwise_and | bitwise_or |
-    arithmetic_add | arithmetic_sub | arithmetic_mul | arithmetic_div | arithmetic_mod
+expression_postfix = {
+    assignment_expression_postfix
+  | call_postfix
+  | postfix_unary_operator
+  | binary_expression_postfix
 }
-unary_expression   = { unary_prefix_operator* ~ postfix_expression }
 
-logical_or  = { expression ~ "||" ~ expression }
-logical_and = { expression ~ "&&" ~ expression }
-logical_eq  = { expression ~ "==" ~ expression }
-logical_neq = { expression ~ "!=" ~ expression }
+postfix_unary_operator = { "?" | "++" | "--" }
 
-bitwise_and = {expression ~ "&" ~ expression }
-bitwise_or  = {expression ~ "|" ~ expression }
+assignment_expression_postfix = { "=" ~ expression }
 
-arithmetic_add = { expression ~ "+" ~ expression }
-arithmetic_sub = { expression ~ "-" ~ expression }
-arithmetic_mul = { expression ~ "*" ~ expression }
-arithmetic_div = { expression ~ "/" ~ expression }
-arithmetic_mod = { expression ~ "%" ~ expression }
+binary_expression_postfix = {
+    boolean_or
+  | boolean_and
+  | boolean_eq
+  | boolean_neq
+  | boolean_leq
+  | boolean_geq
+  | boolean_le
+  | boolean_ge
+  | bitwise_and
+  | bitwise_or
+  | arithmetic_add
+  | arithmetic_sub
+  | arithmetic_mul
+  | arithmetic_div
+  | arithmetic_mod
+}
 
-postfix_expression = { primary_expression ~ (call_postfix | unary_postfix_operator)* }
+boolean_or  = { "||" ~ expression }
+boolean_and = { "&&" ~ expression }
+boolean_eq  = { "==" ~ expression }
+boolean_neq = { "!=" ~ expression }
+boolean_leq = { "<=" ~ expression }
+boolean_geq = { ">=" ~ expression }
+boolean_le  = { "<" ~ expression }
+boolean_ge  = { ">" ~ expression }
+
+bitwise_and = { "&" ~ expression }
+bitwise_or  = { "|" ~ expression }
+
+arithmetic_add = { "+" ~ expression }
+arithmetic_sub = { "-" ~ expression }
+arithmetic_mul = { "*" ~ expression }
+arithmetic_div = { "/" ~ expression }
+arithmetic_mod = { "%" ~ expression }
 
 call_postfix = { "(" ~ call_params? ~ ")" }
+call_params  = { (expression ~ ",")* ~ expression ~ ","? }
 
-unary_prefix_operator  = { "!" | "-" | "+" | "&" | "*" }
-unary_postfix_operator = { "?" | "++" | "--" }
+let_declaration  = { "let" ~ mutable_modifier? ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
+mutable_modifier = { "mut" }
 
-primary_expression = { block | "(" ~ expression ~ ")" | path | number | string }
-
-let_declaration  = { "let" ~ "mut"? ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
 const_definition = { "const" ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
 
 params  = { (param ~ ",")* ~ param ~ ","? ~ varidic? }
