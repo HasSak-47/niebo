@@ -47,6 +47,7 @@ impl Project {
         // TypeAlias is a valid Path but not an expression so it get's discarted
         // - for each expression get determine it's return type
         // - make sure that if something returns that it returns the same type
+        // - convert operations into their equivalent core::op::OP
 
         return Ok(());
     }
