@@ -50,13 +50,15 @@ expression = {
   | match_expression
   | loop_expression
   | return_expression
-  | logical_or
-  | call_expression 
+  | assignment_expression
+  | operation_expression
 }
 
-// temploral quick solution for a non left recursive call expression
-call_expression  = { expression ~ "(" ~ call_params? ~ ")" }
-call_params      = {(expression ~ ",")* ~ expression ~ ","?}
+operation_expression = {
+    binary_expression | unary_expression
+}
+
+call_params      = { (expression ~ ",")* ~ expression ~ ","? }
 if_expression    = { "if" ~ expression ~ block ~ ("else" ~ (if_expression | block))? }
 while_expression = { "while" ~ expression ~ block }
 for_expression   = { "for" ~ identifier ~ "in" ~ expression ~ block }
@@ -69,21 +71,32 @@ return_expression  = { "return" ~ expression? }
 break_statement    = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";" }
 
-logical_or     = { logical_and ~ ("||" ~ logical_and)* }
-logical_and    = { equality ~ ("&&" ~ equality)* }
-equality       = { comparison ~ (("==" | "!=") ~ comparison)* }
-comparison     = { bitwise_or ~ (("<=" | ">=" | "<" | ">") ~ bitwise_or)* }
-bitwise_or     = { bitwise_xor ~ ("|" ~ bitwise_xor)* }
-bitwise_xor    = { bitwise_and ~ ("^" ~ bitwise_and)* }
-bitwise_and    = { shift ~ ("&" ~ shift)* }
-shift          = { additive ~ (("<<" | ">>") ~ additive)* }
-additive       = { multiplicative ~ (("+" | "-") ~ multiplicative)* }
-multiplicative = { unary_expression ~ (("*" | "/" | "%") ~ unary_expression)* }
+assignment_expression = { expression ~ "=" ~ expression }
 
+binary_expression = {
+    logical_or | logical_and | logical_eq | logical_neq |
+    bitwise_and | bitwise_or |
+    arithmetic_add | arithmetic_sub | arithmetic_mul | arithmetic_div | arithmetic_mod
+}
 unary_expression   = { unary_prefix_operator* ~ postfix_expression }
+
+logical_or  = { expression ~ "||" ~ expression }
+logical_and = { expression ~ "&&" ~ expression }
+logical_eq  = { expression ~ "==" ~ expression }
+logical_neq = { expression ~ "!=" ~ expression }
+
+bitwise_and = {expression ~ "&" ~ expression }
+bitwise_or  = {expression ~ "|" ~ expression }
+
+arithmetic_add = { expression ~ "+" ~ expression }
+arithmetic_sub = { expression ~ "-" ~ expression }
+arithmetic_mul = { expression ~ "*" ~ expression }
+arithmetic_div = { expression ~ "/" ~ expression }
+arithmetic_mod = { expression ~ "%" ~ expression }
+
 postfix_expression = { primary_expression ~ (call_postfix | unary_postfix_operator)* }
 
-call_postfix = { "(" ~ (expression ~ ",")* ~ expression? ~ ","? ~ ")" }
+call_postfix = { "(" ~ call_params? ~ ")" }
 
 unary_prefix_operator  = { "!" | "-" | "+" | "&" | "*" }
 unary_postfix_operator = { "?" | "++" | "--" }
@@ -148,7 +161,9 @@ literal_expression = { number | string }
 number       = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
 int_suffix   =  { ("i" | "u") ~ ASCII_DIGIT+ }
 float_suffix =  { "f" ~ ASCII_DIGIT+ }
-string       = @{ "\"" ~ ANY* ~ "\"" }
+string       = @{
+    "\"" ~ ("\\\"" | "\\\\" | "\\n" | "\\r" | "\\t" | "\\0" | "\\x" ~ ASCII_HEX_DIGIT{2} | "\\u" ~ "{" ~ ASCII_HEX_DIGIT+ ~ "}" | (!"\"" ~ ANY))* ~ "\""
+}
 symbol       = @{ ANY }
 
 identifier_elements = { ASCII_ALPHANUMERIC | "_" }

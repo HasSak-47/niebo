@@ -326,4 +326,32 @@ mod test {
         )?;
         return Ok(());
     }
+
+    #[test]
+    fn test_call_expression() -> anyhow::Result<()> {
+        TokenStream::parse(Rule::expression, "printf(\"%d\", i)")?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_min_clike() -> anyhow::Result<()> {
+        TokenStream::parse(
+            Rule::module,
+            "header stdio::printf;
+
+type TestType = int32;
+
+fn main() -> i32 {
+    let i = 0;
+    while i < 10 {
+        printf(\"%d\", i);
+        i = i + 1;
+    }
+    return 0;
+} ",
+        )?;
+
+        return Ok(());
+    }
 }
