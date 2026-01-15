@@ -1,5 +1,6 @@
 pub mod expressions;
 pub mod function;
+pub mod project;
 pub mod traits;
 pub mod typing;
 
@@ -231,27 +232,5 @@ impl Module {
             c_import: false,
             path,
         });
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Project {
-    pub root_module: Module,
-    pub external_modules: HashMap<String, Module>,
-    pub name: String,
-    pub version: (usize, usize, usize),
-}
-
-impl Project {
-    pub fn new<S: Into<String>>(name: S, version: (usize, usize, usize)) -> Self {
-        return Self {
-            root_module: Module {
-                imports: vec![],
-                definitions: vec![],
-            },
-            external_modules: HashMap::new(),
-            name: name.into(),
-            version,
-        };
     }
 }

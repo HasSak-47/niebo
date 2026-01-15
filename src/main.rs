@@ -4,12 +4,13 @@ use std::{fs::File, io::Read};
 
 use crate::{
     ast::{
-        Definition, Project,
+        Definition,
         expressions::{
             Expression, ExpressionKind, Statement, call::Call, literal::Literal,
             operations::BinaryOperator,
         },
         function::FunctionBuilder,
+        project::Project,
     },
     ir::IR,
 };

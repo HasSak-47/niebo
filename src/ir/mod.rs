@@ -3,11 +3,12 @@ use crate::ir::core::create_core_module;
 
 use crate::{
     ast::{
-        DefinitionKind, Module, Path, Project,
+        DefinitionKind, Module, Path,
         expressions::{
             Expression, ExpressionKind, Statement, block::Block, conditional::Conditional,
             loops::LoopExpression, operations::UnaryOperator,
         },
+        project::Project,
         traits::Trait,
     },
     general::types::Type,
