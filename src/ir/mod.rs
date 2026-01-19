@@ -1,5 +1,5 @@
 use crate::ast::expressions::operations::BinaryOperator;
-use crate::ir::core::create_core_module;
+use crate::ir::core::create_core_project;
 
 use crate::{
     ast::{
@@ -43,8 +43,8 @@ fn find_traits<'a>(cur_path: Path, traits: &mut Vec<(Path, &'a Trait)>, module: 
 
 impl<'a> IR<'a> {
     pub fn from_project(mut p: Project) -> Self {
-        p.external_modules
-            .insert("core".to_string(), create_core_module());
+        p.external_projects
+            .insert("core".to_string(), create_core_project());
 
         let mut traits = Vec::new();
         let path = Path::from(p.name.clone());
@@ -54,8 +54,9 @@ impl<'a> IR<'a> {
             traits: Vec::new(),
         };
         find_traits(path, &mut traits, &ir.project.root_module);
-        for (name, module) in &ir.project.external_modules {
-            find_traits(Path::from(name), &mut traits, module);
+        for (name, module) in &ir.project.external_projects {
+            // find_traits(Path::from(name), &mut traits, module);
+            todo!()
         }
 
         // de sugar_module

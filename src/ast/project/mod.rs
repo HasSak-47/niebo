@@ -1,16 +1,19 @@
-use std::{collections::HashMap, fmt::Debug};
+mod cimports;
 
-use anyhow::{Result, anyhow};
+use std::{collections::HashMap, fmt::Debug, path::PathBuf};
+
+use anyhow::{Result, anyhow, bail};
+use clang::{Clang, Index, TranslationUnit};
 
 use crate::{
-    ast::{Definition, DefinitionKind, Module, expressions::Statement, typing::TypeName},
+    ast::{Definition, DefinitionKind, Module, Path, expressions::Statement, typing::TypeName},
     general::types::*,
 };
 
 #[derive(Debug, Clone)]
 pub struct Project {
     pub root_module: Module,
-    pub external_modules: HashMap<String, Module>,
+    pub external_projects: HashMap<String, Project>,
     pub name: String,
     pub version: (usize, usize, usize),
 }
@@ -18,19 +21,72 @@ pub struct Project {
 impl Project {
     pub fn new<S: Into<String>>(name: S, version: (usize, usize, usize)) -> Self {
         return Self {
-            root_module: Module {
-                imports: vec![],
-                definitions: vec![],
-            },
-            external_modules: HashMap::new(),
+            root_module: Module::new(),
+            external_projects: HashMap::new(),
             name: name.into(),
             version,
         };
     }
 
+    pub fn add_external_project<S: Into<String>>(&mut self, name: S, project: Project) {
+        self.external_projects.insert(name.into(), project);
+    }
+
+    fn get_non_local_definition_module<P1, P2>(md: &Module, cur_path: P1, name: P2) -> &Definition
+    where
+        P1: AsRef<Path>,
+        P2: AsRef<Path>,
+    {
+        let name = name.as_ref();
+        let cur_path = cur_path.as_ref();
+
+        let root = name.get(0);
+        if root.is_template() {
+            todo!()
+        }
+
+        for def in &md.definitions {
+            if def.name == root.ident {
+                match &def.kind {
+                    DefinitionKind::Module(md) => {
+                        let mut new_path = cur_path.clone();
+                        new_path.pop_front();
+                        let mut new_name = name.clone();
+                        new_name.pop_front();
+                        Project::get_non_local_definition_module(&md, new_path, new_name);
+                    }
+                    _ => return def,
+                }
+            }
+        }
+
+        unreachable!();
+    }
+
+    pub fn get_non_local_definition<P1, P2>(&self, cur_path: P1, name: P2) -> &Definition
+    where
+        P1: AsRef<Path>,
+        P2: AsRef<Path>,
+    {
+        let name = name.as_ref();
+        let root = name.get(0);
+        if root.is_template() {
+            todo!()
+        }
+
+        if self.external_projects.contains_key(&root.ident) {
+            let p = &self.external_projects[&root.ident];
+            let mut new_name = name.clone();
+            new_name.pop_front();
+
+            return p.get_non_local_definition(cur_path, new_name);
+        }
+
+        return Project::get_non_local_definition_module(&self.root_module, cur_path, name);
+    }
+
     // NOTE: ommit templates for now do to complexity
     pub fn generate_ir(&mut self) -> Result<()> {
-        // todo
         // - generate a registry to determine what is each Identifier/Path
         // - determine type of all variables
         // for example "let i = 10;" has no type in the AST but it's type should be i32
@@ -48,6 +104,40 @@ impl Project {
         // - for each expression get determine it's return type
         // - make sure that if something returns that it returns the same type
         // - convert operations into their equivalent core::op::OP
+
+        // convert each path identifier/path into it's full path
+        // loading module imports
+        let mut import_registry = HashMap::<Path, &Definition>::new();
+        let clang = Clang::new().map_err(|s| anyhow!("clang: {s}"))?;
+        let index = Index::new(&clang, false, false);
+
+        let mut c_cache = HashMap::<String, TranslationUnit>::new();
+        for import in &self.root_module.imports {
+            if import.c_import {
+                let header = &import.path.get(0).ident;
+                if !c_cache.contains_key(header) {
+                    // quick and dirty stdlib c handler
+                    let mut path = PathBuf::from(format!("/usr/include/{header}"));
+                    path.set_extension("h");
+                    if !path.exists() {
+                        bail!("header not found");
+                    }
+                    // this function fucking crashes the whole program if it path can't be found
+                    let parsed = index.parser(path).parse()?;
+                    c_cache.insert(header.clone(), parsed);
+                }
+                let unit = &c_cache[header];
+
+                todo!("handle c imports");
+            }
+            import_registry.insert(
+                import.path.clone(),
+                self.get_non_local_definition(Path::new(), &import.path),
+            );
+        }
+
+        println!("loaded all modules...");
+        println!("{import_registry:?}");
 
         return Ok(());
     }

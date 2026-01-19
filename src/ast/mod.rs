@@ -15,10 +15,16 @@ use expressions::Expression;
 
 use traits::{Trait, TraitBuilder};
 
-#[derive(Default, Clone, PartialEq, Eq)]
+#[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct PathIdent {
     pub ident: String,
     pub template_spec: Vec<Path>,
+}
+
+impl PathIdent {
+    pub fn is_template(&self) -> bool {
+        return !self.template_spec.is_empty();
+    }
 }
 
 impl Debug for PathIdent {
@@ -35,7 +41,7 @@ impl Debug for PathIdent {
     }
 }
 
-#[derive(Default, Clone, PartialEq, Eq)]
+#[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct Path {
     pub v: Vec<PathIdent>,
 }
@@ -72,8 +78,27 @@ impl Path {
         self.v.push(ident);
     }
 
+    pub fn get(&self, index: usize) -> &PathIdent {
+        return &self.v[index];
+    }
+
     pub fn new() -> Self {
         Self { v: vec![] }
+    }
+
+    pub fn pop_front(&mut self) {
+        self.v.remove(0);
+    }
+
+    pub fn len(&self) -> usize {
+        return self.v.len();
+    }
+}
+
+// isn't impl<T> AsRef<T> for T { ... } a default implementation?
+impl AsRef<Path> for Path {
+    fn as_ref(&self) -> &Path {
+        return self;
     }
 }
 
