@@ -255,7 +255,7 @@ pub fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Primiti
     let mut inner = pair.into_inner();
     let next = inner.next().unwrap();
     match next.as_rule() {
-        Rule::int_type => return Ok(PrimitiveType::Int),
+        Rule::int_type => return Ok(PrimitiveType::Int(0)),
         un => unreachable!(""),
     }
     todo!("{:?}", next.as_rule());

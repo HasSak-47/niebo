@@ -6,7 +6,10 @@ use anyhow::{Result, anyhow, bail};
 use clang::{Clang, Index, TranslationUnit};
 
 use crate::{
-    ast::{Definition, DefinitionKind, Module, Path, expressions::Statement, typing::TypeName},
+    ast::{
+        Definition, DefinitionKind, Module, Path, expressions::Statement,
+        function::FunctionBuilder, project::cimports::CCache, typing::TypeName,
+    },
     general::types::*,
 };
 
@@ -22,6 +25,7 @@ impl Project {
     pub fn new<S: Into<String>>(name: S, version: (usize, usize, usize)) -> Self {
         return Self {
             root_module: Module::new(),
+            // todo load core into external projects for core::* resolution
             external_projects: HashMap::new(),
             name: name.into(),
             version,
@@ -107,28 +111,14 @@ impl Project {
 
         // convert each path identifier/path into it's full path
         // loading module imports
+        let mut c_definitions = HashMap::<String, Definition>::new();
         let mut import_registry = HashMap::<Path, &Definition>::new();
         let clang = Clang::new().map_err(|s| anyhow!("clang: {s}"))?;
-        let index = Index::new(&clang, false, false);
+        let mut ccache = CCache::new(&clang)?;
 
-        let mut c_cache = HashMap::<String, TranslationUnit>::new();
         for import in &self.root_module.imports {
             if import.c_import {
-                let header = &import.path.get(0).ident;
-                if !c_cache.contains_key(header) {
-                    // quick and dirty stdlib c handler
-                    let mut path = PathBuf::from(format!("/usr/include/{header}"));
-                    path.set_extension("h");
-                    if !path.exists() {
-                        bail!("header not found");
-                    }
-                    // this function fucking crashes the whole program if it path can't be found
-                    let parsed = index.parser(path).parse()?;
-                    c_cache.insert(header.clone(), parsed);
-                }
-                let unit = &c_cache[header];
-
-                todo!("handle c imports");
+                ccache.resolve_c_definition(&import.path)?;
             }
             import_registry.insert(
                 import.path.clone(),
@@ -136,9 +126,9 @@ impl Project {
             );
         }
 
-        println!("loaded all modules...");
-        println!("{import_registry:?}");
+        // validate that all typenames in the module are indeed names/alias of a type
+        //
 
-        return Ok(());
+        todo!()
     }
 }

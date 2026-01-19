@@ -1,9 +1,9 @@
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {
     Bool,
-    Int,
-    Uint,
-    Float,
+    Int(usize),
+    Uint(usize),
+    Float(usize),
     String,
     Void,
 }
@@ -52,15 +52,23 @@ pub enum Type {
 
 impl Type {
     pub fn int() -> Self {
-        Self::Primitive(PrimitiveType::Int)
+        Self::Primitive(PrimitiveType::Int(32))
     }
 
     pub fn uint() -> Self {
-        Self::Primitive(PrimitiveType::Uint)
+        Self::Primitive(PrimitiveType::Uint(32))
+    }
+
+    pub fn int_p(prec: usize) -> Self {
+        Self::Primitive(PrimitiveType::Int(prec))
+    }
+
+    pub fn uint_p(prec: usize) -> Self {
+        Self::Primitive(PrimitiveType::Uint(prec))
     }
 
     pub fn float() -> Self {
-        Self::Primitive(PrimitiveType::Float)
+        Self::Primitive(PrimitiveType::Float(32))
     }
 
     pub fn bool() -> Self {

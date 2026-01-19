@@ -154,6 +154,11 @@ pub enum DefinitionKind {
     Function(Function),
     Module(Module),
     Trait(Trait),
+
+    // hidden definitions used for c symbol resolution
+    FunctionC(FunctionC),
+    VarC(Variable),
+    // MacroC(Variable),
 }
 
 #[derive(Debug, Clone)]

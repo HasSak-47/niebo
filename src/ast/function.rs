@@ -9,7 +9,7 @@ use crate::general::types::*;
 pub struct FunctionBuilder {
     pub ident: String,
     pub ret_ty: Option<TypeName>,
-    pub params: Vec<(String, TypeName)>,
+    pub params: Vec<(Option<String>, TypeName)>,
     pub varidic: bool,
     pub constant: bool,
     pub body: Option<Block>,
@@ -44,18 +44,29 @@ impl FunctionBuilder {
         return self;
     }
 
+    pub fn set_varidic(mut self, varidic: bool) -> Self {
+        self.varidic = varidic;
+        return self;
+    }
+
     pub fn varidic(mut self) -> Self {
         self.varidic = true;
         return self;
     }
 
-    pub fn add_param<S: AsRef<str>, ITyN: Into<TypeName>>(
+    pub fn add_param<S: Into<String>, ITyN: Into<TypeName>>(
         mut self,
         ident: S,
         tyname: ITyN,
     ) -> Self {
-        self.params
-            .push((ident.as_ref().to_string(), tyname.into()));
+        let ident = ident.into();
+        self.params.push((Some(ident), tyname.into()));
+        return self;
+    }
+
+    pub fn add_anon_param<ITyN: Into<TypeName>>(mut self, tyname: ITyN) -> Self {
+        self.params.push((None, tyname.into()));
+
         return self;
     }
 
@@ -79,14 +90,31 @@ impl FunctionBuilder {
         return self;
     }
 
+    pub fn build_c_function(self) -> Definition {
+        let fun_c = FunctionC {
+            varidic: self.varidic,
+            return_ty: self.ret_ty,
+            constant: false,
+            parameters: self.params,
+        };
+        return Definition {
+            kind: DefinitionKind::FunctionC(fun_c),
+            visibility: Visibility::Public,
+            name: self.ident,
+        };
+    }
+
     pub fn build_def(self) -> Definition {
         assert!(self.body.is_some());
         let body = self.body.unwrap();
         let f = Function {
             body,
             constant: self.constant,
-            parameters: self.params,
-            varidic: self.varidic,
+            parameters: self
+                .params
+                .into_iter()
+                .map(|(n, t)| (n.unwrap(), t))
+                .collect(),
             return_ty: self.ret_ty,
         };
 
@@ -101,9 +129,16 @@ impl FunctionBuilder {
 // since it lives in the AST the types are not yet resolved and are treated as paths
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub varidic: bool,
     pub constant: bool,
     pub return_ty: Option<TypeName>,
     pub parameters: Vec<(String, TypeName)>,
     pub body: Block,
+}
+
+#[derive(Debug, Clone)]
+pub struct FunctionC {
+    pub varidic: bool,
+    pub constant: bool,
+    pub return_ty: Option<TypeName>,
+    pub parameters: Vec<(Option<String>, TypeName)>,
 }
