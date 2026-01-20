@@ -130,7 +130,6 @@ impl Project {
         }
 
         // validate that all typenames in the module are indeed names/alias of a type
-        //
 
         todo!()
     }
