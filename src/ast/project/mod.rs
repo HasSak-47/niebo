@@ -1,9 +1,10 @@
 mod cimports;
 
-use std::{collections::HashMap, fmt::Debug, path::PathBuf};
+use std::{collections::HashMap, fmt::Debug, fs::File, io::Read, path::PathBuf};
 
 use anyhow::{Result, anyhow, bail};
 use clang::{Clang, Index, TranslationUnit};
+use serde::Deserialize;
 
 use crate::{
     ast::{
@@ -14,23 +15,60 @@ use crate::{
     general::types::*,
 };
 
+mod chmura {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    pub enum LibKinds {
+        NieboLib,
+        LibC,
+    }
+
+    #[derive(Deserialize)]
+    pub struct Lib {
+        project_type: LibKinds,
+    }
+
+    #[derive(Deserialize)]
+    pub struct Project {
+        name: String,
+        version: String,
+        edition: String,
+    }
+
+    #[derive(Deserialize)]
+    pub struct Chmura {
+        project: Project,
+        lib: Option<Lib>,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Project {
     pub root_module: Module,
     pub external_projects: HashMap<String, Project>,
     pub name: String,
     pub version: (usize, usize, usize),
+    // edition of the compiler
+    pub edition: (usize, usize, usize),
 }
 
 impl Project {
-    pub fn new<S: Into<String>>(name: S, version: (usize, usize, usize)) -> Self {
-        return Self {
-            root_module: Module::new(),
-            // todo load core into external projects for core::* resolution
-            external_projects: HashMap::new(),
-            name: name.into(),
-            version,
-        };
+    pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+        let path = path.as_ref();
+        if !path.is_dir() {
+            bail!("Niebo: Path is not a directory");
+        }
+        let mut chmura_path = path.to_path_buf();
+        chmura_path.push("chmura");
+        chmura_path.set_extension("toml");
+        let mut file = File::open(chmura_path)?;
+
+        let mut buffer = String::new();
+        file.read_to_string(&mut buffer);
+
+        let chmura: chmura::Chmura = toml::from_str(buffer.as_str())?;
+        todo!()
     }
 
     pub fn add_external_project<S: Into<String>>(&mut self, name: S, project: Project) {

@@ -1,0 +1,7 @@
+[project]
+name = "core"
+version = "0.1.0"
+edition = "0.1.0"
+
+[lib]
+project_type = "NieboLib"

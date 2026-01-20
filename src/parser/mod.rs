@@ -12,7 +12,10 @@ use crate::{
         },
         function::FunctionBuilder,
     },
-    general::{path::{Path, PathIdent}, types::{PrimitiveType, Type}},
+    general::{
+        path::{Path, PathIdent},
+        types::{PrimitiveType, Type},
+    },
 };
 
 #[derive(Parser)]

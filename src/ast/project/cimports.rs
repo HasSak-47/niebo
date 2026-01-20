@@ -82,9 +82,13 @@ fn rec_from<'a>(
         clang::TypeKind::Typedef
         | clang::TypeKind::Elaborated
         | clang::TypeKind::Auto
-        | clang::TypeKind::Unexposed => {
-            rec_from(&value.get_canonical_type(), parent, depth + 1, visiting, deps)
-        }
+        | clang::TypeKind::Unexposed => rec_from(
+            &value.get_canonical_type(),
+            parent,
+            depth + 1,
+            visiting,
+            deps,
+        ),
         clang::TypeKind::FunctionPrototype | clang::TypeKind::FunctionNoPrototype => {
             let ret = value
                 .get_result_type()
@@ -95,7 +99,12 @@ fn rec_from<'a>(
                 .get_argument_types()
                 .unwrap_or_default()
                 .into_iter()
-                .map(|ty| ("".to_string(), rec_from(&ty, parent, depth + 1, visiting, deps)))
+                .map(|ty| {
+                    (
+                        "".to_string(),
+                        rec_from(&ty, parent, depth + 1, visiting, deps),
+                    )
+                })
                 .collect();
             Type::function(params, ret, value.is_variadic())
         }
@@ -179,10 +188,7 @@ fn convert_clang_type<'a>(value: &clang::Type<'a>) -> Type {
     rec_from(value, "", 0, &mut visiting, &mut deps)
 }
 
-fn convert_clang_type_with_deps<'a>(
-    value: &clang::Type<'a>,
-    deps: &mut HashSet<String>,
-) -> Type {
+fn convert_clang_type_with_deps<'a>(value: &clang::Type<'a>, deps: &mut HashSet<String>) -> Type {
     let mut visiting = HashSet::new();
     rec_from(value, "", 0, &mut visiting, deps)
 }
