@@ -1,6 +1,12 @@
 mod cimports;
 
-use std::{collections::HashMap, fmt::Debug, fs::File, io::Read, path::PathBuf};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    fs::File,
+    io::{BufReader, Read},
+    path::PathBuf,
+};
 
 use anyhow::{Result, anyhow, bail};
 use clang::{Clang, Index, TranslationUnit};
@@ -8,17 +14,18 @@ use serde::Deserialize;
 
 use crate::{
     ast::{
-        Definition, DefinitionKind, Module, expressions::Statement, function::FunctionBuilder,
-        project::cimports::CCache,
+        Definition, DefinitionKind, Module, ModuleKind, expressions::Statement,
+        function::FunctionBuilder, project::cimports::CCache,
     },
-    general::path::Path,
-    general::types::*,
+    general::{path::Path, types::*},
+    parser::parse_module,
 };
 
 mod chmura {
     use serde::Deserialize;
 
     #[derive(Deserialize)]
+    #[serde(rename_all = "snake_case")]
     pub enum LibKinds {
         NieboLib,
         LibC,
@@ -26,20 +33,20 @@ mod chmura {
 
     #[derive(Deserialize)]
     pub struct Lib {
-        project_type: LibKinds,
+        pub project_type: LibKinds,
     }
 
     #[derive(Deserialize)]
     pub struct Project {
-        name: String,
-        version: String,
-        edition: String,
+        pub name: String,
+        pub version: String,
+        pub edition: String,
     }
 
     #[derive(Deserialize)]
     pub struct Chmura {
-        project: Project,
-        lib: Option<Lib>,
+        pub project: Project,
+        pub lib: Option<Lib>,
     }
 }
 
@@ -54,6 +61,33 @@ pub struct Project {
 }
 
 impl Project {
+    fn load_modules<P: AsRef<std::path::Path>>(module: &mut Module, cur_path: P) -> Result<()> {
+        let cur_path = cur_path.as_ref();
+        for def in &mut module.definitions {
+            if let Definition {
+                kind: DefinitionKind::Module(md),
+                name,
+                ..
+            } = def
+            {
+                if md.kind == ModuleKind::InFile {
+                    continue;
+                }
+                let mut path = cur_path.to_path_buf();
+                path.push(name);
+                path.set_extension("nb");
+
+                let mut file = File::open(path)?;
+                let mut buffer = String::new();
+                file.read_to_string(&mut buffer);
+
+                *md = parse_module(buffer)?;
+                Self::load_modules(md, cur_path)?
+            }
+        }
+
+        return Ok(());
+    }
     pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         if !path.is_dir() {
@@ -68,7 +102,30 @@ impl Project {
         file.read_to_string(&mut buffer);
 
         let chmura: chmura::Chmura = toml::from_str(buffer.as_str())?;
-        todo!()
+        let src_path = {
+            let mut b = path.to_path_buf();
+            b.push("src");
+            b
+        };
+
+        let mut entry_path = src_path.clone();
+        entry_path.push(if chmura.lib.is_some() { "lib" } else { "main" });
+        entry_path.set_extension("nb");
+
+        let mut file = File::open(entry_path)?;
+        let mut buffer = String::new();
+        file.read_to_string(&mut buffer);
+
+        let mut root = parse_module(buffer)?;
+
+        Self::load_modules(&mut root, src_path);
+        return Ok(Project {
+            root_module: root,
+            external_projects: HashMap::new(),
+            name: chmura.project.name,
+            version: (0, 1, 0),
+            edition: (0, 1, 0),
+        });
     }
 
     pub fn add_external_project<S: Into<String>>(&mut self, name: S, project: Project) {

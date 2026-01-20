@@ -7,7 +7,10 @@ use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
 
-use crate::general::{path::{Path, PathIdent}, types::*};
+use crate::general::{
+    path::{Path, PathIdent},
+    types::*,
+};
 use function::*;
 
 use expressions::Expression;
@@ -71,6 +74,13 @@ pub struct Definition {
 }
 
 impl Definition {
+    pub fn module<S: Into<String>>(ident: S, module: Module) -> Self {
+        return Self {
+            kind: DefinitionKind::Module(module),
+            name: ident.into(),
+            visibility: Visibility::Private,
+        };
+    }
     pub fn type_def<S: Into<String>>(ident: S, path: Path, visibility: Visibility) -> Self {
         return Self {
             name: ident.into(),
@@ -128,8 +138,15 @@ impl Import {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum ModuleKind {
+    InFile,
+    ExFile,
+}
+
 #[derive(Debug, Clone)]
 pub struct Module {
+    pub kind: ModuleKind,
     pub imports: Vec<Import>,
     pub definitions: Vec<Definition>,
 }
@@ -137,13 +154,16 @@ pub struct Module {
 impl Module {
     pub fn new() -> Self {
         return Self {
+            kind: ModuleKind::InFile,
             imports: vec![],
             definitions: vec![],
         };
     }
+
     pub fn add_trait(&mut self, t: TraitBuilder) {
         self.definitions.push(t.build_def());
     }
+
     pub fn add_function(&mut self, f: FunctionBuilder) {
         self.definitions.push(f.build_def());
     }

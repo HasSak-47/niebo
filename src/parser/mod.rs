@@ -3,7 +3,7 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        self, Definition, Import, Module, Variable,
+        self, Definition, Import, Module, Variable, Visibility,
         expressions::{
             Expression, Statement,
             block::Block,
@@ -302,6 +302,20 @@ pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Path> {
 
     return Ok(path);
 }
+pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(pair.as_rule(), Rule::module_definition);
+    let mut inner = pair.into_inner();
+    let ident = inner.next().unwrap();
+
+    if inner.next().is_some() {
+        todo!("handle infine module");
+    }
+
+    let mut md = Module::new();
+    md.kind = ast::ModuleKind::ExFile;
+
+    return Ok(Definition::module(ident.as_str(), md));
+}
 
 pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     let mut inner = pair.into_inner();
@@ -319,22 +333,28 @@ pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defin
 }
 
 pub fn handle_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    // TODO: handle visibility
-    let inner = pair
-        .into_inner()
-        .next()
-        .unwrap()
-        .into_inner()
-        .next()
-        .unwrap();
-    match inner.as_rule() {
-        Rule::type_definition => return handle_type_definitions(inner),
-        Rule::fn_definition => return handle_fn_definitions(inner),
-        Rule::trait_definition => return handle_trait_definitions(inner),
-        un => unreachable!("{un:?}"),
+    let mut inner = pair.into_inner().next().unwrap().into_inner();
+
+    let vis = if let Rule::visibility = inner.peek().unwrap().as_rule() {
+        // TODO: handle global public vs module public
+        inner.next();
+        Visibility::Private
+    } else {
+        Visibility::Private
     };
 
-    todo!()
+    let next = inner.next().unwrap();
+    return match next.as_rule() {
+        Rule::type_definition => handle_type_definitions(next),
+        Rule::fn_definition => handle_fn_definitions(next),
+        Rule::trait_definition => handle_trait_definitions(next),
+        Rule::module_definition => handle_module_definition(next),
+        un => unreachable!("{un:?}"),
+    }
+    .and_then(|mut k| {
+        k.visibility = vis;
+        Ok(k)
+    });
 }
 
 pub fn handle_c_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
