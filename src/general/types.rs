@@ -1,3 +1,5 @@
+use super::path::Path;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {
     Bool,
@@ -48,6 +50,7 @@ pub enum Type {
     MutableReference(Box<Type>),
     Function(FunctionType),
     Template(Template),
+    Named(Path),
 }
 
 impl Type {
@@ -109,5 +112,15 @@ impl Type {
             ret_ty: Box::new(ret_ty),
             varidic,
         })
+    }
+
+    pub fn named(path: Path) -> Self {
+        Self::Named(path)
+    }
+}
+
+impl From<Path> for Type {
+    fn from(path: Path) -> Self {
+        Type::Named(path)
     }
 }

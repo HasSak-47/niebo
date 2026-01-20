@@ -3,7 +3,7 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        self, Definition, Import, Module, Path, PathIdent, Variable,
+        self, Definition, Import, Module, Variable,
         expressions::{
             Expression, Statement,
             block::Block,
@@ -11,9 +11,8 @@ use crate::{
             operations::{BinaryOperation, BinaryOperator},
         },
         function::FunctionBuilder,
-        typing::TypeName,
     },
-    general::types::{PrimitiveType, Type},
+    general::{path::{Path, PathIdent}, types::{PrimitiveType, Type}},
 };
 
 #[derive(Parser)]
@@ -67,13 +66,13 @@ pub fn handle_fn_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Functio
         Rule::params => {
             builder = handle_fn_params(next, builder)?;
             if let Some(s) = inner.next() {
-                builder = builder.set_ret_tyname(handle_type_expression(s)?);
+                builder = builder.set_ret_ty(handle_type_expression(s)?);
             }
         }
 
         // return type
         Rule::type_expr => {
-            builder = builder.set_ret_tyname(handle_type_expression(next)?);
+            builder = builder.set_ret_ty(handle_type_expression(next)?);
         }
         un => unreachable!("{next:?}"),
     }
@@ -261,12 +260,12 @@ pub fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Primiti
     todo!("{:?}", next.as_rule());
 }
 
-pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<TypeName> {
+pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> {
     let mut inner = pair.into_inner();
     let ty = inner.next().unwrap();
     return match ty.as_rule() {
-        Rule::path => Ok(handle_path(ty)?.into()),
-        Rule::primitive_type => Ok(Type::Primitive(handle_primitive_type(ty)?).into()),
+        Rule::path => Ok(Type::named(handle_path(ty)?)),
+        Rule::primitive_type => Ok(Type::Primitive(handle_primitive_type(ty)?)),
         un => unreachable!("{un:?}"),
     };
 }

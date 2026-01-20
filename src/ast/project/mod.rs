@@ -7,9 +7,10 @@ use clang::{Clang, Index, TranslationUnit};
 
 use crate::{
     ast::{
-        Definition, DefinitionKind, Module, Path, expressions::Statement,
-        function::FunctionBuilder, project::cimports::CCache, typing::TypeName,
+        Definition, DefinitionKind, Module, expressions::Statement, function::FunctionBuilder,
+        project::cimports::CCache,
     },
+    general::path::Path,
     general::types::*,
 };
 
@@ -50,6 +51,7 @@ impl Project {
         }
 
         for def in &md.definitions {
+            println!("{def:?}");
             if def.name == root.ident {
                 match &def.kind {
                     DefinitionKind::Module(md) => {
@@ -119,6 +121,7 @@ impl Project {
         for import in &self.root_module.imports {
             if import.c_import {
                 ccache.resolve_c_definition(&import.path)?;
+                continue;
             }
             import_registry.insert(
                 import.path.clone(),

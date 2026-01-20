@@ -2,14 +2,13 @@ use std::collections::HashMap;
 
 use super::expressions::{block::Block, *};
 use super::*;
-use crate::ast::typing::TypeName;
 use crate::general::types::*;
 
 #[derive(Debug)]
 pub struct FunctionBuilder {
     pub ident: String,
-    pub ret_ty: Option<TypeName>,
-    pub params: Vec<(Option<String>, TypeName)>,
+    pub ret_ty: Option<Type>,
+    pub params: Vec<(Option<String>, Type)>,
     pub varidic: bool,
     pub constant: bool,
     pub body: Option<Block>,
@@ -34,7 +33,7 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn set_ret_tyname<TyName: Into<TypeName>>(mut self, ty: TyName) -> Self {
+    pub fn set_ret_ty<Ty: Into<Type>>(mut self, ty: Ty) -> Self {
         self.ret_ty = Some(ty.into());
         return self;
     }
@@ -54,18 +53,18 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn add_param<S: Into<String>, ITyN: Into<TypeName>>(
+    pub fn add_param<S: Into<String>, ITy: Into<Type>>(
         mut self,
         ident: S,
-        tyname: ITyN,
+        ty: ITy,
     ) -> Self {
         let ident = ident.into();
-        self.params.push((Some(ident), tyname.into()));
+        self.params.push((Some(ident), ty.into()));
         return self;
     }
 
-    pub fn add_anon_param<ITyN: Into<TypeName>>(mut self, tyname: ITyN) -> Self {
-        self.params.push((None, tyname.into()));
+    pub fn add_anon_param<ITy: Into<Type>>(mut self, ty: ITy) -> Self {
+        self.params.push((None, ty.into()));
 
         return self;
     }
@@ -130,8 +129,8 @@ impl FunctionBuilder {
 #[derive(Debug, Clone)]
 pub struct Function {
     pub constant: bool,
-    pub return_ty: Option<TypeName>,
-    pub parameters: Vec<(String, TypeName)>,
+    pub return_ty: Option<Type>,
+    pub parameters: Vec<(String, Type)>,
     pub body: Block,
 }
 
@@ -139,6 +138,6 @@ pub struct Function {
 pub struct FunctionC {
     pub varidic: bool,
     pub constant: bool,
-    pub return_ty: Option<TypeName>,
-    pub parameters: Vec<(Option<String>, TypeName)>,
+    pub return_ty: Option<Type>,
+    pub parameters: Vec<(Option<String>, Type)>,
 }

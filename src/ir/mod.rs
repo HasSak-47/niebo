@@ -3,7 +3,7 @@ use crate::ir::core::create_core_project;
 
 use crate::{
     ast::{
-        DefinitionKind, Module, Path,
+        DefinitionKind, Module,
         expressions::{
             Expression, ExpressionKind, Statement, block::Block, conditional::Conditional,
             loops::LoopExpression, operations::UnaryOperator,
@@ -11,7 +11,7 @@ use crate::{
         project::Project,
         traits::Trait,
     },
-    general::types::Type,
+    general::{path::Path, types::Type},
 };
 
 pub mod core;

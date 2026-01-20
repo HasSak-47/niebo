@@ -7,7 +7,7 @@ pub mod operations;
 
 use crate::{
     ast::{
-        Definition, Import, Path,
+        Definition, Import,
         expressions::{
             block::Block,
             call::Call,
@@ -16,9 +16,8 @@ use crate::{
             loops::{LoopExpression, WhileLoop},
             operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
-        typing::TypeName,
     },
-    general::types::Type,
+    general::{path::Path, types::Type},
 };
 
 #[derive(Debug, Clone)]
@@ -50,7 +49,7 @@ pub enum ExpressionKind {
 #[derive(Debug, Clone)]
 pub struct Expression {
     pub kind: Box<ExpressionKind>,
-    pub ret_ty: Option<TypeName>,
+    pub ret_ty: Option<Type>,
 }
 
 impl Expression {

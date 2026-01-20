@@ -1,4 +1,4 @@
-use crate::ast::Path;
+use crate::general::path::Path;
 
 use super::Expression;
 
