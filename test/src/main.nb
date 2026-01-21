@@ -1,9 +1,17 @@
 header stdio::printf;
 
-fn main() -> i32{
-    let mut i = 0;
+type testType = i32;
+
+impl testType {
+    const fn next(&self) -> testType {
+        return self + 1;
+    }
+}
+
+fn main() -> testType {
+    let mut i : testType = 0;
     while i < 10{
         printf("%d\n", i);
-        i += 1;
+        i.next();
     }
 }

@@ -22,7 +22,7 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub enum Statement {
-    // DefinitionKind::Module and DefinitionKind::Trait not allowed
+    // DefinitionKind::Module, DefinitionKind::Trait, and impl blocks not allowed
     Import(Import),
     Definition(Definition),
     Expression(Expression),

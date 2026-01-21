@@ -18,8 +18,8 @@ mod ir;
 mod parser;
 
 fn main() -> anyhow::Result<()> {
-    let mut project = Project::load("./core")?;
-    project.generate_ir()?;
+    let mut core_project = Project::load("./core")?;
+    core_project.generate_ir()?;
 
     return Ok(());
 }

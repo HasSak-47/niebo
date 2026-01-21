@@ -33,7 +33,15 @@ pub struct Variable {
 
 #[derive(Debug, Clone)]
 pub struct Implementation {
-    inner_definitions: Vec<Definition>,
+    pub target: Type,
+    pub definitions: Vec<Definition>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TraitImplementation {
+    pub trait_path: Path,
+    pub target: Type,
+    pub definitions: Vec<Definition>,
 }
 
 macro_rules! into_definition {
@@ -50,6 +58,8 @@ into_definition!(Function);
 into_definition!(Variable);
 into_definition!(Module);
 into_definition!(Trait);
+into_definition!(Implementation);
+into_definition!(TraitImplementation);
 
 #[derive(Debug, Clone)]
 pub enum DefinitionKind {
@@ -59,6 +69,8 @@ pub enum DefinitionKind {
     Function(Function),
     Module(Module),
     Trait(Trait),
+    Implementation(Implementation),
+    TraitImplementation(TraitImplementation),
 
     // hidden definitions used for c symbol resolution
     FunctionC(FunctionC),
