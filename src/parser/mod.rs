@@ -3,7 +3,7 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        self, Definition, Import, Module, Variable, Visibility,
+        self, Definition, Implementation, Import, Module, Variable, Visibility,
         expressions::{
             Expression, Statement,
             block::Block,
@@ -45,11 +45,34 @@ struct Token {
     col: usize,
 }
 
+pub fn handle_fn_param<'a>(
+    pair: Pair<'a, Rule>,
+    mut builder: FunctionBuilder,
+) -> anyhow::Result<FunctionBuilder> {
+    assert_eq!(pair.as_rule(), Rule::param);
+    let mut inner = pair.into_inner();
+
+    let id_p = inner.next().unwrap();
+    assert_eq!(id_p.as_rule(), Rule::identifier);
+
+    let pt_p = inner.next().unwrap();
+    assert_eq!(pt_p.as_rule(), Rule::type_expr);
+
+    return Ok(builder.add_param(id_p.as_str(), handle_type_expression(pt_p)?));
+}
+
 pub fn handle_fn_params<'a>(
     pair: Pair<'a, Rule>,
-    builder: FunctionBuilder,
+    mut builder: FunctionBuilder,
 ) -> anyhow::Result<FunctionBuilder> {
-    todo!()
+    assert_eq!(pair.as_rule(), Rule::params);
+    let mut inner = pair.into_inner();
+
+    for param in inner {
+        builder = handle_fn_param(param, builder)?;
+    }
+
+    return Ok(builder);
 }
 
 pub fn handle_template_def<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<()> {
@@ -269,6 +292,13 @@ pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> 
     return match ty.as_rule() {
         Rule::path => Ok(Type::named(handle_path(ty)?)),
         Rule::primitive_type => Ok(Type::Primitive(handle_primitive_type(ty)?)),
+        Rule::mutable_reference_type => {
+            let mut inner = ty.into_inner();
+            let next = inner.next().unwrap();
+            Ok(Type::MutableReference(Box::new(handle_type_expression(
+                next,
+            )?)))
+        }
         un => unreachable!("{un:?}"),
     };
 }
@@ -301,6 +331,23 @@ pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Path> {
     }
 
     return Ok(path);
+}
+
+pub fn handle_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Implementation> {
+    assert_eq!(pair.as_rule(), Rule::implementation);
+    println!("{pair:?}");
+    let mut inner = pair.into_inner();
+    let target = handle_path(inner.next().unwrap())?;
+    let mut definitions = Vec::new();
+
+    while let Some(ok) = inner.next() {
+        definitions.push(handle_fn_definitions(ok)?);
+    }
+
+    return Ok(Implementation {
+        target,
+        definitions,
+    });
 }
 pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     assert_eq!(pair.as_rule(), Rule::module_definition);
@@ -390,6 +437,10 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
             }
             Rule::import => {
                 md.imports.push(handle_imports(t)?);
+            }
+            Rule::impls => {
+                let def = t.into_inner().next().unwrap();
+                md.impls.push(handle_implementation(def)?);
             }
             un => unreachable!("{t:?}"),
         }

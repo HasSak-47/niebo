@@ -3,7 +3,7 @@ header stdio::printf;
 type testType = i32;
 
 impl testType {
-    const fn next(&self) -> testType {
+    const fn next(self: &mut testType) -> testType {
         return self + 1;
     }
 }
@@ -13,5 +13,6 @@ fn main() -> testType {
     while i < 10{
         printf("%d\n", i);
         i.next();
+
     }
 }

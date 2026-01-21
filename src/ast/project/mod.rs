@@ -214,17 +214,26 @@ impl Project {
         let mut ccache = CCache::new(&clang)?;
 
         for import in &self.root_module.imports {
+            println!("{import:?}");
             if import.c_import {
-                ccache.resolve_c_definition(&import.path)?;
-                continue;
+                println!("resolving: {}", import.path.get(0).ident);
+                ccache.resolve_c_definitions(&import.path.get(0).ident)?;
             }
-            import_registry.insert(
-                import.path.clone(),
-                self.get_non_local_definition(Path::new(), &import.path),
-            );
+        }
+
+        for import in &self.root_module.imports {
+            let path = import.path.clone();
+            let def = if import.c_import {
+                ccache.get_definition(&path)?
+            } else {
+                self.get_non_local_definition(Path::new(), &import.path)
+            };
+
+            import_registry.insert(path, def);
         }
 
         // validate that all typenames in the module are indeed names/alias of a type
+        println!("{import_registry:?}");
 
         todo!()
     }

@@ -1,6 +1,7 @@
 module = { SOI ~ stream ~ EOI }
-stream = { (import | definitions)* }
+stream = { (import | definitions | impls)* }
 
+impls  = { implementation }
 import = { c_import | niebo_import }
 
 c_import      = { "header" ~ path ~ ";" }
@@ -12,6 +13,10 @@ visibility = { "pub" | "module" }
 definitions = { definition }
 
 definition = { visibility? ~ (fn_definition | fn_declaration | type_definition | const_definition | trait_definition | module_definition) }
+
+implementation = {
+    "impl" ~ path ~ "{" ~ fn_definition* ~ "}"
+}
 
 trait_definition = { "trait" ~ identifier ~ template_def? ~ "{" ~ trait_body* ~ "}" }
 trait_body       = {
@@ -42,7 +47,7 @@ statement = {
 }
 
 expression = {
-    (if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression | return_expression | block_expression | prefix_unary_operation_expression | path) ~ expression_postfix?
+    (if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression | return_expression | block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix?
 }
 
 prefix_unary_operation_expression = { prefix_unary_operator ~ expression }
@@ -65,7 +70,10 @@ expression_postfix = {
   | call_postfix
   | postfix_unary_operator
   | binary_expression_postfix
+  | member_access_postfix
 }
+
+member_access_postfix = {"." ~ identifier}
 
 postfix_unary_operator = { "?" | "++" | "--" }
 

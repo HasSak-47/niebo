@@ -219,9 +219,17 @@ impl<'c> CCache<'c> {
             map: HashMap::new(),
         });
     }
-    pub fn resolve_c_definition(&mut self, path: &Path) -> anyhow::Result<()> {
+
+    pub fn get_definition(&self, path: &Path) -> anyhow::Result<&Definition> {
         let header = &path.get(0).ident;
         let symbol = &path.get(1).ident;
+
+        return Ok(&self.map[header].symbols[symbol]);
+    }
+
+    // loads all definitions in c header into a cache
+    pub fn resolve_c_definitions<S: AsRef<str>>(&mut self, header: S) -> anyhow::Result<()> {
+        let header = header.as_ref();
 
         if !self.map.contains_key(header) {
             // quick and dirty stdlib c handler
@@ -268,13 +276,9 @@ impl<'c> CCache<'c> {
                     name: dep,
                 });
             }
-            self.map.insert(header.clone(), entry);
+            self.map.insert(header.to_string(), entry);
         }
 
-        let entry = self.map.get_mut(header).unwrap();
-        if entry.symbols.contains_key(symbol) {
-            return Ok(());
-        }
-        bail!("symbol not found in header");
+        return Ok(());
     }
 }

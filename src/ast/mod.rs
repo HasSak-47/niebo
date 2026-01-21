@@ -33,14 +33,14 @@ pub struct Variable {
 
 #[derive(Debug, Clone)]
 pub struct Implementation {
-    pub target: Type,
+    pub target: Path,
     pub definitions: Vec<Definition>,
 }
 
 #[derive(Debug, Clone)]
 pub struct TraitImplementation {
     pub trait_path: Path,
-    pub target: Type,
+    pub target: Path,
     pub definitions: Vec<Definition>,
 }
 
@@ -161,12 +161,16 @@ pub struct Module {
     pub kind: ModuleKind,
     pub imports: Vec<Import>,
     pub definitions: Vec<Definition>,
+    pub impls: Vec<Implementation>,
+    pub trait_impls: Vec<TraitImplementation>,
 }
 
 impl Module {
     pub fn new() -> Self {
         return Self {
             kind: ModuleKind::InFile,
+            trait_impls: vec![],
+            impls: vec![],
             imports: vec![],
             definitions: vec![],
         };

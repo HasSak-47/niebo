@@ -3,6 +3,7 @@ pub mod call;
 pub mod conditional;
 pub mod literal;
 pub mod loops;
+pub mod member_access;
 pub mod operations;
 
 use crate::{
@@ -14,10 +15,14 @@ use crate::{
             conditional::Conditional,
             literal::Literal,
             loops::{LoopExpression, WhileLoop},
+            member_access::MemberAccess,
             operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
     },
-    general::{path::Path, types::Type},
+    general::{
+        path::{Path, PathIdent},
+        types::Type,
+    },
 };
 
 #[derive(Debug, Clone)]
@@ -33,6 +38,7 @@ pub enum Statement {
 
 #[derive(Debug, Clone)]
 pub enum ExpressionKind {
+    MemberAccess(MemberAccess),
     Block(Block),
     If(Conditional),
     Loop(LoopExpression),
@@ -59,6 +65,17 @@ impl Expression {
             ret_ty: None,
         };
     }
+
+    pub fn member_access(object: Expression, member: PathIdent) -> Self {
+        return Expression {
+            kind: Box::new(ExpressionKind::MemberAccess(MemberAccess {
+                object,
+                member,
+            })),
+            ret_ty: None,
+        };
+    }
+
     pub fn from_literal(l: Literal) -> Self {
         return Expression {
             kind: Box::new(ExpressionKind::Literal(l)),
