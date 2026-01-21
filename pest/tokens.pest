@@ -47,7 +47,7 @@ statement = {
 }
 
 expression = {
-    (if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression | return_expression | block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix?
+    (if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression | return_expression | block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix*
 }
 
 prefix_unary_operation_expression = { prefix_unary_operator ~ expression }
@@ -73,7 +73,7 @@ expression_postfix = {
   | member_access_postfix
 }
 
-member_access_postfix = {"." ~ identifier}
+member_access_postfix = {"." ~ identifier }
 
 postfix_unary_operator = { "?" | "++" | "--" }
 

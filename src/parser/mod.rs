@@ -106,6 +106,13 @@ pub fn handle_fn_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Functio
     return Ok(builder);
 }
 
+pub fn handle_member_access_postfix<'a>(
+    prefix: Expression,
+    pair: Pair<'a, Rule>,
+) -> anyhow::Result<Expression> {
+    todo!()
+}
+
 pub fn handle_assignment_expression_postfix<'a>(
     prefix: Expression,
     pair: Pair<'a, Rule>,
@@ -195,6 +202,8 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
         return Ok(prefix);
     }
 
+    // TODO: create a postfix RPN generator because that is the most normal way to do it instead of
+    // left to right
     let postfix = postfix.unwrap().into_inner().next().unwrap();
     return Ok(match postfix.as_rule() {
         Rule::binary_expression_postfix => handle_binary_expression_postfix(prefix, postfix)?,
@@ -205,6 +214,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
         Rule::call_postfix | Rule::postfix_unary_operator => {
             todo!("{:?}", postfix.as_rule())
         }
+        Rule::member_access_postfix => handle_member_access_postfix(prefix, postfix)?,
         un => unreachable!("{un:?}"),
     });
 }
@@ -451,6 +461,19 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
 #[cfg(test)]
 mod test {
     use super::*;
+    #[test]
+    fn test_member_access() -> anyhow::Result<()> {
+        //  TODO: check that the postfix is correct
+        // expression postfix:call postfix:access postfix:call
+        let mut access = TokenStream::parse(Rule::expression, "a().b(10)")?;
+        let exp = access.next().unwrap();
+        assert_eq!(exp.as_rule(), Rule::expression);
+        for a in access {
+            assert_eq!(a.as_rule(), Rule::expression_postfix);
+        }
+
+        return Ok(());
+    }
 
     #[test]
     fn test_functions() -> anyhow::Result<()> {
