@@ -56,6 +56,7 @@ pub enum ExpressionKind {
 pub struct Expression {
     pub kind: Box<ExpressionKind>,
     pub ret_ty: Option<Type>,
+    pub constant: bool,
 }
 
 impl Expression {
@@ -63,6 +64,7 @@ impl Expression {
         return Self {
             kind: Box::new(ExpressionKind::Assignment(var, value)),
             ret_ty: None,
+            constant: false,
         };
     }
 
@@ -72,6 +74,7 @@ impl Expression {
                 object,
                 member,
             })),
+            constant: true,
             ret_ty: None,
         };
     }
@@ -80,12 +83,14 @@ impl Expression {
         return Expression {
             kind: Box::new(ExpressionKind::Literal(l)),
             ret_ty: None,
+            constant: true,
         };
     }
     pub fn new(kind: ExpressionKind) -> Self {
         Self {
             ret_ty: None,
             kind: Box::new(kind),
+            constant: false,
         }
     }
 

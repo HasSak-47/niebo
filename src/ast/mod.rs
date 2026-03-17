@@ -1,8 +1,10 @@
 pub mod expressions;
 pub mod function;
+pub mod module;
 pub mod project;
 pub mod traits;
 
+use module::*;
 use std::collections::HashMap;
 
 use anyhow::{Result, anyhow};
@@ -147,58 +149,5 @@ impl Import {
             c_import: true,
             path,
         };
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum ModuleKind {
-    InFile,
-    ExFile,
-}
-
-#[derive(Debug, Clone)]
-pub struct Module {
-    pub kind: ModuleKind,
-    pub imports: Vec<Import>,
-    pub definitions: Vec<Definition>,
-    pub impls: Vec<Implementation>,
-    pub trait_impls: Vec<TraitImplementation>,
-}
-
-impl Module {
-    pub fn new() -> Self {
-        return Self {
-            kind: ModuleKind::InFile,
-            trait_impls: vec![],
-            impls: vec![],
-            imports: vec![],
-            definitions: vec![],
-        };
-    }
-
-    pub fn add_trait(&mut self, t: TraitBuilder) {
-        self.definitions.push(t.build_def());
-    }
-
-    pub fn add_function(&mut self, f: FunctionBuilder) {
-        self.definitions.push(f.build_def());
-    }
-
-    pub fn add_c_import<P: Into<Path>>(&mut self, path: P) {
-        let path = path.into();
-        // everything in c has the format header::name
-        assert!(path.v.len() == 2);
-
-        self.imports.push(Import {
-            c_import: true,
-            path,
-        });
-    }
-
-    pub fn add_import(&mut self, path: Path) {
-        self.imports.push(Import {
-            c_import: false,
-            path,
-        });
     }
 }

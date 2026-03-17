@@ -61,6 +61,7 @@ pub struct Project {
 }
 
 impl Project {
+    #[must_use]
     fn load_modules<P: AsRef<std::path::Path>>(module: &mut Module, cur_path: P) -> Result<()> {
         let cur_path = cur_path.as_ref();
         for def in &mut module.definitions {
@@ -77,11 +78,13 @@ impl Project {
                 path.push(name);
                 path.set_extension("nb");
 
+                println!("loading module: {}", path.display());
                 let mut file = File::open(path)?;
                 let mut buffer = String::new();
-                file.read_to_string(&mut buffer);
+                file.read_to_string(&mut buffer)?;
 
                 *md = parse_module(buffer)?;
+                println!("module: {md:?}");
                 Self::load_modules(md, cur_path)?
             }
         }
@@ -99,7 +102,7 @@ impl Project {
         let mut file = File::open(chmura_path)?;
 
         let mut buffer = String::new();
-        file.read_to_string(&mut buffer);
+        file.read_to_string(&mut buffer)?;
 
         let chmura: chmura::Chmura = toml::from_str(buffer.as_str())?;
         let src_path = {
@@ -114,11 +117,11 @@ impl Project {
 
         let mut file = File::open(entry_path)?;
         let mut buffer = String::new();
-        file.read_to_string(&mut buffer);
+        file.read_to_string(&mut buffer)?;
 
         let mut root = parse_module(buffer)?;
 
-        Self::load_modules(&mut root, src_path);
+        Self::load_modules(&mut root, src_path)?;
         return Ok(Project {
             root_module: root,
             external_projects: HashMap::new(),
@@ -139,7 +142,6 @@ impl Project {
     {
         let name = name.as_ref();
         let cur_path = cur_path.as_ref();
-
         let root = name.get(0);
         if root.is_template() {
             todo!()
@@ -185,9 +187,18 @@ impl Project {
 
         return Project::get_non_local_definition_module(&self.root_module, cur_path, name);
     }
+}
 
+struct Scope {
+    definitions: HashMap<Path, Definition>,
+    scope: Vec<HashMap<Path, Definition>>,
+}
+
+struct IRGenerator {}
+
+impl IRGenerator {
     // NOTE: ommit templates for now do to complexity
-    pub fn generate_ir(&mut self) -> Result<()> {
+    pub fn generate_ir(&mut self, mut project: Project) -> Result<()> {
         // - generate a registry to determine what is each Identifier/Path
         // - determine type of all variables
         // for example "let i = 10;" has no type in the AST but it's type should be i32
@@ -208,12 +219,14 @@ impl Project {
 
         // convert each path identifier/path into it's full path
         // loading module imports
-        let mut c_definitions = HashMap::<String, Definition>::new();
+        let c_imports = project.root_module.get_c_imports();
+
         let mut import_registry = HashMap::<Path, &Definition>::new();
+        // TODO: load libs to clang
         let clang = Clang::new().map_err(|s| anyhow!("clang: {s}"))?;
         let mut ccache = CCache::new(&clang)?;
 
-        for import in &self.root_module.imports {
+        for import in &project.root_module.imports {
             println!("{import:?}");
             if import.c_import {
                 println!("resolving: {}", import.path.get(0).ident);
@@ -221,20 +234,6 @@ impl Project {
             }
         }
 
-        for import in &self.root_module.imports {
-            let path = import.path.clone();
-            let def = if import.c_import {
-                ccache.get_definition(&path)?
-            } else {
-                self.get_non_local_definition(Path::new(), &import.path)
-            };
-
-            import_registry.insert(path, def);
-        }
-
-        // validate that all typenames in the module are indeed names/alias of a type
-        println!("{import_registry:?}");
-
-        todo!()
+        todo!("{:?}", project.root_module);
     }
 }

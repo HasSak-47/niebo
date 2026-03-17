@@ -1,16 +1,4 @@
-#![allow(warnings)]
-
-use std::{fs::File, io::Read};
-
-use crate::ast::{
-    Definition,
-    expressions::{
-        Expression, ExpressionKind, Statement, call::Call, literal::Literal,
-        operations::BinaryOperator,
-    },
-    function::FunctionBuilder,
-    project::Project,
-};
+use crate::ast::project::Project;
 
 mod ast;
 mod general;
@@ -22,7 +10,7 @@ fn main() -> anyhow::Result<()> {
     // core_project.generate_ir()?;
 
     let mut test_project = Project::load("./test")?;
-    test_project.generate_ir();
+    test_project.generate_ir()?;
 
     return Ok(());
 }

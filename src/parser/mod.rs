@@ -3,7 +3,7 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        self, Definition, Implementation, Import, Module, Variable, Visibility,
+        self, Definition, Implementation, Import, Variable, Visibility,
         expressions::{
             Expression, Statement,
             block::Block,
@@ -11,6 +11,7 @@ use crate::{
             operations::{BinaryOperation, BinaryOperator},
         },
         function::FunctionBuilder,
+        module::{Module, ModuleKind},
     },
     general::{
         path::{Path, PathIdent},
@@ -110,7 +111,17 @@ pub fn handle_member_access_postfix<'a>(
     prefix: Expression,
     pair: Pair<'a, Rule>,
 ) -> anyhow::Result<Expression> {
-    todo!()
+    assert_eq!(
+        pair.as_rule(),
+        Rule::member_access_postfix,
+        "a non Rule::member_access_postfix reached handle_member_access_postfix"
+    );
+    let mut inner = pair.into_inner();
+    let member = inner.next().unwrap();
+    return Ok(Expression::member_access(
+        prefix,
+        PathIdent::from(member.as_str()),
+    ));
 }
 
 pub fn handle_assignment_expression_postfix<'a>(
@@ -202,8 +213,6 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
         return Ok(prefix);
     }
 
-    // TODO: create a postfix RPN generator because that is the most normal way to do it instead of
-    // left to right
     let postfix = postfix.unwrap().into_inner().next().unwrap();
     return Ok(match postfix.as_rule() {
         Rule::binary_expression_postfix => handle_binary_expression_postfix(prefix, postfix)?,
@@ -345,7 +354,6 @@ pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Path> {
 
 pub fn handle_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Implementation> {
     assert_eq!(pair.as_rule(), Rule::implementation);
-    println!("{pair:?}");
     let mut inner = pair.into_inner();
     let target = handle_path(inner.next().unwrap())?;
     let mut definitions = Vec::new();
@@ -369,7 +377,7 @@ pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     }
 
     let mut md = Module::new();
-    md.kind = ast::ModuleKind::ExFile;
+    md.kind = ModuleKind::ExFile;
 
     return Ok(Definition::module(ident.as_str(), md));
 }
@@ -430,7 +438,7 @@ pub fn handle_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
     };
 }
 
-pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<ast::Module> {
+pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
     let mut md = Module::new();
     let ts = TokenStream::parse(Rule::module, txt.as_ref())?
         .into_iter()
