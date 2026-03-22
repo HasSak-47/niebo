@@ -1,8 +1,0 @@
-use super::op::Add;
-
-impl Add for i32 {
-    #hook[built_in]
-    fn add(self, other: i32) -> i32 {
-        return #hook[built_in_add_i32(self, other)];
-    }
-}

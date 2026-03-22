@@ -53,11 +53,7 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn add_param<S: Into<String>, ITy: Into<Type>>(
-        mut self,
-        ident: S,
-        ty: ITy,
-    ) -> Self {
+    pub fn add_param<S: Into<String>, ITy: Into<Type>>(mut self, ident: S, ty: ITy) -> Self {
         let ident = ident.into();
         self.params.push((Some(ident), ty.into()));
         return self;

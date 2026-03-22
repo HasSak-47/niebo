@@ -19,10 +19,12 @@ use expressions::Expression;
 
 use traits::{Trait, TraitBuilder};
 
-#[derive(Debug, Clone)]
+// WARN: bad default!
+#[derive(Debug, Default, Clone)]
 pub enum Visibility {
     Private,
     Module,
+    #[default]
     Public,
 }
 
@@ -92,7 +94,7 @@ impl Definition {
         return Self {
             kind: DefinitionKind::Module(module),
             name: ident.into(),
-            visibility: Visibility::Private,
+            visibility: Visibility::Public,
         };
     }
     pub fn type_def<S: Into<String>>(ident: S, path: Path, visibility: Visibility) -> Self {
@@ -114,7 +116,7 @@ impl Definition {
                 value: value,
                 ty: ty.and_then(|k| Some(k.into())),
             }),
-            visibility: Visibility::Private,
+            visibility: Visibility::Public,
             name: ident.into(),
         });
     }
@@ -129,7 +131,7 @@ impl Definition {
 
         return Ok(Self {
             kind: DefinitionKind::Variable(Variable { mutable, value, ty }),
-            visibility: Visibility::Private,
+            visibility: Visibility::Public,
             name: ident.into(),
         });
     }

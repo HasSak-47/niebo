@@ -10,9 +10,8 @@ impl testType {
 
 fn main() -> testType {
     let mut i : testType = 0;
-    while i < 10{
+    while i < 10 {
         printf("%d\n", i);
         i.next();
-
     }
 }

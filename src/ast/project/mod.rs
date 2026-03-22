@@ -14,8 +14,10 @@ use serde::Deserialize;
 
 use crate::{
     ast::{
-        Definition, DefinitionKind, Module, ModuleKind, expressions::Statement,
-        function::FunctionBuilder, project::cimports::CCache,
+        Definition, DefinitionKind, Module, ModuleKind, Variable,
+        expressions::Statement,
+        function::{Function, FunctionBuilder, FunctionC},
+        project::cimports::CCache,
     },
     general::{path::Path, types::*},
     parser::parse_module,
@@ -189,14 +191,41 @@ impl Project {
     }
 }
 
-struct Scope {
-    definitions: HashMap<Path, Definition>,
-    scope: Vec<HashMap<Path, Definition>>,
+#[derive(Debug)]
+enum Symbol {
+    FunctionC(FunctionC),
+    Function(Function),
+    Variable(Variable),
 }
 
-struct IRGenerator {}
+#[derive(Debug, Default)]
+struct Scope {
+    symbols: HashMap<Path, Symbol>,
+    types: HashMap<Path, Type>,
+}
+
+#[derive(Debug, Default)]
+pub struct IRGenerator {
+    global: Scope,
+
+    scope: Vec<Scope>,
+}
 
 impl IRGenerator {
+    fn get_symbol(&self, path: &Path) -> Result<&Symbol> {
+        if self.global.symbols.contains_key(path) {
+            return Ok(&self.global.symbols[path]);
+        }
+
+        for scope in self.scope.iter().rev() {
+            if scope.symbols.contains_key(path) {
+                return Ok(&scope.symbols[path]);
+            }
+        }
+
+        bail!("not found");
+    }
+
     // NOTE: ommit templates for now do to complexity
     pub fn generate_ir(&mut self, mut project: Project) -> Result<()> {
         // - generate a registry to determine what is each Identifier/Path
@@ -227,13 +256,14 @@ impl IRGenerator {
         let mut ccache = CCache::new(&clang)?;
 
         for import in &project.root_module.imports {
-            println!("{import:?}");
             if import.c_import {
-                println!("resolving: {}", import.path.get(0).ident);
                 ccache.resolve_c_definitions(&import.path.get(0).ident)?;
+                let mut path = Path::new();
+                path.add_segment(&import.path.get(1).ident);
+                // self.global.symbols.insert(path, );
             }
         }
 
-        todo!("{:?}", project.root_module);
+        todo!("{:#?}", self);
     }
 }
