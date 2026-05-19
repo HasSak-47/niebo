@@ -28,7 +28,7 @@ impl TraitBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Trait {
     pub functions: HashMap<String, Function>,
 }

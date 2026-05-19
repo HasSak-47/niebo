@@ -1,10 +1,22 @@
+use std::fmt::Display;
+
 use super::Expression;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Conditional {
     pub condition: Expression,
     pub then: Expression,
     pub else_: Option<Expression>,
+}
+
+impl Display for Conditional {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "if ({}) {{ {} }} else {{ {:?} }}",
+            self.condition, self.then, self.else_
+        )
+    }
 }
 
 impl Conditional {

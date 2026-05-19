@@ -205,13 +205,13 @@ struct Scope {
 }
 
 #[derive(Debug, Default)]
-pub struct IRGenerator {
+pub struct ProjectPreprocessor {
     global: Scope,
 
     scope: Vec<Scope>,
 }
 
-impl IRGenerator {
+impl ProjectPreprocessor {
     fn get_symbol(&self, path: &Path) -> Result<&Symbol> {
         if self.global.symbols.contains_key(path) {
             return Ok(&self.global.symbols[path]);
@@ -227,7 +227,7 @@ impl IRGenerator {
     }
 
     // NOTE: ommit templates for now do to complexity
-    pub fn generate_ir(&mut self, mut project: Project) -> Result<()> {
+    pub fn process_project(&mut self, mut project: Project) -> Result<()> {
         // - generate a registry to determine what is each Identifier/Path
         // - determine type of all variables
         // for example "let i = 10;" has no type in the AST but it's type should be i32
@@ -264,6 +264,15 @@ impl IRGenerator {
             }
         }
 
-        todo!("{:#?}", self);
+        // let type_registry = HashMap::new();
+        // let func_registry = HashMap::new();
+        for def in &project.root_module.definitions {
+            println!("{def:?}");
+            match def.kind {
+                _ => todo!(),
+            }
+        }
+
+        todo!()
     }
 }

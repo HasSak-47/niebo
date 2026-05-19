@@ -1,0 +1,13 @@
+import super::traits::*;
+
+impl copy for i32{
+    fn copy(&self) -> i32 {
+        return __builtin::copy_i32(i32);
+    }
+}
+
+impl Add<i32, i32> for i32 {
+    fn add(self, other: i32) -> i32 {
+        return __builtin::add_i32_i32(i32);
+    }
+}

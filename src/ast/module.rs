@@ -10,7 +10,7 @@ pub enum ModuleKind {
     ExFile,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub kind: ModuleKind,
     pub imports: Vec<Import>,

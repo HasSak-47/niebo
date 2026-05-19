@@ -1,4 +1,4 @@
-use crate::ast::project::{IRGenerator, Project};
+use crate::ast::project::{Project, ProjectPreprocessor};
 
 mod ast;
 mod general;
@@ -10,8 +10,8 @@ fn main() -> anyhow::Result<()> {
     // core_project.generate_ir()?;
 
     let test_project = Project::load("./test")?;
-    let mut ir = IRGenerator::default();
-    ir.generate_ir(test_project)?;
+    let mut ir = ProjectPreprocessor::default();
+    ir.process_project(test_project)?;
 
     return Ok(());
 }

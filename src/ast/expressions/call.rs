@@ -1,9 +1,17 @@
+use std::fmt::Display;
+
 use super::Expression;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Call {
     pub called: Expression,
     pub parameters: Vec<Expression>,
+}
+
+impl Display for Call {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({})({:?})", self.called, self.parameters)
+    }
 }
 
 impl Call {

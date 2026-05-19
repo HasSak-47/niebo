@@ -6,6 +6,8 @@ pub mod loops;
 pub mod member_access;
 pub mod operations;
 
+use std::fmt::Display;
+
 use crate::{
     ast::{
         Definition, Import,
@@ -25,7 +27,7 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     // DefinitionKind::Module, DefinitionKind::Trait, and impl blocks not allowed
     Import(Import),
@@ -36,7 +38,7 @@ pub enum Statement {
     Use(Path),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionKind {
     MemberAccess(MemberAccess),
     Block(Block),
@@ -52,11 +54,36 @@ pub enum ExpressionKind {
     Assignment(Expression, Expression),
 }
 
-#[derive(Debug, Clone)]
+impl Display for ExpressionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpressionKind::MemberAccess(a) => write!(f, "{}", a),
+            ExpressionKind::Block(a) => write!(f, "{}", a),
+            ExpressionKind::If(a) => write!(f, "{}", a),
+            ExpressionKind::Loop(a) => write!(f, "{}", a),
+            ExpressionKind::While(a) => write!(f, "{}", a),
+            ExpressionKind::Literal(a) => write!(f, "{}", a),
+            ExpressionKind::Identifier(a) => write!(f, "{}", a),
+            ExpressionKind::BinaryOperation(a) => write!(f, "{}", a),
+            ExpressionKind::UnaryOperation(a) => write!(f, "{}", a),
+            ExpressionKind::Call(a) => write!(f, "{}", a),
+            ExpressionKind::Return(a) => write!(f, "{:?}", a),
+            ExpressionKind::Assignment(a, b) => write!(f, "({} = {})", a, b),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Expression {
     pub kind: Box<ExpressionKind>,
     pub ret_ty: Option<Type>,
     pub constant: bool,
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.kind)
+    }
 }
 
 impl Expression {
@@ -68,7 +95,9 @@ impl Expression {
         };
     }
 
-    pub fn member_access(object: Expression, member: PathIdent) -> Self {
+    pub fn member_access<P: Into<PathIdent>>(object: Expression, member: P) -> Self {
+        let member = member.into();
+
         return Expression {
             kind: Box::new(ExpressionKind::MemberAccess(MemberAccess {
                 object,

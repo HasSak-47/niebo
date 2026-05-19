@@ -39,6 +39,7 @@ pub struct Template {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
+    None,
     Primitive(PrimitiveType),
     Struct(StructType),
     Array(Box<Type>),
@@ -50,6 +51,9 @@ pub enum Type {
     MutableReference(Box<Type>),
     Function(FunctionType),
     Template(Template),
+    // alias to a type
+    Alias(Box<Type>),
+    // path to a type that should be resolved later
     Named(Path),
 }
 

@@ -1,6 +1,6 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum LiteralInfo {
     Integer {
         signed: Option<bool>,
@@ -14,10 +14,16 @@ pub enum LiteralInfo {
     },
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct Literal {
     pub info: LiteralInfo,
     pub data: String,
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.data)
+    }
 }
 
 impl Debug for Literal {

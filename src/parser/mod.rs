@@ -8,7 +8,7 @@ use crate::{
             Expression, Statement,
             block::Block,
             literal::Literal,
-            operations::{BinaryOperation, BinaryOperator},
+            operations::{BinaryOperation, BinaryOperator, UnaryOperator},
         },
         function::FunctionBuilder,
         module::{Module, ModuleKind},
@@ -101,16 +101,13 @@ pub fn handle_fn_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Functio
         Rule::type_expr => {
             builder = builder.set_ret_ty(handle_type_expression(next)?);
         }
-        un => unreachable!("{next:?}"),
+        un => unreachable!("{next:?}: {un:?}"),
     }
 
     return Ok(builder);
 }
 
-pub fn handle_member_access_postfix<'a>(
-    prefix: Expression,
-    pair: Pair<'a, Rule>,
-) -> anyhow::Result<Expression> {
+pub fn handle_member_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PathIdent> {
     assert_eq!(
         pair.as_rule(),
         Rule::member_access_postfix,
@@ -118,10 +115,7 @@ pub fn handle_member_access_postfix<'a>(
     );
     let mut inner = pair.into_inner();
     let member = inner.next().unwrap();
-    return Ok(Expression::member_access(
-        prefix,
-        PathIdent::from(member.as_str()),
-    ));
+    return Ok(PathIdent::from(member.as_str()));
 }
 
 pub fn handle_assignment_expression_postfix<'a>(
@@ -134,34 +128,31 @@ pub fn handle_assignment_expression_postfix<'a>(
         "a non Rule::assignment_expression_postfix reached handle_assigment_operation_postfix"
     );
     let mut inner = pair.into_inner();
-    return Ok(Expression::assignment(
-        prefix,
-        handle_expression(inner.next().unwrap())?,
-    ));
+    return Ok(handle_expression(inner.next().unwrap())?);
 }
 
-pub fn handle_call_expression_postfix<'a>(
-    prefix: Expression,
-    pair: Pair<'a, Rule>,
-) -> anyhow::Result<Expression> {
+pub fn handle_call_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<Expression>> {
     assert_eq!(
         pair.as_rule(),
         Rule::call_postfix,
         "a non Rule::call_postfix reached handle_call_expression_postfix"
     );
-    let inner = pair.into_inner().next().unwrap().into_inner();
+    let a = pair.into_inner().next();
+    if a.is_none() {
+        return Ok(vec![]);
+    }
+    let inner = a.unwrap().into_inner();
     let mut params = Vec::new();
     for innr in inner {
         params.push(handle_expression(innr)?);
     }
 
-    return Ok(Expression::call(prefix, params));
+    return Ok(params);
 }
 
 pub fn handle_binary_expression_postfix<'a>(
-    prefix: Expression,
     pair: Pair<'a, Rule>,
-) -> anyhow::Result<Expression> {
+) -> anyhow::Result<(BinaryOperator, Expression)> {
     assert_eq!(
         pair.as_rule(),
         Rule::binary_expression_postfix,
@@ -178,13 +169,17 @@ pub fn handle_binary_expression_postfix<'a>(
     };
     let exp = handle_expression(oper.into_inner().next().unwrap())?;
 
-    return Ok(Expression::binary_operation(operator, prefix, exp));
+    return Ok((operator, exp));
 }
 
 pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
-    let mut inner = pair.into_inner();
+    let mut inner = pair.clone().into_inner();
     let next = inner.next().unwrap();
     let prefix = match next.as_rule() {
+        Rule::expression_priority => {
+            let mut expr = next.into_inner();
+            handle_expression(expr.next().unwrap())?
+        }
         Rule::return_expression => {
             let mut expr = next.into_inner();
             let value = expr.next().and_then(|k| handle_expression(k).ok());
@@ -208,24 +203,172 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
         Rule::block_expression => Expression::block(handle_block_definition(next)?),
         un => unreachable!("{un:?}"),
     };
-    let postfix = inner.next();
-    if let None = postfix {
-        return Ok(prefix);
+
+    let mut postfix_rules = Vec::new();
+
+    while let Some(postfix) = inner.next() {
+        assert_eq!(postfix.as_rule(), Rule::expression_postfix, "non postfix");
+        let postfix = postfix.into_inner().next().unwrap();
+        match postfix.as_rule() {
+            Rule::call_postfix => {}
+            Rule::assignment_expression_postfix => {}
+            Rule::binary_expression_postfix => {}
+            Rule::unary_expression_postfix => {}
+            Rule::member_access_postfix => {}
+            un => unreachable!("{un:?}"),
+        }
+        postfix_rules.push(postfix);
+    }
+    #[derive(Debug)]
+    enum Operation {
+        Call(Vec<Expression>),
+        Access(PathIdent),
+        Unary(UnaryOperator),
+        Binary(BinaryOperator),
     }
 
-    let postfix = postfix.unwrap().into_inner().next().unwrap();
-    return Ok(match postfix.as_rule() {
-        Rule::binary_expression_postfix => handle_binary_expression_postfix(prefix, postfix)?,
-        Rule::call_postfix => handle_call_expression_postfix(prefix, postfix)?,
-        Rule::assignment_expression_postfix => {
-            handle_assignment_expression_postfix(prefix, postfix)?
+    impl PartialEq for Operation {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (Operation::Call(_), Operation::Call(_)) => true,
+                (Operation::Access(a), Operation::Access(b)) => a == b,
+                (Operation::Unary(a), Operation::Unary(b)) => a == b,
+                (Operation::Binary(a), Operation::Binary(b)) => a == b,
+                _ => false,
+            }
         }
-        Rule::call_postfix | Rule::postfix_unary_operator => {
-            todo!("{:?}", postfix.as_rule())
+    }
+
+    impl PartialOrd for Operation {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            Some(match (self, other) {
+                (Operation::Call(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
+                (Operation::Call(_), _) => std::cmp::Ordering::Equal,
+
+                (Operation::Access(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
+                (Operation::Access(_), _) => std::cmp::Ordering::Equal,
+
+                (Operation::Unary(a), Operation::Unary(b)) => a.cmp(b),
+                (Operation::Unary(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
+                (Operation::Unary(_), _) => std::cmp::Ordering::Equal,
+
+                (Operation::Binary(a), Operation::Binary(b)) => a.cmp(b),
+                (Operation::Binary(_), _) => std::cmp::Ordering::Less,
+            })
         }
-        Rule::member_access_postfix => handle_member_access_postfix(prefix, postfix)?,
-        un => unreachable!("{un:?}"),
-    });
+    }
+
+    #[derive(Debug)]
+    enum ExpressionString {
+        Val(Expression),
+        Oper(Operation),
+    }
+
+    impl ExpressionString {
+        fn to_val(self) -> anyhow::Result<Expression> {
+            if let ExpressionString::Val(p) = self {
+                return Ok(p);
+            } else {
+                anyhow::bail!("ExpressionString was not val it was: {self:?}")
+            }
+        }
+    }
+
+    let mut e_string = Vec::new();
+    e_string.push(ExpressionString::Val(prefix));
+    for p in postfix_rules {
+        match p.as_rule() {
+            Rule::binary_expression_postfix => {
+                let (a, b) = handle_binary_expression_postfix(p)?;
+                e_string.push(ExpressionString::Oper(Operation::Binary(a)));
+                e_string.push(ExpressionString::Val(b));
+            }
+            Rule::unary_expression_postfix => {
+                todo!()
+            }
+            Rule::call_postfix => {
+                let params = handle_call_expression_postfix(p)?;
+                e_string.push(ExpressionString::Oper(Operation::Call(params)));
+            }
+            Rule::member_access_postfix => {
+                let ident = handle_member_access_postfix(p)?;
+                e_string.push(ExpressionString::Oper(Operation::Access(ident)));
+            }
+            _ => todo!(),
+        }
+    }
+
+    let mut out_q: Vec<ExpressionString> = Vec::new();
+    let mut op_st = Vec::new();
+
+    for e in e_string {
+        match e {
+            ExpressionString::Val(v) => {
+                out_q.push(ExpressionString::Val(v));
+            }
+            ExpressionString::Oper(o) => {
+                if op_st.len() != 0 {
+                    while let Some(lst) = op_st.last() {
+                        if *lst >= o {
+                            let lst = op_st.pop().unwrap();
+                            out_q.push(ExpressionString::Oper(lst));
+                        } else {
+                            break;
+                        }
+                    }
+                    op_st.push(o);
+                } else {
+                    op_st.push(o);
+                }
+            }
+        }
+    }
+    for lst in op_st.into_iter().rev() {
+        out_q.push(ExpressionString::Oper(lst));
+    }
+
+    fn handle_collapse(
+        o: Operation,
+        out_q: &mut Vec<ExpressionString>,
+    ) -> anyhow::Result<Expression> {
+        let mut get_next_val = || -> anyhow::Result<Expression> {
+            match out_q.pop().unwrap() {
+                ExpressionString::Val(v) => Ok(v),
+                ExpressionString::Oper(o) => handle_collapse(o, out_q),
+            }
+        };
+        match o {
+            Operation::Access(ident) => {
+                let a = get_next_val()?;
+
+                return Ok(Expression::member_access(a, ident));
+            }
+            Operation::Call(params) => {
+                let a = get_next_val()?;
+
+                return Ok(Expression::call(a, params));
+            }
+            Operation::Unary(o) => {
+                let a = get_next_val()?;
+                return Ok(Expression::unary_operation(o, a));
+            }
+            Operation::Binary(o) => {
+                let b = get_next_val()?;
+                let a = get_next_val()?;
+
+                return Ok(Expression::binary_operation(o, a, b));
+            }
+        }
+    }
+
+    while out_q.len() > 1 {
+        if let ExpressionString::Oper(o) = out_q.pop().unwrap() {
+            let e = handle_collapse(o, &mut out_q)?;
+            out_q.push(ExpressionString::Val(e));
+        }
+    }
+
+    return out_q.pop().unwrap().to_val();
 }
 
 pub fn handle_let_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statement> {
@@ -306,6 +449,7 @@ pub fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Primiti
 }
 
 pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> {
+    println!("herhe{pair:?}");
     let mut inner = pair.into_inner();
     let ty = inner.next().unwrap();
     return match ty.as_rule() {
@@ -382,19 +526,71 @@ pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     return Ok(Definition::module(ident.as_str(), md));
 }
 
-pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::alias_definition,
+        "handle_type_alias_definitions got a non alias_definition"
+    );
     let mut inner = pair.into_inner();
-    let ident = inner.next().unwrap().into_inner();
-    let def = inner.next().unwrap().into_inner();
-
-    let type_ident = ident.as_str();
-    let type_def = def.as_str();
+    let ident = inner.next().unwrap().to_string();
+    let path = inner.next().unwrap();
 
     return Ok(Definition::type_def(
-        type_ident,
-        Path::from(type_def),
-        ast::Visibility::Public,
+        ident,
+        Type::Alias(Box::new(Type::named(handle_path(path)?))),
+        Visibility::Public,
     ));
+}
+
+pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::struct_definition,
+        "handle_type_struct_definitions got a non struct_definition"
+    );
+    todo!()
+}
+
+pub fn handle_type_union_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::union_definition,
+        "handle_type_union_definitions got a non union_definition"
+    );
+    todo!()
+}
+
+pub fn handle_type_variant_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::variant_definition,
+        "handle_type_variant_definitions got a non variant_definition"
+    );
+    todo!()
+}
+
+pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::type_definition,
+        "handle_type_definitions got a non type_definition"
+    );
+    println!("{pair:?}\n");
+    let inner = pair.into_inner().next().unwrap();
+    return match inner.as_rule() {
+        Rule::struct_definition => {
+            todo!()
+        }
+        Rule::alias_definition => handle_type_alias_definitions(inner),
+        Rule::variant_definition => {
+            todo!()
+        }
+        Rule::union_definition => {
+            todo!()
+        }
+        _ => unreachable!(),
+    };
 }
 
 pub fn handle_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
@@ -469,6 +665,28 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
 #[cfg(test)]
 mod test {
     use super::*;
+    #[test]
+    fn test_operator_precedence() -> anyhow::Result<()> {
+        let k = TokenStream::parse(Rule::expression, "a().b + c.d()")?
+            .next()
+            .unwrap();
+        assert_eq!(k.as_rule(), Rule::expression);
+        let parsed = handle_expression(k)?;
+
+        let expected = Expression::binary_operation(
+            BinaryOperator::Addition,
+            Expression::member_access(Expression::call(Expression::identifier("a"), vec![]), "b"),
+            Expression::call(
+                Expression::member_access(Expression::identifier("c"), "d"),
+                vec![],
+            ),
+        );
+
+        assert!(parsed == expected, "{parsed} != {expected}");
+
+        return Ok(());
+    }
+
     #[test]
     fn test_member_access() -> anyhow::Result<()> {
         //  TODO: check that the postfix is correct

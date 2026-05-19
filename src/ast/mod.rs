@@ -20,7 +20,7 @@ use expressions::Expression;
 use traits::{Trait, TraitBuilder};
 
 // WARN: bad default!
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum Visibility {
     Private,
     Module,
@@ -28,20 +28,20 @@ pub enum Visibility {
     Public,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
     mutable: bool,
     value: Expression,
     ty: Option<Type>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Implementation {
     pub target: Path,
     pub definitions: Vec<Definition>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TraitImplementation {
     pub trait_path: Path,
     pub target: Path,
@@ -65,11 +65,10 @@ into_definition!(Trait);
 into_definition!(Implementation);
 into_definition!(TraitImplementation);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DefinitionKind {
     Variable(Variable),
     Type(Type),
-    TypeAlias(Path),
     Function(Function),
     Module(Module),
     Trait(Trait),
@@ -82,7 +81,7 @@ pub enum DefinitionKind {
     // MacroC(Variable),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Definition {
     pub kind: DefinitionKind,
     pub visibility: Visibility,
@@ -97,10 +96,10 @@ impl Definition {
             visibility: Visibility::Public,
         };
     }
-    pub fn type_def<S: Into<String>>(ident: S, path: Path, visibility: Visibility) -> Self {
+    pub fn type_def<S: Into<String>>(ident: S, ty: Type, visibility: Visibility) -> Self {
         return Self {
             name: ident.into(),
-            kind: DefinitionKind::TypeAlias(path),
+            kind: DefinitionKind::Type(ty),
             visibility,
         };
     }
@@ -137,7 +136,7 @@ impl Definition {
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct Import {
     pub c_import: bool,
     pub path: Path,

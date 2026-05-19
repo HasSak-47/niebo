@@ -5,8 +5,8 @@ impls  = { implementation }
 import = { c_import | niebo_import }
 
 c_import      = { "header" ~ path ~ ";" }
-niebo_import  = { "use" ~ path ~ ";" }
-use_statement = { "use" ~ path ~ ";" }
+niebo_import  = { "import" ~ path ~ ";" }
+use_statement = { "import" ~ path ~ ";" }
 
 visibility = { "pub" | "module" }
 
@@ -26,8 +26,18 @@ trait_body       = {
   | fn_declaration ~ ";"
 }
 
-type_declaration = { "type" ~ identifier }
-type_definition  = { type_declaration ~ "=" ~ path ~ ";" }
+struct_declaration = {"struct" ~ identifier}
+union_declaration = {"union" ~ identifier}
+variant_declaration = {"variant" ~ identifier}
+alias_declaration = {"type" ~ identifier}
+
+struct_definition = {"struct" ~ identifier ~ "{" ~ "}" }
+union_definition = {"union" ~ identifier~ "{" ~ "}" }
+variant_definition = {"variant" ~ identifier ~ "{" ~ "}"}
+alias_definition = {"type" ~ identifier ~ "=" ~ path ~ ";"}
+
+type_declaration = { (struct_declaration | union_declaration | variant_declaration | alias_declaration) ~ ";"}
+type_definition = { struct_definition | union_definition | variant_definition | alias_definition }
 
 fn_declaration = { "const"? ~ "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
 fn_definition  = { fn_declaration ~ block_expression }
@@ -46,8 +56,9 @@ statement = {
   | expression ~ ";"?
 }
 
+expression_priority = { "(" ~ expression ~ ")" }
 expression = {
-    (if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression | return_expression | block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix*
+    return_expression | ((expression_priority | if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression |  block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix*)
 }
 
 prefix_unary_operation_expression = { prefix_unary_operator ~ expression }
@@ -68,14 +79,14 @@ continue_statement = { "continue" ~ ";" }
 expression_postfix = {
     assignment_expression_postfix
   | call_postfix
-  | postfix_unary_operator
+  | unary_expression_postfix
   | binary_expression_postfix
   | member_access_postfix
 }
 
 member_access_postfix = {"." ~ identifier }
 
-postfix_unary_operator = { "?" | "++" | "--" }
+unary_expression_postfix = { "?" | "++" | "--" }
 
 assignment_expression_postfix = { "=" ~ expression }
 
@@ -90,6 +101,7 @@ binary_expression_postfix = {
   | boolean_ge
   | bitwise_and
   | bitwise_or
+  | bitwise_xor
   | arithmetic_add
   | arithmetic_sub
   | arithmetic_mul
@@ -108,6 +120,7 @@ boolean_ge  = { ">" ~ expression }
 
 bitwise_and = { "&" ~ expression }
 bitwise_or  = { "|" ~ expression }
+bitwise_xor = { "~" ~ expression }
 
 arithmetic_add = { "+" ~ expression }
 arithmetic_sub = { "-" ~ expression }

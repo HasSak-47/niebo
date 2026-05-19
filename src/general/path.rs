@@ -6,6 +6,12 @@ pub struct PathIdent {
     pub template_spec: Vec<Path>,
 }
 
+impl std::fmt::Display for PathIdent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
 impl PathIdent {
     pub fn is_template(&self) -> bool {
         return !self.template_spec.is_empty();
@@ -29,6 +35,12 @@ impl Debug for PathIdent {
 #[derive(Default, Clone, PartialEq, Eq, Hash)]
 pub struct Path {
     pub v: Vec<PathIdent>,
+}
+
+impl std::fmt::Display for Path {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
 }
 
 impl Debug for Path {

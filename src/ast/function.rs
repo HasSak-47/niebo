@@ -4,7 +4,7 @@ use super::expressions::{block::Block, *};
 use super::*;
 use crate::general::types::*;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct FunctionBuilder {
     pub ident: String,
     pub ret_ty: Option<Type>,
@@ -122,7 +122,7 @@ impl FunctionBuilder {
 }
 
 // since it lives in the AST the types are not yet resolved and are treated as paths
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub constant: bool,
     pub return_ty: Option<Type>,
@@ -130,7 +130,7 @@ pub struct Function {
     pub body: Block,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionC {
     pub varidic: bool,
     pub constant: bool,
