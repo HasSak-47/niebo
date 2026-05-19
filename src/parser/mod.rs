@@ -1,3 +1,6 @@
+mod type_handling;
+use type_handling::*;
+
 use pest::{Parser, RuleType, iterators::Pair};
 use pest_derive::Parser;
 
@@ -21,7 +24,7 @@ use crate::{
 
 #[derive(Parser)]
 #[grammar = "./pest/tokens.pest"]
-struct TokenStream;
+pub struct TokenStream;
 
 #[derive(Debug, Default)]
 struct Identifier {
@@ -438,34 +441,6 @@ pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     todo!("implement into the trait definition ast")
 }
 
-pub fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveType> {
-    let mut inner = pair.into_inner();
-    let next = inner.next().unwrap();
-    match next.as_rule() {
-        Rule::int_type => return Ok(PrimitiveType::Int(0)),
-        un => unreachable!(""),
-    }
-    todo!("{:?}", next.as_rule());
-}
-
-pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> {
-    println!("herhe{pair:?}");
-    let mut inner = pair.into_inner();
-    let ty = inner.next().unwrap();
-    return match ty.as_rule() {
-        Rule::path => Ok(Type::named(handle_path(ty)?)),
-        Rule::primitive_type => Ok(Type::Primitive(handle_primitive_type(ty)?)),
-        Rule::mutable_reference_type => {
-            let mut inner = ty.into_inner();
-            let next = inner.next().unwrap();
-            Ok(Type::MutableReference(Box::new(handle_type_expression(
-                next,
-            )?)))
-        }
-        un => unreachable!("{un:?}"),
-    };
-}
-
 pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PathIdent> {
     let mut inner = pair.into_inner();
     let ident = inner.next().unwrap().as_str().to_string();
@@ -524,73 +499,6 @@ pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     md.kind = ModuleKind::ExFile;
 
     return Ok(Definition::module(ident.as_str(), md));
-}
-
-pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    assert_eq!(
-        pair.as_rule(),
-        Rule::alias_definition,
-        "handle_type_alias_definitions got a non alias_definition"
-    );
-    let mut inner = pair.into_inner();
-    let ident = inner.next().unwrap().to_string();
-    let path = inner.next().unwrap();
-
-    return Ok(Definition::type_def(
-        ident,
-        Type::Alias(Box::new(Type::named(handle_path(path)?))),
-        Visibility::Public,
-    ));
-}
-
-pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    assert_eq!(
-        pair.as_rule(),
-        Rule::struct_definition,
-        "handle_type_struct_definitions got a non struct_definition"
-    );
-    todo!()
-}
-
-pub fn handle_type_union_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    assert_eq!(
-        pair.as_rule(),
-        Rule::union_definition,
-        "handle_type_union_definitions got a non union_definition"
-    );
-    todo!()
-}
-
-pub fn handle_type_variant_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    assert_eq!(
-        pair.as_rule(),
-        Rule::variant_definition,
-        "handle_type_variant_definitions got a non variant_definition"
-    );
-    todo!()
-}
-
-pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    assert_eq!(
-        pair.as_rule(),
-        Rule::type_definition,
-        "handle_type_definitions got a non type_definition"
-    );
-    println!("{pair:?}\n");
-    let inner = pair.into_inner().next().unwrap();
-    return match inner.as_rule() {
-        Rule::struct_definition => {
-            todo!()
-        }
-        Rule::alias_definition => handle_type_alias_definitions(inner),
-        Rule::variant_definition => {
-            todo!()
-        }
-        Rule::union_definition => {
-            todo!()
-        }
-        _ => unreachable!(),
-    };
 }
 
 pub fn handle_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
@@ -656,7 +564,7 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
                 let def = t.into_inner().next().unwrap();
                 md.impls.push(handle_implementation(def)?);
             }
-            un => unreachable!("{t:?}"),
+            un => unreachable!("{un:?}"),
         }
     }
 

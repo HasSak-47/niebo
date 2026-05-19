@@ -39,7 +39,6 @@ pub struct Template {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
-    None,
     Primitive(PrimitiveType),
     Struct(StructType),
     Array(Box<Type>),
