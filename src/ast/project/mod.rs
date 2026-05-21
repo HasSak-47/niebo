@@ -20,6 +20,7 @@ use crate::{
         project::cimports::CCache,
     },
     general::{path::Path, types::*},
+    ir::Resolver,
     parser::parse_module,
 };
 
@@ -255,6 +256,8 @@ impl ProjectPreprocessor {
         let clang = Clang::new().map_err(|s| anyhow!("clang: {s}"))?;
         let mut ccache = CCache::new(&clang)?;
 
+        let mut res = Resolver::default();
+
         for import in &project.root_module.imports {
             if import.c_import {
                 ccache.resolve_c_definitions(&import.path.get(0).ident)?;
@@ -267,8 +270,14 @@ impl ProjectPreprocessor {
         // let type_registry = HashMap::new();
         // let func_registry = HashMap::new();
         for def in &project.root_module.definitions {
-            println!("{def:?}");
-            match def.kind {
+            println!("{def:#?}");
+            match &def.kind {
+                DefinitionKind::Type(ty) => {
+                    let _ = res
+                        .ty_reg
+                        .entries
+                        .insert(def.name.clone().into(), ty.clone());
+                }
                 _ => todo!(),
             }
         }

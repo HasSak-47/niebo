@@ -1,25 +1,43 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug};
 
-use crate::general::{path::Path, types::Type};
+use crate::{
+    ast,
+    general::{
+        path::{Path, PathIdent},
+        types::Type,
+    },
+};
 
-struct Binary {
-    symbols: HashMap<Path, Symbol>,
-    types: HashMap<Type, Symbol>,
+#[derive(Debug)]
+pub struct Registry<T> {
+    pub entries: HashMap<PathIdent, T>,
 }
 
-pub enum LinkKind {
-    External,
-    Internal,
+struct FunctionDef {
+    local_registry: Resolver,
+    stmts: Vec<ast::expressions::Statement>,
+    return_ty: Type,
 }
 
-pub enum SymbolKind {
-    Registry,
-    Function,
-    Variable,
+impl FunctionDef {
+    fn new(func: ast::function::Function) -> anyhow::Result<Self> {
+        let expected_ret = func.return_ty;
+        for stmt in func.body.statements {}
+        todo!()
+    }
 }
 
-pub struct Symbol {
-    kind: SymbolKind,
-    link: LinkKind,
-    ident: Path,
+#[derive(Debug)]
+pub struct Resolver {
+    pub ty_reg: Registry<Type>,
+}
+
+impl Default for Resolver {
+    fn default() -> Self {
+        Self {
+            ty_reg: Registry {
+                entries: HashMap::new(),
+            },
+        }
+    }
 }

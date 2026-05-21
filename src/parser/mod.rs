@@ -11,6 +11,7 @@ use crate::{
             Expression, Statement,
             block::Block,
             literal::Literal,
+            loops::WhileLoop,
             operations::{BinaryOperation, BinaryOperator, UnaryOperator},
         },
         function::FunctionBuilder,
@@ -176,6 +177,11 @@ pub fn handle_binary_expression_postfix<'a>(
 }
 
 pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::expression,
+        "a non Rule::expression reached handle_expression"
+    );
     let mut inner = pair.clone().into_inner();
     let next = inner.next().unwrap();
     let prefix = match next.as_rule() {
@@ -204,7 +210,14 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
         }
         Rule::path => Expression::identifier(handle_path(next)?),
         Rule::block_expression => Expression::block(handle_block_definition(next)?),
-        un => unreachable!("{un:?}"),
+        Rule::while_expression => {
+            let mut inner = next.into_inner();
+            let condition = handle_expression(inner.next().unwrap())?;
+            let block = Expression::block(handle_block_definition(inner.next().unwrap())?);
+
+            Expression::while_(WhileLoop::new(condition, block))
+        }
+        un => unreachable!("\"{}\": {un:?}", pair.as_str()),
     };
 
     let mut postfix_rules = Vec::new();
@@ -225,6 +238,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
     #[derive(Debug)]
     enum Operation {
         Call(Vec<Expression>),
+        Assign(Expression),
         Access(PathIdent),
         Unary(UnaryOperator),
         Binary(BinaryOperator),
@@ -245,6 +259,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
     impl PartialOrd for Operation {
         fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
             Some(match (self, other) {
+                (Operation::Assign(_), _) => std::cmp::Ordering::Equal,
                 (Operation::Call(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
                 (Operation::Call(_), _) => std::cmp::Ordering::Equal,
 
@@ -297,7 +312,13 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
                 let ident = handle_member_access_postfix(p)?;
                 e_string.push(ExpressionString::Oper(Operation::Access(ident)));
             }
-            _ => todo!(),
+            Rule::assignment_expression_postfix => {
+                let mut ex = p.into_inner();
+                e_string.push(ExpressionString::Oper(Operation::Assign(
+                    handle_expression(ex.next().unwrap())?,
+                )));
+            }
+            un => todo!("{un:?}:'{}'", p.as_str()),
         }
     }
 
@@ -361,6 +382,10 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
 
                 return Ok(Expression::binary_operation(o, a, b));
             }
+            Operation::Assign(b) => {
+                let a = get_next_val()?;
+                return Ok(Expression::assignment(a, b));
+            }
         }
     }
 
@@ -391,9 +416,14 @@ pub fn handle_let_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statem
     };
 
     let ident = inner.next().unwrap().as_str();
+    let ty = if let Rule::type_expr = inner.peek().unwrap().as_rule() {
+        Some(handle_type_expression(inner.next().unwrap())?)
+    } else {
+        None
+    };
     let expr = handle_expression(inner.next().unwrap())?;
 
-    let var = Definition::variable::<&str, Path>(ident, expr, mutable, None)?;
+    let var = Definition::variable(ident, expr, mutable, ty)?;
 
     return Ok(Statement::Definition(var));
 }
@@ -419,6 +449,11 @@ pub fn handle_statement<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statement> {
 }
 
 pub fn handle_block_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Block> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::block_expression,
+        "a non Rule::block_expression reached handle_definitions"
+    );
     let inner = pair.into_inner();
     let mut block = Block::new();
     for stmt in inner {
@@ -429,6 +464,11 @@ pub fn handle_block_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Block
 }
 
 pub fn handle_fn_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::fn_definition,
+        "a non Rule::definition reached handle_definitions"
+    );
     let mut inner = pair.into_inner();
     let declaration = inner.next().unwrap();
     let block = inner.next().unwrap();
@@ -502,6 +542,11 @@ pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
 }
 
 pub fn handle_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::definitions,
+        "a non Rule::definition reached handle_definitions"
+    );
     let mut inner = pair.into_inner().next().unwrap().into_inner();
 
     let vis = if let Rule::visibility = inner.peek().unwrap().as_rule() {

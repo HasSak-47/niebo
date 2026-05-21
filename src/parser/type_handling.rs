@@ -1,22 +1,8 @@
-use pest::{Parser, RuleType, iterators::Pair};
-use pest_derive::Parser;
+use pest::iterators::Pair;
 
 use crate::{
-    ast::{
-        self, Definition, Implementation, Import, Variable, Visibility,
-        expressions::{
-            Expression, Statement,
-            block::Block,
-            literal::Literal,
-            operations::{BinaryOperation, BinaryOperator, UnaryOperator},
-        },
-        function::FunctionBuilder,
-        module::{Module, ModuleKind},
-    },
-    general::{
-        path::{Path, PathIdent},
-        types::{PrimitiveType, Type},
-    },
+    ast::{Definition, Visibility},
+    general::types::{PrimitiveType, Type},
     parser::*,
 };
 
@@ -29,7 +15,10 @@ fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveTy
     let mut inner = pair.into_inner();
     let next = inner.next().unwrap();
     match next.as_rule() {
-        Rule::int_type => return Ok(PrimitiveType::Int(0)),
+        Rule::int_type => {
+            let prec = next.into_inner().next().unwrap().as_str().parse()?;
+            return Ok(PrimitiveType::Int(prec));
+        }
         un => unreachable!("{un:?}"),
     }
 }
@@ -41,12 +30,12 @@ pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result
         "handle_type_alias_definitions got a non alias_definition"
     );
     let mut inner = pair.into_inner();
-    let ident = inner.next().unwrap().to_string();
-    let path = inner.next().unwrap();
+    let ident = inner.next().unwrap().as_str().to_string();
+    let type_exp = inner.next().unwrap();
 
     return Ok(Definition::type_def(
         ident,
-        Type::Alias(Box::new(Type::named(handle_path(path)?))),
+        Type::Alias(Box::new(handle_type_expression(type_exp)?)),
         Visibility::Public,
     ));
 }
@@ -84,28 +73,25 @@ pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defin
         Rule::type_definition,
         "handle_type_definitions got a non type_definition"
     );
-    println!("{pair:?}\n");
     let inner = pair.into_inner().next().unwrap();
     return match inner.as_rule() {
-        Rule::struct_definition => {
-            todo!()
-        }
+        Rule::struct_definition => handle_type_struct_definitions(inner),
         Rule::alias_definition => handle_type_alias_definitions(inner),
-        Rule::variant_definition => {
-            todo!()
-        }
-        Rule::union_definition => {
-            todo!()
-        }
+        Rule::variant_definition => handle_type_variant_definitions(inner),
+        Rule::union_definition => handle_type_union_definitions(inner),
         _ => unreachable!(),
     };
 }
 
 pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::type_expr,
+        "handle_type_expression got a non type_expr"
+    );
     let mut inner = pair.into_inner();
     let ty = inner.next().unwrap();
     return match ty.as_rule() {
-        Rule::path => Ok(Type::named(handle_path(ty)?)),
         Rule::primitive_type => Ok(Type::Primitive(handle_primitive_type(ty)?)),
         Rule::mutable_reference_type => {
             let mut inner = ty.into_inner();
@@ -114,6 +100,8 @@ pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> 
                 next,
             )?)))
         }
+        Rule::path => Ok(Type::named(handle_path(ty)?)),
+
         un => unreachable!("{un:?}"),
     };
 }
