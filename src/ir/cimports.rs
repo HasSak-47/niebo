@@ -7,7 +7,9 @@ use anyhow::bail;
 use clang::{Clang, Index};
 
 use crate::{
-    ast::{Definition, DefinitionKind, Visibility, function::FunctionBuilder},
+    ast::{
+        Definition, DefinitionKind, Visibility, expressions::Statement, function::FunctionBuilder,
+    },
     general::{
         path::Path,
         types::{PrimitiveType, Type},
@@ -247,7 +249,12 @@ impl<'c> CCache<'c> {
                 let s = child.get_name().unwrap();
                 match child.get_kind() {
                     clang::EntityKind::FunctionDecl => {
-                        let mut builder = FunctionBuilder::new(&s).set_varidic(child.is_variadic());
+                        let mut builder = FunctionBuilder::new(&s)
+                            .set_varidic(child.is_variadic())
+                            .set_ret_ty(convert_clang_type_with_deps(
+                                &child.get_result_type().unwrap(),
+                                &mut deps,
+                            ));
                         let params = child.get_children();
 
                         for param in params.iter().filter(|f| f.get_type().is_some()) {

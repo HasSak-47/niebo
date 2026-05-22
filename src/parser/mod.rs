@@ -176,6 +176,29 @@ pub fn handle_binary_expression_postfix<'a>(
     return Ok((operator, exp));
 }
 
+fn unescape_string_literal(raw: &str) -> String {
+    let inner = &raw[1..raw.len() - 1];
+    let mut out = String::with_capacity(inner.len());
+    let mut chars = inner.chars();
+
+    while let Some(ch) = chars.next() {
+        if ch == '\\' {
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some(other) => {
+                    out.push('\\');
+                    out.push(other);
+                }
+                None => out.push('\\'),
+            }
+        } else {
+            out.push(ch);
+        }
+    }
+
+    out
+}
+
 pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
     assert_eq!(
         pair.as_rule(),
@@ -202,7 +225,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
                     Expression::literal(literal)
                 }
                 Rule::string => {
-                    let literal = Literal::string(literal.as_str());
+                    let literal = Literal::string(unescape_string_literal(literal.as_str()));
                     Expression::literal(literal)
                 }
                 _ => unreachable!(""),
@@ -717,6 +740,19 @@ mod test {
     #[test]
     fn test_call_expression() -> anyhow::Result<()> {
         TokenStream::parse(Rule::expression, "printf(\"%d\", i)")?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_string_escape_newline() -> anyhow::Result<()> {
+        let expr = TokenStream::parse(Rule::expression, "\"a\\nb\"")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expr)?;
+
+        let expected = Expression::literal(Literal::string("a\nb"));
+        assert_eq!(parsed, expected);
 
         Ok(())
     }

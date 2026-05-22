@@ -2,11 +2,15 @@ use std::collections::HashMap;
 
 use clang::Clang;
 use inkwell::{
+    AddressSpace,
     builder::Builder,
     context::Context,
     module::Module,
-    types::{AnyType, BasicTypeEnum, IntType, VoidType},
-    values::{AnyValue, AnyValueEnum, PointerValue},
+    targets::{Target, TargetMachine},
+    types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType},
+    values::{
+        AnyValue, AnyValueEnum, BasicMetadataValueEnum, BasicValueEnum, FunctionValue, PointerValue,
+    },
 };
 
 use crate::{
@@ -36,9 +40,17 @@ struct CodeGen<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
     locals: HashMap<Path, PointerValue<'ctx>>,
+    functions: HashMap<Path, FunctionValue<'ctx>>,
 }
 
 trait TypeIr {
+    fn make_fn_type<'ctx>(
+        &self,
+        params: &[BasicMetadataTypeEnum<'ctx>],
+        varidic: bool,
+        ctx: &'ctx Context,
+        codegen: &mut CodeGen<'ctx>,
+    ) -> anyhow::Result<FunctionType<'ctx>>;
     fn to_ir_type<'ctx>(
         &self,
         ctx: &'ctx Context,
@@ -60,7 +72,7 @@ trait ExpressionIr {
         &self,
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
-    ) -> anyhow::Result<Option<AnyValueEnum<'ctx>>>;
+    ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>>;
 
     fn to_ir_place<'ctx>(
         &self,
@@ -70,6 +82,24 @@ trait ExpressionIr {
 }
 
 impl TypeIr for Type {
+    fn make_fn_type<'ctx>(
+        &self,
+        params: &[BasicMetadataTypeEnum<'ctx>],
+        varidic: bool,
+        ctx: &'ctx Context,
+        codegen: &mut CodeGen<'ctx>,
+    ) -> anyhow::Result<FunctionType<'ctx>> {
+        let _ = codegen;
+        match self {
+            Type::Primitive(p) => match p {
+                PrimitiveType::Void => Ok(ctx.void_type().fn_type(params, varidic)),
+                p => Ok(Type::Primitive(p.clone())
+                    .to_ir_type(ctx, codegen)?
+                    .fn_type(params, varidic)),
+            },
+            un => unimplemented!("{un:?}"),
+        }
+    }
     fn to_ir_type<'ctx>(
         &self,
         ctx: &'ctx Context,
@@ -79,9 +109,12 @@ impl TypeIr for Type {
         match self {
             Type::Primitive(p) => match p {
                 PrimitiveType::Int(_) => Ok(ctx.i32_type().into()),
-                _ => todo!(),
+                PrimitiveType::String => Ok(ctx.ptr_type(AddressSpace::default()).into()),
+                PrimitiveType::Void => unreachable!(),
+                un => unimplemented!("{un:?}"),
             },
-            _ => todo!(),
+            Type::Pointer(ptr) => ptr.to_ir_type(ctx, codegen),
+            un => unimplemented!("{un:?}"),
         }
     }
 }
@@ -97,6 +130,8 @@ impl StatementIr for ast::Variable {
         let p = codegen.builder.build_alloca(ty, &name)?;
 
         codegen.locals.insert(name.into(), p);
+        let val = self.value.to_ir_value(ctx, codegen)?.unwrap();
+        codegen.builder.build_store(p, val)?;
 
         return Ok(());
     }
@@ -107,10 +142,10 @@ impl ExpressionIr for Path {
         &self,
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
-    ) -> anyhow::Result<Option<AnyValueEnum<'ctx>>> {
+    ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
         let ptr = self.to_ir_place(ctx, codegen)?;
         let value = codegen.builder.build_load(ctx.i32_type(), ptr, "")?;
-        Ok(Some(value.as_any_value_enum()))
+        Ok(Some(value))
     }
 
     fn to_ir_place<'ctx>(
@@ -128,7 +163,7 @@ impl ExpressionIr for Literal {
         &self,
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
-    ) -> anyhow::Result<Option<AnyValueEnum<'ctx>>> {
+    ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
         let _ = codegen;
         match &self.info {
             LiteralInfo::Integer { .. } => {
@@ -138,6 +173,14 @@ impl ExpressionIr for Literal {
                         .unwrap()
                         .into(),
                 ));
+            }
+            LiteralInfo::String => {
+                let p = codegen
+                    .builder
+                    .build_global_string_ptr(&self.data, "")?
+                    .as_pointer_value();
+
+                return Ok(Some(p.into()));
             }
             _ => todo!(),
         }
@@ -158,7 +201,7 @@ impl ExpressionIr for BinaryOperation {
         &self,
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
-    ) -> anyhow::Result<Option<AnyValueEnum<'ctx>>> {
+    ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
         let a = self.operands[0]
             .to_ir_value(ctx, codegen)?
             .ok_or_else(|| anyhow::anyhow!("left operand did not produce a value"))?
@@ -173,7 +216,7 @@ impl ExpressionIr for BinaryOperation {
                     codegen
                         .builder
                         .build_int_compare(inkwell::IntPredicate::SLT, a, b, "")?
-                        .as_any_value_enum(),
+                        .into(),
                 ));
             }
 
@@ -182,7 +225,7 @@ impl ExpressionIr for BinaryOperation {
                     codegen
                         .builder
                         .build_int_compare(inkwell::IntPredicate::EQ, a, b, "")?
-                        .as_any_value_enum(),
+                        .into(),
                 ));
             }
             BinaryOperator::Addition => {
@@ -207,7 +250,7 @@ impl ExpressionIr for Expression {
         &self,
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
-    ) -> anyhow::Result<Option<AnyValueEnum<'ctx>>> {
+    ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
         match &*self.kind {
             ExpressionKind::While(while_) => {
                 let current_block = codegen
@@ -225,12 +268,14 @@ impl ExpressionIr for Expression {
                 codegen.builder.build_unconditional_branch(cond_bb)?;
                 codegen.builder.position_at_end(cond_bb);
 
-                // TODO: lower `while_.condition` into an i1/int predicate.
+                // condition
                 let con = while_.condition.to_ir_value(ctx, codegen)?.unwrap();
                 codegen
                     .builder
                     .build_conditional_branch(con.into_int_value(), body_bb, end_bb)?;
+                codegen.builder.position_at_end(body_bb);
                 // continue loop
+                while_.then.to_ir_value(ctx, codegen)?;
                 codegen.builder.build_unconditional_branch(cond_bb).unwrap();
 
                 // after loop
@@ -245,6 +290,31 @@ impl ExpressionIr for Expression {
                 return id.to_ir_value(ctx, codegen);
             }
             ExpressionKind::Literal(lit) => return lit.to_ir_value(ctx, codegen),
+            ExpressionKind::Block(b) => return b.to_ir_value(ctx, codegen),
+            ExpressionKind::Call(call) => {
+                let function = match &*call.called.kind {
+                    ExpressionKind::Identifier(path) => codegen.functions[path],
+                    un => todo!("{un:?}"),
+                };
+
+                let mut args = Vec::with_capacity(call.parameters.len());
+                for arg in &call.parameters {
+                    let value = arg
+                        .to_ir_value(ctx, codegen)?
+                        .ok_or_else(|| anyhow::anyhow!("call argument did not produce a value"))?;
+                    args.push(value.into());
+                }
+
+                let call = codegen.builder.build_call(function, &args, "")?;
+                return Ok(call.try_as_basic_value().basic());
+            }
+            ExpressionKind::Assignment(a, b) => {
+                let a = a.to_ir_place(ctx, codegen)?;
+                let b = b.to_ir_value(ctx, codegen)?.unwrap();
+
+                codegen.builder.build_store(a, b)?;
+                return Ok(None);
+            }
             un => todo!("{un:?}"),
         }
     }
@@ -286,19 +356,26 @@ impl StatementIr for Statement {
     }
 }
 
-impl StatementIr for Block {
-    fn to_ir<'ctx>(
+impl ExpressionIr for Block {
+    fn to_ir_value<'ctx>(
         &self,
-        name: String,
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
-    ) -> anyhow::Result<()> {
-        let _ = name;
+    ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
         let mut iter = self.statements.iter();
         while let Some(stmt) = iter.next() {
             stmt.to_ir(String::new(), ctx, codegen)?;
         }
-        return Ok(());
+        return Ok(None);
+    }
+
+    fn to_ir_place<'ctx>(
+        &self,
+        ctx: &'ctx Context,
+        codegen: &mut CodeGen<'ctx>,
+    ) -> anyhow::Result<PointerValue<'ctx>> {
+        let _ = (ctx, codegen);
+        todo!()
     }
 }
 
@@ -311,6 +388,7 @@ impl StatementIr for Function {
     ) -> anyhow::Result<()> {
         let fn_type = ctx.void_type().fn_type(&[], false);
         let func = codegen.module.add_function(&name, fn_type, None);
+        codegen.functions.insert(name.into(), func);
         let basic_block = ctx.append_basic_block(func, "");
         codegen.builder.position_at_end(basic_block);
 
@@ -334,20 +412,53 @@ fn main() -> anyhow::Result<()> {
     let clang = Clang::new().unwrap();
     let mut ccache = CCache::new(&clang)?;
 
-    for import in &project.root_module.imports {
-        if import.c_import {
-            ccache.resolve_c_definitions(&import.path.get(0).ident)?;
-            let mut path = Path::new();
-            path.add_segment(&import.path.get(1).ident);
-            // self.global.symbols.insert(path, );
-        }
-    }
     let context = Context::create();
     let mut codegen = CodeGen {
         module: context.create_module(&project.name),
         builder: context.create_builder(),
         locals: HashMap::new(),
+        functions: HashMap::new(),
     };
+
+    for import in &project.root_module.imports {
+        if import.c_import {
+            ccache.resolve_c_definitions(&import.path.get(0).ident)?;
+            let mut name = Path::new();
+            let mut header_path = Path::new();
+            header_path.add_segment(&import.path.get(0).ident);
+            header_path.add_segment(&import.path.get(1).ident);
+            name.add_segment(&import.path.get(1).ident);
+
+            let func = ccache.get_definition(&header_path)?;
+            match &func.kind {
+                ast::DefinitionKind::FunctionC(f) => {
+                    let mut args = Vec::with_capacity(f.parameters.len());
+                    for arg in &f.parameters {
+                        let ty = arg.1.to_ir_type(&context, &mut codegen)?;
+                        args.push(ty.into());
+                    }
+
+                    let ty = f.return_ty.clone().unwrap().make_fn_type(
+                        args.as_slice(),
+                        f.varidic,
+                        &context,
+                        &mut codegen,
+                    )?;
+
+                    let func = codegen.module.add_function(
+                        &name.get(0).ident,
+                        ty,
+                        Some(inkwell::module::Linkage::External),
+                    );
+
+                    codegen.functions.insert(name, func);
+                }
+                ast::DefinitionKind::VarC(_) => {}
+                _ => unreachable!(),
+            }
+        }
+    }
+
     for def in &project.root_module.definitions {
         match &def.kind {
             ast::DefinitionKind::Function(f) => {
@@ -357,7 +468,31 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    codegen.module.print_to_file("out.ll").unwrap();
+    codegen.module.print_to_file("out.ll")?;
+    let triple = TargetMachine::get_default_triple();
+    codegen.module.set_triple(&triple);
+
+    let target = Target::from_triple(&triple).unwrap();
+
+    let machine = target
+        .create_target_machine(
+            &triple,
+            "generic",
+            "",
+            inkwell::OptimizationLevel::None,
+            inkwell::targets::RelocMode::Default,
+            inkwell::targets::CodeModel::Default,
+        )
+        .unwrap();
+
+    use std::path::Path as RustPath;
+    machine
+        .write_to_file(
+            &codegen.module,
+            inkwell::targets::FileType::Object,
+            &RustPath::new("out.o"),
+        )
+        .unwrap();
 
     return Ok(());
 }
