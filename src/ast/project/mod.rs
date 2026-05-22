@@ -1,26 +1,12 @@
-mod cimports;
+use std::{collections::HashMap, fmt::Debug, fs::File, io::Read};
 
-use std::{
-    collections::HashMap,
-    fmt::Debug,
-    fs::File,
-    io::{BufReader, Read},
-    path::PathBuf,
-};
-
-use anyhow::{Result, anyhow, bail};
-use clang::{Clang, Index, TranslationUnit};
-use serde::Deserialize;
+use anyhow::{Result, bail};
 
 use crate::{
     ast::{
-        Definition, DefinitionKind, Module, ModuleKind, Variable,
-        expressions::Statement,
-        function::{Function, FunctionBuilder, FunctionC},
-        project::cimports::CCache,
+        Definition, DefinitionKind, Module, ModuleKind,
+        expressions::loops::{LoopExpression, WhileLoop},
     },
-    general::{path::Path, types::*},
-    ir::Resolver,
     parser::parse_module,
 };
 
@@ -137,98 +123,14 @@ impl Project {
     pub fn add_external_project<S: Into<String>>(&mut self, name: S, project: Project) {
         self.external_projects.insert(name.into(), project);
     }
-
-    fn get_non_local_definition_module<P1, P2>(md: &Module, cur_path: P1, name: P2) -> &Definition
-    where
-        P1: AsRef<Path>,
-        P2: AsRef<Path>,
-    {
-        let name = name.as_ref();
-        let cur_path = cur_path.as_ref();
-        let root = name.get(0);
-        if root.is_template() {
-            todo!()
-        }
-
-        for def in &md.definitions {
-            println!("{def:?}");
-            if def.name == root.ident {
-                match &def.kind {
-                    DefinitionKind::Module(md) => {
-                        let mut new_path = cur_path.clone();
-                        new_path.pop_front();
-                        let mut new_name = name.clone();
-                        new_name.pop_front();
-                        Project::get_non_local_definition_module(&md, new_path, new_name);
-                    }
-                    _ => return def,
-                }
-            }
-        }
-
-        unreachable!();
-    }
-
-    pub fn get_non_local_definition<P1, P2>(&self, cur_path: P1, name: P2) -> &Definition
-    where
-        P1: AsRef<Path>,
-        P2: AsRef<Path>,
-    {
-        let name = name.as_ref();
-        let root = name.get(0);
-        if root.is_template() {
-            todo!()
-        }
-
-        if self.external_projects.contains_key(&root.ident) {
-            let p = &self.external_projects[&root.ident];
-            let mut new_name = name.clone();
-            new_name.pop_front();
-
-            return p.get_non_local_definition(cur_path, new_name);
-        }
-
-        return Project::get_non_local_definition_module(&self.root_module, cur_path, name);
-    }
-}
-
-#[derive(Debug)]
-enum Symbol {
-    FunctionC(FunctionC),
-    Function(Function),
-    Variable(Variable),
 }
 
 #[derive(Debug, Default)]
-struct Scope {
-    symbols: HashMap<Path, Symbol>,
-    types: HashMap<Path, Type>,
-}
-
-#[derive(Debug, Default)]
-pub struct ProjectPreprocessor {
-    global: Scope,
-
-    scope: Vec<Scope>,
-}
+pub struct ProjectPreprocessor {}
 
 impl ProjectPreprocessor {
-    fn get_symbol(&self, path: &Path) -> Result<&Symbol> {
-        if self.global.symbols.contains_key(path) {
-            return Ok(&self.global.symbols[path]);
-        }
-
-        for scope in self.scope.iter().rev() {
-            if scope.symbols.contains_key(path) {
-                return Ok(&scope.symbols[path]);
-            }
-        }
-
-        bail!("not found");
-    }
-
     // NOTE: ommit templates for now do to complexity
-    pub fn process_project(&mut self, mut project: Project) -> Result<()> {
+    pub fn process_project(&mut self, project: Project) -> Result<Project> {
         // - generate a registry to determine what is each Identifier/Path
         // - determine type of all variables
         // for example "let i = 10;" has no type in the AST but it's type should be i32
@@ -249,39 +151,8 @@ impl ProjectPreprocessor {
 
         // convert each path identifier/path into it's full path
         // loading module imports
-        let c_imports = project.root_module.get_c_imports();
+        // let mut res = Resolver::default();
 
-        let mut import_registry = HashMap::<Path, &Definition>::new();
-        // TODO: load libs to clang
-        let clang = Clang::new().map_err(|s| anyhow!("clang: {s}"))?;
-        let mut ccache = CCache::new(&clang)?;
-
-        let mut res = Resolver::default();
-
-        for import in &project.root_module.imports {
-            if import.c_import {
-                ccache.resolve_c_definitions(&import.path.get(0).ident)?;
-                let mut path = Path::new();
-                path.add_segment(&import.path.get(1).ident);
-                // self.global.symbols.insert(path, );
-            }
-        }
-
-        // let type_registry = HashMap::new();
-        // let func_registry = HashMap::new();
-        for def in &project.root_module.definitions {
-            println!("{def:#?}");
-            match &def.kind {
-                DefinitionKind::Type(ty) => {
-                    let _ = res
-                        .ty_reg
-                        .entries
-                        .insert(def.name.clone().into(), ty.clone());
-                }
-                _ => todo!(),
-            }
-        }
-
-        todo!()
+        return Ok(project);
     }
 }

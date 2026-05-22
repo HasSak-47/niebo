@@ -30,9 +30,9 @@ pub enum Visibility {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Variable {
-    mutable: bool,
-    value: Expression,
-    ty: Option<Type>,
+    pub mutable: bool,
+    pub value: Expression,
+    pub ty: Option<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
