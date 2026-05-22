@@ -6,7 +6,7 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        self, Definition, Implementation, Import, Variable, Visibility,
+        self, Definition, Implementation, Import, TraitImplementation, Variable, Visibility,
         expressions::{
             Expression, Statement,
             block::Block,
@@ -549,6 +549,24 @@ pub fn handle_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Impleme
         definitions,
     });
 }
+
+pub fn handle_trait_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<TraitImplementation> {
+    assert_eq!(pair.as_rule(), Rule::trait_implementation);
+    let mut inner = pair.into_inner();
+    let target = handle_path(inner.next().unwrap())?;
+    let trait_path = handle_path(inner.next().unwrap())?;
+    let mut definitions = Vec::new();
+
+    while let Some(ok) = inner.next() {
+        definitions.push(handle_fn_definitions(ok)?);
+    }
+
+    Ok(TraitImplementation {
+        trait_path,
+        target,
+        definitions,
+    })
+}
 pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     assert_eq!(pair.as_rule(), Rule::module_definition);
     let mut inner = pair.into_inner();
@@ -630,7 +648,13 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
             }
             Rule::impls => {
                 let def = t.into_inner().next().unwrap();
-                md.impls.push(handle_implementation(def)?);
+                match def.as_rule() {
+                    Rule::implementation => md.impls.push(handle_implementation(def)?),
+                    Rule::trait_implementation => {
+                        md.trait_impls.push(handle_trait_implementation(def)?)
+                    }
+                    un => unreachable!("{un:?}"),
+                }
             }
             un => unreachable!("{un:?}"),
         }
@@ -681,7 +705,7 @@ mod test {
     fn test_functions() -> anyhow::Result<()> {
         TokenStream::parse(
             Rule::fn_definition,
-            "fn main() -> i32 {
+            "func main() -> i32 {
     let i = 0;
     while i < 10 {
         i++;
@@ -706,19 +730,33 @@ mod test {
     fn test_traits() -> anyhow::Result<()> {
         TokenStream::parse(
             Rule::definitions,
-            "trait TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfn func() -> Type;\n}",
+            "inter TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfunc func() -> Type;\n}",
         )?;
 
         TokenStream::parse(
             Rule::trait_definition,
-            "trait testTrait<T: Add<T>>{
-    type TestType = int32;
+            "inter testTrait<T: Add<T>>{
+    type TestType = i32;
     
-    fn test_function<T: Add<T>>(t: T) -> T ;
+    func test_function<T: Add<T>>(t: T) -> T ;
 }",
         )?;
 
         return Ok(());
+    }
+
+    #[test]
+    fn test_extend_impl() -> anyhow::Result<()> {
+        TokenStream::parse(
+            Rule::trait_implementation,
+            "extend Vec2 as Add<Vec2> {
+    func add(other: Vec2) -> Vec2 {
+        return self;
+    }
+}",
+        )?;
+
+        Ok(())
     }
     #[test]
     fn test_idents() -> anyhow::Result<()> {
@@ -728,11 +766,11 @@ mod test {
 
         TokenStream::parse(
             Rule::fn_declaration,
-            "fn test_fn_declaration(t: T, u: U) -> U",
+            "func test_fn_declaration(t: T, u: U) -> U",
         )?;
         TokenStream::parse(
             Rule::fn_declaration,
-            "fn test_fn_declaration_template<T: global::A<T> >(t: T, u: U) -> U",
+            "func test_fn_declaration_template<T: global::A<T> >(t: T, u: U) -> U",
         )?;
         return Ok(());
     }
@@ -763,9 +801,9 @@ mod test {
             Rule::module,
             "header stdio::printf;
 
-type TestType = int32;
+type TestType = i32;
 
-fn main() -> i32 {
+func main() -> i32 {
     let i = 0;
     while i < 10 {
         printf(\"%d\", i);

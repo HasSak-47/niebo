@@ -1,21 +1,21 @@
 pub mod i32;
 
-pub trait Copy {
-     fn copy(&self) -> Self;
+pub inter Copy {
+     func copy(&self) -> Self;
 }
 
-pub trait Add<T, R> {
-    fn add(self, other: T) -> T;
+pub inter Add<T, R> {
+    func add(self, other: T) -> T;
 }
 
-pub trait Sub<T, R> {
-    fn sub(self, other: T) -> R;
+pub inter Sub<T, R> {
+    func sub(self, other: T) -> R;
 }
 
-pub trait Mul<T, R> {
-    fn mul(self, other: T) -> R;
+pub inter Mul<T, R> {
+    func mul(self, other: T) -> R;
 }
 
-pub trait Div<T, R> {
-    fn div(self, other: T) -> R;
+pub inter Div<T, R> {
+    func div(self, other: T) -> R;
 }

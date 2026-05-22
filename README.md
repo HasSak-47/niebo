@@ -1,43 +1,19 @@
 # Niebo
 
-Niebo is an experimental systems-programming language and compiler written in Rust. The project parses a custom source language, builds an AST, performs early project preprocessing, resolves selected C imports through `libclang`, and lowers the result into LLVM IR with `inkwell`.
+Niebo is an experimental compiler and language project. It is aimed at end-to-end compiler construction rather than isolated parsing work, so the repository covers the full path from grammar and parsing through AST construction, project loading, preprocessing, LLVM lowering, and native object generation.
 
-This is a compiler engineering project intended to demonstrate language implementation work: parsing, AST design, symbol handling, foreign-function integration, and LLVM-based code generation.
+The current implementation already includes a custom frontend built with Pest, a project model loaded from `chmura.toml`, a code generator built on Inkwell, and early C interop support through `libclang`. During code generation, local variables and callable functions are tracked separately, which keeps lvalue handling and call lowering clean and matches the shape of an LLVM-backed compiler.
 
-## Highlights
+## Language Scope
 
-- Custom language frontend built with `pest`
-- Structured AST for modules, functions, statements, expressions, and types
-- Project loader that reads a `chmura.toml` manifest and source tree
-- Early preprocessing stage for future name and type resolution
-- C header import support via `libclang`
-- LLVM IR and object file generation through `inkwell`
-- Explicit split between statement lowering and expression lowering in codegen
-
-## Current Capabilities
-
-The compiler can currently:
-
-- Parse functions, blocks, variable definitions, calls, binary expressions, `while` loops, and string/integer literals
-- Handle `\n` in string literals during parsing
-- Resolve selected C function declarations from imported headers
-- Emit LLVM IR to `out.ll`
-- Emit an object file to `out.o`
-
-The current test program in [`test/src/main.nb`](./test/src/main.nb) demonstrates:
-
-- C import of `stdio::printf`
-- local variable allocation and assignment
-- integer comparison and addition
-- `while` loop lowering
-- external function calls
+Niebo is intended as a systems language with explicit types, compiled native output, and visible low-level interop. At the language-design level, the project is aiming for modules, interfaces, inherent method blocks, trait-style extension blocks, algebraic and low-level data types, generics, pattern matching, and direct access to C headers through declarations such as `header stdio::printf;`.
 
 ## Example
 
 ```niebo
 header stdio::printf;
 
-fn main() -> testType {
+func main() -> testType {
     let mut i : i32 = 0;
     while i < 10 {
         printf("%d\n", i);
@@ -46,67 +22,48 @@ fn main() -> testType {
 }
 ```
 
-## Architecture
+## How To Use
 
-- `src/parser/`
-  Parses Niebo source into AST nodes using `pest`.
-- `src/ast/`
-  Defines the language syntax tree and project model.
-- `src/ir/`
-  Contains C import resolution and IR-related support code.
-- `src/main.rs`
-  Drives project loading, preprocessing, symbol registration, LLVM lowering, and object generation.
-
-The code generator currently maintains separate symbol tables for:
-
-- local variables as LLVM pointer values
-- callable functions as LLVM function values
-
-This keeps lvalue handling and function calls distinct, which is important for a compiler targeting SSA/LLVM IR.
-
-## Build
+For normal use, start from the `stable` branch:
 
 ```bash
-cargo check
+git checkout stable
 ```
 
-Run parser tests:
+The `main` branch may contain work-in-progress compiler changes, while `stable` is the better default for trying the project, demos, and portfolio review.
+
+The compiler can load either a Niebo project directory or a single `.nb` script file. To compile a project, run:
 
 ```bash
-cargo test
+cargo run -- ./test --mode project --out out.o
 ```
 
-Compile the sample project:
+This treats `./test` as a project directory containing `chmura.toml` and a `src/` tree. To compile a standalone script instead, run:
 
 ```bash
-cargo run
+cargo run -- ./test/src/main.nb --mode script --out out.o
 ```
 
-This produces:
+In both cases, `PATH` is the input path, `--mode` selects whether that path is interpreted as a project or a single script, and `--out` chooses the backend output path.
 
-- `out.ll` — generated LLVM IR
-- `out.o` — generated object file
+## Output
+
+The backend currently writes LLVM-generated output to the path you provide. In practice, the pipeline is structured around LLVM IR generation followed by native object emission.
 
 ## Tech Stack
 
+The project is built primarily
+
 - Rust
-- `pest`
-- `inkwell`
+- Pest
+- Inkwell
 - LLVM
 - `libclang`
-- `serde` / `toml`
-
-## Why This Project Matters
-
-Niebo is a compiler project focused on core language implementation work rather than framework usage. It demonstrates:
-
-- parser and grammar design
-- AST and IR-oriented architecture
-- symbol resolution strategy
-- foreign-function interoperability
-- LLVM code generation
-- incremental compiler construction in a strongly typed language
+- `serde`
+- `toml`
 
 ## Status
 
-This project is in active development. The frontend and code generation pipeline are functional for a small subset of the language, while broader type resolution, richer expression support, and more complete lowering are still in progress.
+The parser and AST already describe more of that surface than the backend fully lowers today. In practice, the implemented subset is smaller but real: functions, blocks, local variables, integer and string literals, arithmetic and comparison expressions, assignments, `while` loops, direct calls, and C-style imports are all present in the current pipeline.
+
+Niebo is in active development. The frontend and backend pipeline are functional for a limited subset of the language, while broader type resolution, richer expression support, and more complete lowering are still being built out.

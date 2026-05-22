@@ -1,7 +1,7 @@
 module = { SOI ~ stream ~ EOI }
 stream = { (import | definitions | impls)* }
 
-impls  = { implementation }
+impls  = { implementation | trait_implementation }
 import = { c_import | niebo_import }
 
 c_import      = { "header" ~ path ~ ";" }
@@ -15,10 +15,14 @@ definitions = { definition }
 definition = { visibility? ~ (fn_definition | fn_declaration | type_definition | const_definition | trait_definition | module_definition) }
 
 implementation = {
-    "impl" ~ path ~ "{" ~ fn_definition* ~ "}"
+    "methods" ~ path ~ "{" ~ fn_definition* ~ "}"
 }
 
-trait_definition = { "trait" ~ identifier ~ template_def? ~ "{" ~ trait_body* ~ "}" }
+trait_implementation = {
+    "extend" ~ path ~ "as" ~ path ~ "{" ~ fn_definition* ~ "}"
+}
+
+trait_definition = { "inter" ~ identifier ~ template_def? ~ "{" ~ trait_body* ~ "}" }
 trait_body       = {
     type_definition
   | fn_definition
@@ -39,7 +43,7 @@ alias_definition = {"type" ~ identifier ~ "=" ~ type_expr ~ ";"}
 type_declaration = { (struct_declaration | union_declaration | variant_declaration | alias_declaration) ~ ";"}
 type_definition = { struct_definition | union_definition | variant_definition | alias_definition }
 
-fn_declaration = { "const"? ~ "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
+fn_declaration = { "const"? ~ "func" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
 fn_definition  = { fn_declaration ~ block_expression }
 
 module_definition = { "mod" ~ identifier ~ (";" | ("{" ~ stream ~ "}")) }
@@ -166,7 +170,7 @@ type_expr = {
   | "(" ~ type_expr ~ ")"
 }
 
-function_type = { "fn" ~ "(" ~ type_params? ~ ")" ~ ("->" ~ type_expr)? }
+function_type = { "func" ~ "(" ~ type_params? ~ ")" ~ ("->" ~ type_expr)? }
 type_params   = { (type_expr ~ ",")* ~ type_expr ~ ","? }
 
 array_type             = { "[" ~ type_expr ~ "]" }
@@ -201,8 +205,8 @@ identifier_elements = { ASCII_ALPHANUMERIC | "_" }
 keyword = {
     "type"
   | "mod"
-  | "fn"
-  | "trait"
+  | "func"
+  | "inter"
   | "let"
   | "const"
   | "mut"
@@ -216,6 +220,9 @@ keyword = {
   | "loop"
   | "match"
   | "use"
+  | "methods"
+  | "extend"
+  | "as"
   | "header"
   | "break"
   | "continue"

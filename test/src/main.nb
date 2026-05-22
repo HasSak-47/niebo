@@ -1,6 +1,6 @@
 header stdio::printf;
 
-fn main() -> testType {
+func main() -> testType {
     let mut i : i32 = 0;
     while i < 10 {
         printf("%d\n", i);

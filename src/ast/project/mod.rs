@@ -80,6 +80,21 @@ impl Project {
 
         return Ok(());
     }
+    pub fn load_script<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
+        let mut buffer = String::new();
+        let mut file = File::open(path)?;
+        file.read_to_string(&mut buffer)?;
+
+        let root = parse_module(buffer)?;
+
+        return Ok(Project {
+            root_module: root,
+            external_projects: HashMap::new(),
+            name: "".into(),
+            version: (0, 1, 0),
+            edition: (0, 1, 0),
+        });
+    }
     pub fn load<P: AsRef<std::path::Path>>(path: P) -> Result<Self> {
         let path = path.as_ref();
         if !path.is_dir() {
