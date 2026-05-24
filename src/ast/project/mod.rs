@@ -5,8 +5,12 @@ use anyhow::{Result, bail};
 use crate::{
     ast::{
         Definition, DefinitionKind, Module, ModuleKind,
-        expressions::loops::{LoopExpression, WhileLoop},
+        expressions::{
+            loops::{LoopExpression, WhileLoop},
+            operations::BinaryOperation,
+        },
     },
+    general::{path::Path, types::Type},
     parser::parse_module,
 };
 
@@ -140,8 +144,151 @@ impl Project {
     }
 }
 
+#[derive(Debug, Clone)]
+enum Symbol {
+    Variable(Type),
+    Type(Type),
+    Function { ret_ty: Type, params: Vec<Type> },
+}
+
 #[derive(Debug, Default)]
-pub struct ProjectPreprocessor {}
+pub struct ProjectPreprocessor {
+    local_scope: Vec<HashMap<Path, Symbol>>,
+    global_scope: HashMap<Path, Symbol>,
+}
+
+trait ExpressionValidator {
+    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()>;
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type>;
+}
+
+impl ExpressionValidator for crate::ast::Expression {
+    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+        use crate::ast::expressions::ExpressionKind;
+
+        match self.kind.as_mut() {
+            ExpressionKind::BinaryOperation(b_exp) => b_exp.validate(procesor),
+
+            _ => todo!(),
+        }
+    }
+
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+        use crate::ast::expressions::ExpressionKind;
+
+        return match self.kind.as_mut() {
+            ExpressionKind::BinaryOperation(b_exp) => b_exp.resolve_ret_ty(procesor),
+            _ => todo!(),
+        };
+    }
+}
+
+impl ExpressionValidator for crate::ast::expressions::block::Block {
+    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+        use crate::ast::{Definition, DefinitionKind, expressions::Statement};
+
+        procesor.push_scope();
+        for stmt in &self.statements {
+            match stmt {
+                Statement::Definition(Definition { kind, name, .. }) => match kind {
+                    DefinitionKind::Function(func) => {
+                        procesor.register_local_symbol(
+                            name.into(),
+                            Symbol::Function {
+                                ret_ty: func.return_ty.clone().unwrap(),
+                                params: func.parameters.iter().map(|a| a.1.clone()).collect(),
+                            },
+                        );
+                    }
+                    DefinitionKind::Variable(var) => {
+                        procesor.register_local_symbol(
+                            name.into(),
+                            Symbol::Variable(var.ty.clone().unwrap()),
+                        );
+                    }
+                    _ => todo!(),
+                },
+                _ => todo!(),
+            }
+        }
+        todo!()
+    }
+
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+        todo!()
+    }
+}
+
+impl ExpressionValidator for BinaryOperation {
+    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+        self.operands[0].validate(procesor)?;
+        self.operands[1].validate(procesor)?;
+
+        let a_ty = self.operands[0].resolve_ret_ty(procesor)?;
+        let b_ty = self.operands[1].resolve_ret_ty(procesor)?;
+
+        if a_ty != b_ty {
+            anyhow::bail!("{a_ty:?} and {b_ty:?} are not the same type");
+        }
+        return Ok(());
+    }
+
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+        use crate::ast::expressions::operations::BinaryOperator;
+        self.validate(procesor)?;
+        return Ok(match self.operator {
+            BinaryOperator::Greater
+            | BinaryOperator::Lesser
+            | BinaryOperator::GreaterOrEqual
+            | BinaryOperator::LesserOrEqual
+            | BinaryOperator::Equal
+            | BinaryOperator::NotEqual => Type::bool(),
+            _ => self.operands[0].ret_ty.clone().unwrap(),
+        });
+    }
+}
+
+impl ProjectPreprocessor {
+    fn push_scope(&mut self) {
+        self.local_scope.push(HashMap::new());
+    }
+
+    fn pop_scope(&mut self) {
+        self.local_scope.pop();
+    }
+
+    fn register_local_symbol(&mut self, path: Path, kind: Symbol) {
+        self.local_scope.last_mut().unwrap().insert(path, kind);
+    }
+
+    fn register_global_symbol(&self, path: Path, kind: Symbol) -> Option<Symbol> {
+        for (s_path, s_kind) in &self.global_scope {
+            if *s_path == path {
+                return Some(s_kind.clone());
+            }
+        }
+
+        return None;
+    }
+
+    fn find_symbol(&self, path: Path) -> Option<Symbol> {
+        for (s_path, s_kind) in &self.global_scope {
+            if *s_path == path {
+                return Some(s_kind.clone());
+            }
+        }
+
+        for local_scope in self.local_scope.iter().rev() {
+            for (s_path, s_kind) in local_scope {
+                if *s_path == path {
+                    return Some(s_kind.clone());
+                }
+            }
+        }
+
+        return None;
+    }
+}
 
 impl ProjectPreprocessor {
     // NOTE: ommit templates for now do to complexity

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::general::path::Path;
+use crate::general::{path::Path, types::Type};
 
 use super::Expression;
 

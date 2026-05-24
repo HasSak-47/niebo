@@ -24,13 +24,11 @@ func main() -> testType {
 
 ## How To Use
 
-For normal use, start from the `stable` branch:
+Use the `stable` branch to run the application, the `main` branch may contain work-in-progress compiler changes, while `stable` is the better default for trying the project.
 
 ```bash
-git checkout stable
+git clone -b stable https://github.com/HasSak-47/yaidl.git
 ```
-
-The `main` branch may contain work-in-progress compiler changes, while `stable` is the better default for trying the project, demos, and portfolio review.
 
 The compiler can load either a Niebo project directory or a single `.nb` script file. To compile a project, run:
 
