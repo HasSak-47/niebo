@@ -1,11 +1,11 @@
-use std::path::PathBuf;
+use std::{env::current_dir, path::PathBuf};
 
 use clap::{Parser, ValueEnum};
 use pretty_env_logger::init_custom_env;
 
 use crate::{
-    ast::project::{Project, ProjectPreprocessor},
-    ir::compile,
+    ast::project::Project,
+    ir::{compile, validator::ProjectPreprocessor},
 };
 
 mod ast;
@@ -22,7 +22,7 @@ struct Cli {
     path: PathBuf,
 
     /// Output file path
-    #[arg(long, value_name = "OUT")]
+    #[arg(long, value_name = "OUT", default_value_os_t = current_dir().unwrap())]
     out: PathBuf,
 
     /// Treat PATH as a project directory or a standalone script

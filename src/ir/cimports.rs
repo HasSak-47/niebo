@@ -11,7 +11,7 @@ use crate::{
         Definition, DefinitionKind, Visibility, expressions::Statement, function::FunctionBuilder,
     },
     general::{
-        path::QualifiedName,
+        naming::QualifiedName,
         types::{PrimitiveType, Type},
     },
 };

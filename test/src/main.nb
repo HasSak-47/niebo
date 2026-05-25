@@ -1,10 +1,12 @@
 header stdio::printf;
 header stdio::scanf;
 
-func main() -> testType {
+func main() -> i32 {
     let mut i : i32 = 0;
     while i < 10 {
         printf("%d\n", i);
         scanf("%d", &i);
     }
+
+    return 0;
 }

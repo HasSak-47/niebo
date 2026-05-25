@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use anyhow::{Result, anyhow};
 
 use crate::general::{
-    path::{QualifiedName, QualifiedNameSegment},
+    naming::{QualifiedName, QualifiedNameSegment},
     types::*,
 };
 use function::*;

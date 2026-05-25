@@ -1,3 +1,6 @@
+pub mod cimports;
+pub mod validator;
+
 use std::{collections::HashMap, path::PathBuf};
 
 use clang::Clang;
@@ -21,12 +24,13 @@ use crate::{
             operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
         function::Function,
-        project::{Project, cimports::*},
+        project::Project,
     },
     general::{
-        path::QualifiedName,
+        naming::QualifiedName,
         types::{PrimitiveType, Type},
     },
+    ir::cimports::CCache,
 };
 
 pub struct CodeGen<'ctx> {

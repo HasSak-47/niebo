@@ -18,7 +18,7 @@ use crate::{
         module::{Module, ModuleKind},
     },
     general::{
-        path::{QualifiedName, QualifiedNameSegment},
+        naming::{QualifiedName, QualifiedNameSegment},
         types::{PrimitiveType, Type},
     },
 };

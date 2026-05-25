@@ -1,4 +1,4 @@
-use super::path::QualifiedName;
+use super::naming::QualifiedName;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {

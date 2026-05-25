@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::general::{path::QualifiedName, types::Type};
+use crate::general::{naming::QualifiedName, types::Type};
 
 use super::Expression;
 

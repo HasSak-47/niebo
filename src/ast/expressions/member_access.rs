@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{ast::expressions::Expression, general::path::QualifiedNameSegment};
+use crate::{ast::expressions::Expression, general::naming::QualifiedNameSegment};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberAccess {

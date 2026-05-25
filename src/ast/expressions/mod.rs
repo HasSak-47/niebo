@@ -22,7 +22,7 @@ use crate::{
         },
     },
     general::{
-        path::{QualifiedName, QualifiedNameSegment},
+        naming::{QualifiedName, QualifiedNameSegment},
         types::Type,
     },
 };
