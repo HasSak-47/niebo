@@ -1,4 +1,3 @@
-pub mod cimports;
 use std::{collections::HashMap, path::PathBuf};
 
 use clang::Clang;
@@ -22,13 +21,12 @@ use crate::{
             operations::{BinaryOperation, BinaryOperator},
         },
         function::Function,
-        project::Project,
+        project::{Project, cimports::*},
     },
     general::{
         path::Path,
         types::{PrimitiveType, Type},
     },
-    ir::cimports::CCache,
 };
 
 pub struct CodeGen<'ctx> {
