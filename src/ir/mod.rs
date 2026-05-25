@@ -373,6 +373,23 @@ impl StatementIr for Statement {
                 let _ = name;
                 let _ = exp.to_ir_value(ctx, codegen)?;
             }
+            Statement::Return(ex) => {
+                match ex {
+                    Some(s) => {
+                        if let Some(val) = s.to_ir_value(ctx, codegen)? {
+                            codegen.builder.build_return(Some(&val))?;
+                        } else {
+                            codegen.builder.build_return(None)?;
+                        }
+                    }
+                    _ => {
+                        codegen.builder.build_return(None)?;
+                    }
+                }
+
+                return Ok(());
+            }
+
             un => todo!("{un:?}"),
         }
 

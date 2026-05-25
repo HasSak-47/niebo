@@ -36,6 +36,8 @@ pub enum Statement {
     Break,
     Continue,
     Use(QualifiedName),
+    Return(Option<Expression>),
+    Value(Option<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -50,7 +52,6 @@ pub enum ExpressionKind {
     BinaryOperation(BinaryOperation),
     UnaryOperation(UnaryOperation),
     Call(Call),
-    Return(Option<Expression>),
     Assignment(Expression, Expression),
 }
 
@@ -67,7 +68,6 @@ impl Display for ExpressionKind {
             ExpressionKind::BinaryOperation(a) => write!(f, "{}", a),
             ExpressionKind::UnaryOperation(a) => write!(f, "{}", a),
             ExpressionKind::Call(a) => write!(f, "{}", a),
-            ExpressionKind::Return(a) => write!(f, "{:?}", a),
             ExpressionKind::Assignment(a, b) => write!(f, "({} = {})", a, b),
         }
     }
@@ -166,9 +166,5 @@ impl Expression {
 
     pub fn call(called: Expression, params: Vec<Expression>) -> Self {
         Self::new(ExpressionKind::Call(Call::new(called, params)))
-    }
-
-    pub fn return_(value: Option<Expression>) -> Self {
-        Self::new(ExpressionKind::Return(value))
     }
 }

@@ -39,14 +39,14 @@ trait ExpressionValidator {
 impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation {
     fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
         use crate::ast::expressions::operations::UnaryOperator;
-        let operand_valid = self.operand.validate(procesor)?;
+        self.operand.validate(procesor)?;
         let operand_ty = self.operand.resolve_ret_ty(procesor)?;
         match self.operator {
             UnaryOperator::Ref => {
                 return Ok(());
             }
-            UnaryOperator::Deref => match self.operand.resolve_ret_ty(procesor)? {
-                Type::Pointer(ty) => return Ok(()),
+            UnaryOperator::Deref => match operand_ty {
+                Type::Pointer(_) => return Ok(()),
                 ty => bail!("{ty:?} cannot be deref"),
             },
             UnaryOperator::Negation => {
@@ -201,6 +201,14 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
                 },
                 Statement::Expression(ex) => {
                     ex.validate(procesor)?;
+                }
+                Statement::Return(ex) => {
+                    match ex {
+                        Some(s) => s.validate(procesor)?,
+                        _ => {}
+                    }
+
+                    return Ok(());
                 }
                 td => todo!("{td:?}"),
             }

@@ -50,19 +50,25 @@ module_definition = { "mod" ~ identifier ~ (";" | ("{" ~ stream ~ "}")) }
 
 block_expression = { "{" ~ statement* ~ "}" }
 
+return_statement   = { "return" ~ expression? }
+value_statement    = { "value" ~ expression? }
+
 statement = {
-    import
-  | use_statement
-  | let_declaration
-  | const_definition
-  | break_statement
-  | continue_statement
+    (import ~ ";")
+  | (use_statement ~ ";")
+  | (let_declaration ~ ";")
+  | (const_definition ~ ";")
+  | (break_statement ~ ";")
+  | (continue_statement ~ ";")
+  | (return_statement  ~ ";")
+  | (value_statement  ~ ";")
+  | (continue_statement ~ ";")
   | expression ~ ";"?
 }
 
 expression_priority = { "(" ~ expression ~ ")" }
 expression = {
-    return_expression | ((expression_priority | if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression |  block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix*)
+    (expression_priority | if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression |  block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix*
 }
 
 prefix_unary_operation_expression = { prefix_unary_operator ~ expression }
@@ -76,7 +82,6 @@ match_arm        = { pattern ~ "=>" ~ (block_expression | expression) ~ ","? }
 pattern          = { identifier | path | number | string | "_" }
 
 loop_expression    = { "loop" ~ block_expression }
-return_expression  = { "return" ~ expression? }
 break_statement    = { "break" ~ ";" }
 continue_statement = { "continue" ~ ";" }
 
@@ -135,10 +140,10 @@ arithmetic_mod = { "%" ~ expression }
 call_postfix = { "(" ~ call_params? ~ ")" }
 call_params  = { (expression ~ ",")* ~ expression ~ ","? }
 
-let_declaration  = { "let" ~ mutable_modifier? ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
+let_declaration  = { "let" ~ mutable_modifier? ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression }
 mutable_modifier = { "mut" }
 
-const_definition = { "const" ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression ~ ";" }
+const_definition = { "const" ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression }
 
 params  = { (param ~ ",")* ~ param ~ ","? ~ varidic? }
 param   = { identifier ~ ":" ~ type_expr }
