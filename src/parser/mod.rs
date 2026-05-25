@@ -18,7 +18,7 @@ use crate::{
         module::{Module, ModuleKind},
     },
     general::{
-        path::{Path, PathIdent},
+        path::{QualifiedName, QualifiedNameSegment},
         types::{PrimitiveType, Type},
     },
 };
@@ -111,7 +111,9 @@ pub fn handle_fn_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Functio
     return Ok(builder);
 }
 
-pub fn handle_member_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PathIdent> {
+pub fn handle_member_access_postfix<'a>(
+    pair: Pair<'a, Rule>,
+) -> anyhow::Result<QualifiedNameSegment> {
     assert_eq!(
         pair.as_rule(),
         Rule::member_access_postfix,
@@ -119,7 +121,7 @@ pub fn handle_member_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<
     );
     let mut inner = pair.into_inner();
     let member = inner.next().unwrap();
-    return Ok(PathIdent::from(member.as_str()));
+    return Ok(QualifiedNameSegment::from(member.as_str()));
 }
 
 pub fn handle_assignment_expression_postfix<'a>(
@@ -262,7 +264,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
     enum Operation {
         Call(Vec<Expression>),
         Assign(Expression),
-        Access(PathIdent),
+        Access(QualifiedNameSegment),
         Unary(UnaryOperator),
         Binary(BinaryOperator),
     }
@@ -504,29 +506,29 @@ pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     todo!("implement into the trait definition ast")
 }
 
-pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PathIdent> {
+pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNameSegment> {
     let mut inner = pair.into_inner();
     let ident = inner.next().unwrap().as_str().to_string();
     if let Some(tm) = inner.next() {
         todo!("handle template specialization");
     }
 
-    return Ok(PathIdent {
+    return Ok(QualifiedNameSegment {
         ident,
         template_spec: vec![],
     });
 }
 
-pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Path> {
+pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedName> {
     let mut inner = pair.into_inner();
     let next = inner.peek().unwrap();
-    let mut path = Path::new();
+    let mut path = QualifiedName::new();
 
     if let Rule::rel_path = next.as_rule() {
         todo!("handle relative paths...");
     }
 
-    let mut path = Path::new();
+    let mut path = QualifiedName::new();
     for ident in inner {
         path.add_segment(handle_path_ident(ident)?);
     }
@@ -550,7 +552,9 @@ pub fn handle_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Impleme
     });
 }
 
-pub fn handle_trait_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<TraitImplementation> {
+pub fn handle_trait_implementation<'a>(
+    pair: Pair<'a, Rule>,
+) -> anyhow::Result<TraitImplementation> {
     assert_eq!(pair.as_rule(), Rule::trait_implementation);
     let mut inner = pair.into_inner();
     let target = handle_path(inner.next().unwrap())?;

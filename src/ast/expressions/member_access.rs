@@ -1,11 +1,11 @@
 use std::fmt::Display;
 
-use crate::{ast::expressions::Expression, general::path::PathIdent};
+use crate::{ast::expressions::Expression, general::path::QualifiedNameSegment};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberAccess {
     pub object: Expression,
-    pub member: PathIdent,
+    pub member: QualifiedNameSegment,
 }
 
 impl Display for MemberAccess {

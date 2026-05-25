@@ -12,7 +12,7 @@ use crate::{
             operations::BinaryOperation,
         },
     },
-    general::{path::Path, types::Type},
+    general::{path::QualifiedName, types::Type},
     parser::parse_module,
 };
 
@@ -157,8 +157,8 @@ enum Symbol {
 
 #[derive(Debug, Default)]
 pub struct ProjectPreprocessor {
-    local_scope: Vec<HashMap<Path, Symbol>>,
-    global_scope: HashMap<Path, Symbol>,
+    local_scope: Vec<HashMap<QualifiedName, Symbol>>,
+    global_scope: HashMap<QualifiedName, Symbol>,
 }
 
 trait ExpressionValidator {
@@ -195,7 +195,7 @@ impl ExpressionValidator for crate::ast::expressions::call::Call {
     }
 }
 
-impl ExpressionValidator for crate::ast::Path {
+impl ExpressionValidator for crate::ast::QualifiedName {
     fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
         let ty = procesor
             .find_symbol(self.clone())
@@ -360,15 +360,15 @@ impl ProjectPreprocessor {
         self.local_scope.pop();
     }
 
-    fn register_local_symbol(&mut self, path: Path, kind: Symbol) {
+    fn register_local_symbol(&mut self, path: QualifiedName, kind: Symbol) {
         self.local_scope.last_mut().unwrap().insert(path, kind);
     }
 
-    fn register_global_symbol(&mut self, path: Path, kind: Symbol) {
+    fn register_global_symbol(&mut self, path: QualifiedName, kind: Symbol) {
         self.global_scope.insert(path, kind);
     }
 
-    fn find_symbol(&self, path: Path) -> Option<Symbol> {
+    fn find_symbol(&self, path: QualifiedName) -> Option<Symbol> {
         for (s_path, s_kind) in &self.global_scope {
             if *s_path == path {
                 return Some(s_kind.clone());
@@ -417,8 +417,8 @@ impl ProjectPreprocessor {
         for import in &project.root_module.imports {
             if import.c_import {
                 ccache.resolve_c_definitions(&import.path.get(0).ident)?;
-                let mut name = Path::new();
-                let mut header_path = Path::new();
+                let mut name = QualifiedName::new();
+                let mut header_path = QualifiedName::new();
                 header_path.add_segment(&import.path.get(0).ident);
                 header_path.add_segment(&import.path.get(1).ident);
                 name.add_segment(&import.path.get(1).ident);

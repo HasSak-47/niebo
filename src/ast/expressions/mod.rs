@@ -22,7 +22,7 @@ use crate::{
         },
     },
     general::{
-        path::{Path, PathIdent},
+        path::{QualifiedName, QualifiedNameSegment},
         types::Type,
     },
 };
@@ -35,7 +35,7 @@ pub enum Statement {
     Expression(Expression),
     Break,
     Continue,
-    Use(Path),
+    Use(QualifiedName),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,7 +46,7 @@ pub enum ExpressionKind {
     Loop(LoopExpression),
     While(WhileLoop),
     Literal(Literal),
-    Identifier(Path),
+    Identifier(QualifiedName),
     BinaryOperation(BinaryOperation),
     UnaryOperation(UnaryOperation),
     Call(Call),
@@ -95,7 +95,7 @@ impl Expression {
         };
     }
 
-    pub fn member_access<P: Into<PathIdent>>(object: Expression, member: P) -> Self {
+    pub fn member_access<P: Into<QualifiedNameSegment>>(object: Expression, member: P) -> Self {
         let member = member.into();
 
         return Expression {
@@ -145,7 +145,7 @@ impl Expression {
         Self::new(ExpressionKind::Literal(literal))
     }
 
-    pub fn identifier<P: Into<Path>>(path: P) -> Self {
+    pub fn identifier<P: Into<QualifiedName>>(path: P) -> Self {
         let path = path.into();
         Self::new(ExpressionKind::Identifier(path))
     }

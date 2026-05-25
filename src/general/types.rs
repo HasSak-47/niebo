@@ -1,4 +1,4 @@
-use super::path::Path;
+use super::path::QualifiedName;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {
@@ -53,7 +53,7 @@ pub enum Type {
     // alias to a type
     Alias(Box<Type>),
     // path to a type that should be resolved later
-    Named(Path),
+    Named(QualifiedName),
 }
 
 impl Type {
@@ -117,13 +117,13 @@ impl Type {
         })
     }
 
-    pub fn named(path: Path) -> Self {
+    pub fn named(path: QualifiedName) -> Self {
         Self::Named(path)
     }
 }
 
-impl From<Path> for Type {
-    fn from(path: Path) -> Self {
+impl From<QualifiedName> for Type {
+    fn from(path: QualifiedName) -> Self {
         Type::Named(path)
     }
 }

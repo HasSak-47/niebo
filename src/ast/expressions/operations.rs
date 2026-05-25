@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::general::{path::Path, types::Type};
+use crate::general::{path::QualifiedName, types::Type};
 
 use super::Expression;
 
@@ -53,13 +53,13 @@ impl Display for BinaryOperator {
 }
 
 impl BinaryOperator {
-    pub fn into_path(&self) -> Path {
+    pub fn into_path(&self) -> QualifiedName {
         let val = match self {
             BinaryOperator::Addition => "add",
             _ => todo!(),
         }
         .to_string();
-        return Path {
+        return QualifiedName {
             v: vec![val.into(), "core".into()],
         };
     }

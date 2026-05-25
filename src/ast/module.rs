@@ -1,7 +1,8 @@
 use crate::ast::DefinitionKind;
 
 use super::{
-    Definition, FunctionBuilder, Implementation, Import, Path, TraitBuilder, TraitImplementation,
+    Definition, FunctionBuilder, Implementation, Import, QualifiedName, TraitBuilder,
+    TraitImplementation,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,7 +39,7 @@ impl Module {
         self.definitions.push(f.build_def());
     }
 
-    pub fn add_c_import<P: Into<Path>>(&mut self, path: P) {
+    pub fn add_c_import<P: Into<QualifiedName>>(&mut self, path: P) {
         let path = path.into();
         // everything in c has the format header::name
         assert!(path.v.len() == 2);
@@ -49,14 +50,14 @@ impl Module {
         });
     }
 
-    pub fn add_import(&mut self, path: Path) {
+    pub fn add_import(&mut self, path: QualifiedName) {
         self.imports.push(Import {
             c_import: false,
             path,
         });
     }
 
-    pub fn get_c_imports(&self) -> Vec<Path> {
+    pub fn get_c_imports(&self) -> Vec<QualifiedName> {
         let mut v = Vec::new();
         for import in &self.imports {
             if import.c_import {

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use anyhow::{Result, anyhow};
 
 use crate::general::{
-    path::{Path, PathIdent},
+    path::{QualifiedName, QualifiedNameSegment},
     types::*,
 };
 use function::*;
@@ -37,14 +37,14 @@ pub struct Variable {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Implementation {
-    pub target: Path,
+    pub target: QualifiedName,
     pub definitions: Vec<Definition>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TraitImplementation {
-    pub trait_path: Path,
-    pub target: Path,
+    pub trait_path: QualifiedName,
+    pub target: QualifiedName,
     pub definitions: Vec<Definition>,
 }
 
@@ -139,11 +139,11 @@ impl Definition {
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Import {
     pub c_import: bool,
-    pub path: Path,
+    pub path: QualifiedName,
 }
 
 impl Import {
-    pub fn c_import(path: Path) -> Self {
+    pub fn c_import(path: QualifiedName) -> Self {
         // c imports only have 2 path members
         assert!(path.v.len() == 2);
         return Self {

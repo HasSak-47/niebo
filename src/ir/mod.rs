@@ -24,7 +24,7 @@ use crate::{
         project::{Project, cimports::*},
     },
     general::{
-        path::Path,
+        path::QualifiedName,
         types::{PrimitiveType, Type},
     },
 };
@@ -32,8 +32,8 @@ use crate::{
 pub struct CodeGen<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    locals: HashMap<Path, PointerValue<'ctx>>,
-    functions: HashMap<Path, FunctionValue<'ctx>>,
+    locals: HashMap<QualifiedName, PointerValue<'ctx>>,
+    functions: HashMap<QualifiedName, FunctionValue<'ctx>>,
 }
 
 trait TypeIr {
@@ -130,7 +130,7 @@ impl StatementIr for ast::Variable {
     }
 }
 
-impl ExpressionIr for Path {
+impl ExpressionIr for QualifiedName {
     fn to_ir_value<'ctx>(
         &self,
         ctx: &'ctx Context,
@@ -409,8 +409,8 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
     for import in &project.root_module.imports {
         if import.c_import {
             ccache.resolve_c_definitions(&import.path.get(0).ident)?;
-            let mut name = Path::new();
-            let mut header_path = Path::new();
+            let mut name = QualifiedName::new();
+            let mut header_path = QualifiedName::new();
             header_path.add_segment(&import.path.get(0).ident);
             header_path.add_segment(&import.path.get(1).ident);
             name.add_segment(&import.path.get(1).ident);

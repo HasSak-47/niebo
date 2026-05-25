@@ -11,7 +11,7 @@ use crate::{
         Definition, DefinitionKind, Visibility, expressions::Statement, function::FunctionBuilder,
     },
     general::{
-        path::Path,
+        path::QualifiedName,
         types::{PrimitiveType, Type},
     },
 };
@@ -131,7 +131,7 @@ fn rec_from<'a>(
                 };
                 if record_name != "<anonymous>" {
                     deps.insert(record_name.clone());
-                    return Type::named(Path::from(record_name));
+                    return Type::named(QualifiedName::from(record_name));
                 }
                 let record_key = decl
                     .get_usr()
@@ -221,7 +221,7 @@ impl<'c> CCache<'c> {
         });
     }
 
-    pub fn get_definition(&self, path: &Path) -> anyhow::Result<&Definition> {
+    pub fn get_definition(&self, path: &QualifiedName) -> anyhow::Result<&Definition> {
         let header = &path.get(0).ident;
         let symbol = &path.get(1).ident;
 
@@ -277,7 +277,7 @@ impl<'c> CCache<'c> {
             }
             for dep in deps {
                 entry.symbols.entry(dep.clone()).or_insert(Definition {
-                    kind: DefinitionKind::Type(Type::named(Path::from(dep.clone()))),
+                    kind: DefinitionKind::Type(Type::named(QualifiedName::from(dep.clone()))),
                     visibility: Visibility::Public,
                     name: dep,
                 });
