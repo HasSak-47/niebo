@@ -166,6 +166,43 @@ trait ExpressionValidator {
     fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type>;
 }
 
+impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation {
+    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+        use crate::ast::expressions::operations::UnaryOperator;
+        let operand_valid = self.operand.validate(procesor)?;
+        let operand_ty = self.operand.resolve_ret_ty(procesor)?;
+        match self.operator {
+            UnaryOperator::Ref => {
+                return Ok(());
+            }
+            UnaryOperator::Deref => match self.operand.resolve_ret_ty(procesor)? {
+                Type::Pointer(ty) => return Ok(()),
+                ty => bail!("{ty:?} cannot be deref"),
+            },
+            UnaryOperator::Negation => {
+                todo!()
+            }
+        }
+    }
+
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+        use crate::ast::expressions::operations::UnaryOperator;
+        let oper_ty = self.operand.resolve_ret_ty(procesor)?;
+        match self.operator {
+            UnaryOperator::Ref => {
+                return Ok(Type::pointer(oper_ty));
+            }
+            UnaryOperator::Deref => match self.operand.resolve_ret_ty(procesor)? {
+                Type::Pointer(ty) => return Ok(*ty),
+                ty => unreachable!("{ty:?} cannot be deref"),
+            },
+            UnaryOperator::Negation => {
+                todo!()
+            }
+        }
+    }
+}
+
 impl ExpressionValidator for crate::ast::expressions::literal::Literal {
     fn resolve_ret_ty(&mut self, _: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
         use crate::ast::expressions::literal::LiteralInfo;
@@ -239,6 +276,7 @@ impl ExpressionValidator for crate::ast::Expression {
 
                 Ok(())
             }
+            ExpressionKind::UnaryOperation(unary) => unary.validate(procesor),
 
             td => todo!("{td:?}"),
         }
@@ -255,7 +293,8 @@ impl ExpressionValidator for crate::ast::Expression {
                 ExpressionKind::Block(blk) => blk.resolve_ret_ty(procesor),
                 ExpressionKind::Call(call) => call.resolve_ret_ty(procesor),
 
-                ExpressionKind::Assignment(a, b) => a.resolve_ret_ty(procesor),
+                ExpressionKind::Assignment(a, _) => a.resolve_ret_ty(procesor),
+                ExpressionKind::UnaryOperation(unary) => unary.resolve_ret_ty(procesor),
                 _ => todo!(),
             }?;
             self.ret_ty = Some(ty);
@@ -296,6 +335,7 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
                 td => todo!("{td:?}"),
             }
         }
+        procesor.pop_scope();
 
         return Ok(());
     }

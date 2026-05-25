@@ -1,9 +1,10 @@
 header stdio::printf;
+header stdio::scanf;
 
 func main() -> testType {
     let mut i : i32 = 0;
     while i < 10 {
         printf("%d\n", i);
-        i = i + 1;
+        scanf("%d", &i);
     }
 }

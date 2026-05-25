@@ -18,7 +18,7 @@ use crate::{
             Expression, ExpressionKind, Statement,
             block::Block,
             literal::{Literal, LiteralInfo},
-            operations::{BinaryOperation, BinaryOperator},
+            operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
         function::Function,
         project::{Project, cimports::*},
@@ -189,6 +189,30 @@ impl ExpressionIr for Literal {
     }
 }
 
+impl ExpressionIr for UnaryOperation {
+    fn to_ir_value<'ctx>(
+        &self,
+        ctx: &'ctx Context,
+        codegen: &mut CodeGen<'ctx>,
+    ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
+        match &self.operator {
+            UnaryOperator::Ref => {
+                return Ok(Some(self.operand.to_ir_place(ctx, codegen)?.into()));
+            }
+            un => unimplemented!("{un:?}"),
+        }
+    }
+
+    fn to_ir_place<'ctx>(
+        &self,
+        ctx: &'ctx Context,
+        codegen: &mut CodeGen<'ctx>,
+    ) -> anyhow::Result<PointerValue<'ctx>> {
+        let _ = (ctx, codegen);
+        todo!()
+    }
+}
+
 impl ExpressionIr for BinaryOperation {
     fn to_ir_value<'ctx>(
         &self,
@@ -307,6 +331,9 @@ impl ExpressionIr for Expression {
 
                 codegen.builder.build_store(a, b)?;
                 return Ok(None);
+            }
+            ExpressionKind::UnaryOperation(unary) => {
+                return Ok(Some(unary.to_ir_value(ctx, codegen)?.unwrap()));
             }
             un => todo!("{un:?}"),
         }

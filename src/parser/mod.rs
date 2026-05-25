@@ -242,6 +242,20 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
 
             Expression::while_(WhileLoop::new(condition, block))
         }
+        Rule::prefix_unary_operation_expression => {
+            let mut inner = next.into_inner();
+            let oper = match inner.next().unwrap().as_str() {
+                "&" => UnaryOperator::Ref,
+                "*" => UnaryOperator::Deref,
+                "-" => UnaryOperator::Negation,
+                un => unreachable!("unreachable unary operator: {un:?}"),
+            };
+
+            return Ok(Expression::unary_operation(
+                oper,
+                handle_expression(inner.next().unwrap())?,
+            ));
+        }
         un => unreachable!("\"{}\": {un:?}", pair.as_str()),
     };
 
