@@ -339,6 +339,47 @@ impl ExpressionIr for Expression {
             ExpressionKind::UnaryOperation(unary) => {
                 return Ok(Some(unary.to_ir_value(ctx, codegen)?.unwrap()));
             }
+            ExpressionKind::Loop(loop_) => {
+                return Ok(loop_.body.to_ir_value(ctx, codegen)?);
+            }
+            ExpressionKind::If(if_) => {
+                let current_block = codegen
+                    .builder
+                    .get_insert_block()
+                    .ok_or_else(|| anyhow::anyhow!("builder has no insertion block"))?;
+                let function = current_block
+                    .get_parent()
+                    .ok_or_else(|| anyhow::anyhow!("insertion block has no parent function"))?;
+
+                let cond_bb = ctx.append_basic_block(function, "if.cond");
+                let body_bb = ctx.append_basic_block(function, "if.body");
+                let else_bb = ctx.append_basic_block(function, "if.else");
+                let end_bb = ctx.append_basic_block(function, "if.end");
+
+                codegen.builder.build_unconditional_branch(cond_bb)?;
+                codegen.builder.position_at_end(cond_bb);
+
+                // condition
+                let con = if_.condition.to_ir_value(ctx, codegen)?.unwrap();
+                codegen
+                    .builder
+                    .build_conditional_branch(con.into_int_value(), body_bb, else_bb)?;
+
+                // then block
+                codegen.builder.position_at_end(body_bb);
+                if_.then.to_ir_value(ctx, codegen)?;
+                codegen.builder.build_unconditional_branch(end_bb).unwrap();
+
+                // else block
+                codegen.builder.position_at_end(body_bb);
+                if let Some(ex) = &if_.else_ {
+                    ex.to_ir_value(ctx, codegen)?;
+                    codegen.builder.position_at_end(end_bb);
+                }
+
+                // fuck it I just want it to compiler rn
+                return Ok(None);
+            }
             un => todo!("{un:?}"),
         }
     }
@@ -389,7 +430,6 @@ impl StatementIr for Statement {
 
                 return Ok(());
             }
-
             un => todo!("{un:?}"),
         }
 

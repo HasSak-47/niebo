@@ -82,8 +82,8 @@ match_arm        = { pattern ~ "=>" ~ (block_expression | expression) ~ ","? }
 pattern          = { identifier | path | number | string | "_" }
 
 loop_expression    = { "loop" ~ block_expression }
-break_statement    = { "break" ~ ";" }
-continue_statement = { "continue" ~ ";" }
+break_statement    = { "break" }
+continue_statement = { "continue" }
 
 expression_postfix = {
     assignment_expression_postfix

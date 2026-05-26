@@ -13,7 +13,10 @@ use crate::{
         module::{Module, ModuleKind},
         project::Project,
     },
-    general::{naming::QualifiedName, types::Type},
+    general::{
+        naming::QualifiedName,
+        types::{PrimitiveType, Type},
+    },
     ir::cimports::CCache,
     parser::parse_module,
 };
@@ -34,6 +37,16 @@ pub struct ProjectPreprocessor {
 trait ExpressionValidator {
     fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()>;
     fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type>;
+}
+
+impl ExpressionValidator for crate::ast::expressions::loops::LoopExpression {
+    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+        self.body.validate(procesor)
+    }
+
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+        self.body.resolve_ret_ty(procesor)
+    }
 }
 
 impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation {
@@ -123,6 +136,30 @@ impl ExpressionValidator for crate::general::naming::QualifiedName {
     }
 }
 
+impl ExpressionValidator for crate::ast::expressions::conditional::Conditional {
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+        return self.then.resolve_ret_ty(procesor);
+    }
+
+    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+        self.condition.validate(procesor)?;
+        self.then.validate(procesor)?;
+        match &mut self.else_ {
+            Some(s) => {
+                s.validate(procesor)?;
+                if s.resolve_ret_ty(procesor)? != self.then.resolve_ret_ty(procesor)? {
+                    bail!("branches are of different type");
+                }
+            }
+            _ => {}
+        }
+        if let Type::Primitive(PrimitiveType::Bool) = self.condition.resolve_ret_ty(procesor)? {
+            return Ok(());
+        }
+        bail!("if condition type is not a boolean");
+    }
+}
+
 impl ExpressionValidator for crate::ast::expressions::Expression {
     fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
         use crate::ast::expressions::ExpressionKind;
@@ -147,7 +184,8 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
                 Ok(())
             }
             ExpressionKind::UnaryOperation(unary) => unary.validate(procesor),
-
+            ExpressionKind::Loop(loop_) => loop_.validate(procesor),
+            ExpressionKind::If(if_) => if_.validate(procesor),
             td => todo!("{td:?}"),
         }
     }
@@ -165,6 +203,8 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
 
                 ExpressionKind::Assignment(a, _) => a.resolve_ret_ty(procesor),
                 ExpressionKind::UnaryOperation(unary) => unary.resolve_ret_ty(procesor),
+                ExpressionKind::Loop(loop_) => loop_.resolve_ret_ty(procesor),
+                ExpressionKind::If(if_) => if_.resolve_ret_ty(procesor),
                 _ => todo!(),
             }?;
             self.ret_ty = Some(ty);
@@ -208,6 +248,10 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
                         _ => {}
                     }
 
+                    return Ok(());
+                }
+                // WARN: BAD! procesor is not aware when is inside a breakable block!
+                Statement::Break => {
                     return Ok(());
                 }
                 td => todo!("{td:?}"),

@@ -6,16 +6,15 @@ use crate::{
     ast::expressions::{
         Expression,
         block::Block,
+        conditional::{Conditional, ConditionalBuilder},
         literal::Literal,
-        loops::WhileLoop,
+        loops::{LoopExpression, WhileLoop},
         operations::{BinaryOperator, UnaryOperator},
     },
     general::naming::QualifiedNameSegment,
 };
 
-pub fn handle_member_access_postfix<'a>(
-    pair: Pair<'a, Rule>,
-) -> anyhow::Result<QualifiedNameSegment> {
+fn handle_member_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNameSegment> {
     assert_eq!(
         pair.as_rule(),
         Rule::member_access_postfix,
@@ -26,7 +25,7 @@ pub fn handle_member_access_postfix<'a>(
     return Ok(QualifiedNameSegment::from(member.as_str()));
 }
 
-pub fn handle_assignment_expression_postfix<'a>(
+fn handle_assignment_expression_postfix<'a>(
     prefix: Expression,
     pair: Pair<'a, Rule>,
 ) -> anyhow::Result<Expression> {
@@ -39,7 +38,7 @@ pub fn handle_assignment_expression_postfix<'a>(
     return Ok(handle_expression(inner.next().unwrap())?);
 }
 
-pub fn handle_call_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<Expression>> {
+fn handle_call_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<Expression>> {
     assert_eq!(
         pair.as_rule(),
         Rule::call_postfix,
@@ -58,7 +57,7 @@ pub fn handle_call_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Resul
     return Ok(params);
 }
 
-pub fn handle_binary_expression_postfix<'a>(
+fn handle_binary_expression_postfix<'a>(
     pair: Pair<'a, Rule>,
 ) -> anyhow::Result<(BinaryOperator, Expression)> {
     assert_eq!(
@@ -72,6 +71,7 @@ pub fn handle_binary_expression_postfix<'a>(
     let operator = match &oper.as_rule() {
         Rule::boolean_leq => BinaryOperator::LesserOrEqual,
         Rule::boolean_le => BinaryOperator::Lesser,
+        Rule::boolean_eq => BinaryOperator::Equal,
         Rule::arithmetic_add => BinaryOperator::Addition,
         un => unreachable!("{un:?}"),
     };
@@ -118,6 +118,96 @@ pub fn handle_block_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Block
     return Ok(block);
 }
 
+fn handle_if_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Conditional> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::if_expression,
+        "a non Rule::if_expression reached handle_if_expression"
+    );
+    let mut inner = pair.into_inner();
+    let cond = inner.next().unwrap();
+    let then = inner.next().unwrap();
+    let mut cond = ConditionalBuilder::new(
+        handle_expression(cond)?,
+        Expression::block(handle_block_expression(then)?),
+    );
+    if let Some(else_) = inner.next() {
+        cond = cond.set_else(Expression::block(handle_block_expression(else_)?));
+    }
+
+    return Ok(cond.build());
+}
+
+fn handle_loop_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<LoopExpression> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::loop_expression,
+        "a non Rule::loop_expression reached handle_loop_expression"
+    );
+    let mut inner = pair.into_inner();
+    let body = inner.next().unwrap();
+    return Ok(LoopExpression::new(Expression::block(
+        handle_block_expression(body)?,
+    )));
+}
+
+#[derive(Debug)]
+enum Operation {
+    Call(Vec<Expression>),
+    Assign(Expression),
+    Access(QualifiedNameSegment),
+    Unary(UnaryOperator),
+    Binary(BinaryOperator),
+}
+
+impl PartialEq for Operation {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Operation::Call(_), Operation::Call(_)) => true,
+            (Operation::Access(a), Operation::Access(b)) => a == b,
+            (Operation::Unary(a), Operation::Unary(b)) => a == b,
+            (Operation::Binary(a), Operation::Binary(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Operation {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(match (self, other) {
+            (Operation::Assign(_), _) => std::cmp::Ordering::Equal,
+            (Operation::Call(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
+            (Operation::Call(_), _) => std::cmp::Ordering::Equal,
+
+            (Operation::Access(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
+            (Operation::Access(_), _) => std::cmp::Ordering::Equal,
+
+            (Operation::Unary(a), Operation::Unary(b)) => a.cmp(b),
+            (Operation::Unary(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
+            (Operation::Unary(_), _) => std::cmp::Ordering::Equal,
+
+            (Operation::Binary(a), Operation::Binary(b)) => a.cmp(b),
+            (Operation::Binary(_), _) => std::cmp::Ordering::Less,
+        })
+    }
+}
+
+#[derive(Debug)]
+enum ExpressionString {
+    Val(Expression),
+    Oper(Operation),
+}
+
+impl ExpressionString {
+    fn to_val(self) -> anyhow::Result<Expression> {
+        if let ExpressionString::Val(p) = self {
+            return Ok(p);
+        } else {
+            anyhow::bail!("ExpressionString was not val it was: {self:?}")
+        }
+    }
+}
+
 pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
     assert_eq!(
         pair.as_rule(),
@@ -147,6 +237,8 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
         }
         Rule::path => Expression::identifier(handle_path(next)?),
         Rule::block_expression => Expression::block(handle_block_expression(next)?),
+        Rule::loop_expression => Expression::loop_(handle_loop_expression(next)?),
+        Rule::if_expression => Expression::if_(handle_if_expression(next)?),
         Rule::while_expression => {
             let mut inner = next.into_inner();
             let condition = handle_expression(inner.next().unwrap())?;
@@ -185,62 +277,6 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             un => unreachable!("{un:?}"),
         }
         postfix_rules.push(postfix);
-    }
-    #[derive(Debug)]
-    enum Operation {
-        Call(Vec<Expression>),
-        Assign(Expression),
-        Access(QualifiedNameSegment),
-        Unary(UnaryOperator),
-        Binary(BinaryOperator),
-    }
-
-    impl PartialEq for Operation {
-        fn eq(&self, other: &Self) -> bool {
-            match (self, other) {
-                (Operation::Call(_), Operation::Call(_)) => true,
-                (Operation::Access(a), Operation::Access(b)) => a == b,
-                (Operation::Unary(a), Operation::Unary(b)) => a == b,
-                (Operation::Binary(a), Operation::Binary(b)) => a == b,
-                _ => false,
-            }
-        }
-    }
-
-    impl PartialOrd for Operation {
-        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-            Some(match (self, other) {
-                (Operation::Assign(_), _) => std::cmp::Ordering::Equal,
-                (Operation::Call(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
-                (Operation::Call(_), _) => std::cmp::Ordering::Equal,
-
-                (Operation::Access(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
-                (Operation::Access(_), _) => std::cmp::Ordering::Equal,
-
-                (Operation::Unary(a), Operation::Unary(b)) => a.cmp(b),
-                (Operation::Unary(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
-                (Operation::Unary(_), _) => std::cmp::Ordering::Equal,
-
-                (Operation::Binary(a), Operation::Binary(b)) => a.cmp(b),
-                (Operation::Binary(_), _) => std::cmp::Ordering::Less,
-            })
-        }
-    }
-
-    #[derive(Debug)]
-    enum ExpressionString {
-        Val(Expression),
-        Oper(Operation),
-    }
-
-    impl ExpressionString {
-        fn to_val(self) -> anyhow::Result<Expression> {
-            if let ExpressionString::Val(p) = self {
-                return Ok(p);
-            } else {
-                anyhow::bail!("ExpressionString was not val it was: {self:?}")
-            }
-        }
     }
 
     let mut e_string = Vec::new();

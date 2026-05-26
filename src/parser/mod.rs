@@ -160,10 +160,8 @@ pub fn handle_statement<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statement> {
             let value = expr.next().and_then(|k| handle_expression(k).ok());
             Statement::Return(value)
         }
-        Rule::import
-        | Rule::const_definition
-        | Rule::break_statement
-        | Rule::continue_statement => todo!(),
+        Rule::break_statement => Statement::Break,
+        Rule::import | Rule::const_definition | Rule::continue_statement => todo!(),
         un => unreachable!("{un:?}"),
     });
 }
@@ -477,6 +475,38 @@ mod test {
         assert_eq!(parsed, expected);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_break() -> anyhow::Result<()> {
+        let mut stream = TokenStream::parse(
+            Rule::block_expression,
+            "{
+    scanf(\"%d\", &i);
+
+    if i == 0{
+        printf(\"exiting...\");
+        break;
+    }
+}",
+        )?
+        .next()
+        .unwrap()
+        .into_inner();
+
+        stream.next().unwrap();
+        let statement_if_ = stream.next().unwrap();
+        let expression_if_ = statement_if_.into_inner().next().unwrap();
+        let mut if_ = expression_if_.into_inner().next().unwrap().into_inner();
+        let if_con = if_.next().unwrap();
+        assert_eq!(if_con.as_rule(), Rule::expression);
+        let if_then = if_.next().unwrap();
+        assert_eq!(if_then.as_rule(), Rule::block_expression);
+        let exp = handle_block_expression(if_then)?;
+        if let Statement::Break = exp.statements[1] {
+            return Ok(());
+        }
+        anyhow::bail!("break statement not found");
     }
 
     #[test]
