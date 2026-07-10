@@ -6,7 +6,7 @@ import = { c_import | niebo_import }
 
 c_import      = { "header" ~ path ~ ";" }
 niebo_import  = { "import" ~ path ~ ";" }
-use_statement = { "import" ~ path ~ ";" }
+use_statement = { "use" ~ identifier ~ "as" ~ path ~ ";" }
 
 visibility = { "pub" | "module" }
 
@@ -30,20 +30,20 @@ trait_body       = {
   | fn_declaration ~ ";"
 }
 
-struct_declaration = {"struct" ~ identifier}
-union_declaration = {"union" ~ identifier}
+struct_declaration  = {"struct" ~ identifier}
+union_declaration   = {"union" ~ identifier}
 variant_declaration = {"variant" ~ identifier}
-alias_declaration = {"type" ~ identifier}
+alias_declaration   = {"type" ~ identifier}
 
-struct_definition = {"struct" ~ identifier ~ "{" ~ "}" }
-union_definition = {"union" ~ identifier~ "{" ~ "}" }
+struct_definition  = {"struct" ~ identifier ~ "{" ~ "}" }
+union_definition   = {"union" ~ identifier~ "{" ~ "}" }
 variant_definition = {"variant" ~ identifier ~ "{" ~ "}"}
-alias_definition = {"type" ~ identifier ~ "=" ~ type_expr ~ ";"}
+alias_definition   = {"type" ~ identifier ~ "=" ~ type_expr ~ ";"}
 
 type_declaration = { (struct_declaration | union_declaration | variant_declaration | alias_declaration) ~ ";"}
 type_definition = { struct_definition | union_definition | variant_definition | alias_definition }
 
-fn_declaration = { "const"? ~ "func" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
+fn_declaration = { "const"? ~ "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
 fn_definition  = { fn_declaration ~ block_expression }
 
 module_definition = { "mod" ~ identifier ~ (";" | ("{" ~ stream ~ "}")) }
@@ -89,14 +89,24 @@ continue_statement = { "continue" ~ identifier? }
 expression_postfix = {
     assignment_expression_postfix
   | call_postfix
+  | index_access_postfix
   | unary_expression_postfix
   | binary_expression_postfix
   | member_access_postfix
 }
 
 member_access_postfix = {"." ~ identifier }
+index_access_postfix = {"[" ~ expression ~ "]" }
 
-unary_expression_postfix = { "?" | "++" | "--" }
+unary_return_error_postfix = { "?" }
+unary_increase_postfix = { "++" }
+unary_decrease_postfix = { "--" }
+
+unary_expression_postfix = { 
+    unary_return_error_postfix
+  | unary_increase_postfix
+  | unary_decrease_postfix
+}
 
 assignment_expression_postfix = { "=" ~ expression }
 
@@ -138,6 +148,16 @@ arithmetic_mul = { "*" ~ expression }
 arithmetic_div = { "/" ~ expression }
 arithmetic_mod = { "%" ~ expression }
 
+assignment_bitwise_and = { "&=" ~ expression }
+assignment_bitwise_or  = { "|=" ~ expression }
+assignment_bitwise_xor = { "~=" ~ expression }
+assignment_arithmetic_add = { "+=" ~ expression }
+assignment_arithmetic_sub = { "-=" ~ expression }
+assignment_arithmetic_mul = { "*=" ~ expression }
+assignment_arithmetic_div = { "/=" ~ expression }
+assignment_arithmetic_mod = { "%=" ~ expression }
+
+
 call_postfix = { "(" ~ call_params? ~ ")" }
 call_params  = { (expression ~ ",")* ~ expression ~ ","? }
 
@@ -176,7 +196,7 @@ type_expr = {
   | "(" ~ type_expr ~ ")"
 }
 
-function_type = { "func" ~ "(" ~ type_params? ~ ")" ~ ("->" ~ type_expr)? }
+function_type = { "fn" ~ "(" ~ type_params? ~ ")" ~ ("->" ~ type_expr)? }
 type_params   = { (type_expr ~ ",")* ~ type_expr ~ ","? }
 
 array_type             = { "[" ~ type_expr ~ "]" }
@@ -195,7 +215,7 @@ primitive_type     =  { int_type | uint_type | float_type | "bool" | "int" | "ui
 prec               = @{ASCII_DIGIT+}
 int_type           =  { "i" ~ prec }
 uint_type          =  { "u" ~ prec }
-float_type         =  { "float" ~ prec+ }
+float_type         =  { "float" ~ prec }
 literal_expression =  { number | string }
 
 number       = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
@@ -211,7 +231,7 @@ identifier_elements = { ASCII_ALPHANUMERIC | "_" }
 keyword = {
     "type"
   | "mod"
-  | "func"
+  | "fn"
   | "inter"
   | "let"
   | "const"

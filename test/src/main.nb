@@ -1,20 +1,43 @@
 header stdio::printf;
 header stdio::scanf;
+header stdlib::malloc;
+header stdlib::free;
+header stdlib::realloc;
 
-func main() -> i32 {
-    let mut i : i32 = 0;
-    printf("echo any positive integer, 0 to exit");
+fn main() -> i32 {
+    let mut sum : i32 = 0;
+    let mut numbers: *mut i32 = nullptr;
+    let mut count : i32 = 0;
+    printf("sum all positive integers, 0 to exit\n");
+
     main_loop: loop {
-        scanf("%d", &i);
+        let mut i : i32 = 0;
+        scanf("%d: ", &i);
 
-        if i == 0{
-            printf("exiting...");
+        if i == 0 {
             break main_loop;
         }
-        else{
-            printf("%d\n", i);
+        else {
+            sum = sum + i;
+            let aux : *mut i32 = realloc(numbers, count + count + 1);
+            if(aux == nullptr){
+                printf("realloc failed! : %p %p\n", numbers, aux);
+                return;
+            }
+
+            numbers = aux;
+            numbers[count] = i;
         }
     }
+
+
+    let mut i : i32 = 0;
+    while i < count {
+        printf("%d ", numbers[i]);
+        i = i + 1;
+    }
+    printf("sum: %d ", sum);
+    printf("exiting...");
 
     return;
 }

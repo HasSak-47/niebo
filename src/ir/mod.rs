@@ -12,7 +12,7 @@ use inkwell::{
     module::Module,
     targets::{Target, TargetMachine},
     types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicValueEnum, FunctionValue, PointerValue},
+    values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
 };
 
 use crate::{
@@ -37,7 +37,9 @@ use crate::{
 pub struct CodeGen<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
-    locals: HashMap<QualifiedName, PointerValue<'ctx>>,
+    machine: TargetMachine,
+    locals: HashMap<QualifiedName, (PointerValue<'ctx>, Type)>,
+    constants: HashMap<QualifiedName, BasicValueEnum<'ctx>>,
     functions: HashMap<QualifiedName, FunctionValue<'ctx>>,
 
     named_blocks: HashMap<String, Rc<BasicBlock<'ctx>>>,
@@ -98,6 +100,9 @@ impl TypeIr for Type {
                     .to_ir_type(ctx, codegen)?
                     .fn_type(params, varidic)),
             },
+            Type::Pointer(_) => Ok(ctx
+                .ptr_type(AddressSpace::default())
+                .fn_type(params, varidic)),
             un => unimplemented!("{un:?}"),
         }
     }
@@ -115,6 +120,7 @@ impl TypeIr for Type {
                 un => unimplemented!("{un:?}"),
             },
             Type::Pointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
+            Type::MutablePointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
             un => unimplemented!("{un:?}"),
         }
     }
@@ -130,7 +136,9 @@ impl StatementIr for ast::Variable {
         let ty = self.ty.clone().unwrap().to_ir_type(ctx, codegen)?;
         let p = codegen.builder.build_alloca(ty, &name)?;
 
-        codegen.locals.insert(name.into(), p);
+        codegen
+            .locals
+            .insert(name.into(), (p, self.ty.as_ref().unwrap().clone()));
         let val = self.value.to_ir_value(ctx, codegen)?.unwrap();
         codegen.builder.build_store(p, val)?;
 
@@ -144,9 +152,27 @@ impl ExpressionIr for QualifiedName {
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
     ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
+        if codegen.constants.contains_key(self) {
+            return Ok(Some(codegen.constants[self]));
+        }
+
         let ptr = self.to_ir_place(ctx, codegen)?;
-        let value = codegen.builder.build_load(ctx.i32_type(), ptr, "")?;
-        Ok(Some(value))
+        return Ok(Some(match codegen.locals[self].1 {
+            Type::Primitive(PrimitiveType::Int(32)) => {
+                codegen.builder.build_load(ctx.i32_type(), ptr, "")?
+            }
+            Type::Pointer(_) => {
+                codegen
+                    .builder
+                    .build_load(ctx.ptr_type(AddressSpace::default()), ptr, "")?
+            }
+            Type::MutablePointer(_) => {
+                codegen
+                    .builder
+                    .build_load(ctx.ptr_type(AddressSpace::default()), ptr, "")?
+            }
+            _ => todo!(),
+        }));
     }
 
     fn to_ir_place<'ctx>(
@@ -155,7 +181,10 @@ impl ExpressionIr for QualifiedName {
         codegen: &mut CodeGen<'ctx>,
     ) -> anyhow::Result<PointerValue<'ctx>> {
         let _ = ctx;
-        Ok(codegen.locals[self])
+        if codegen.constants.contains_key(self) {
+            anyhow::bail!("fukc")
+        }
+        Ok(codegen.locals[self].0)
     }
 }
 
@@ -167,14 +196,30 @@ impl ExpressionIr for Literal {
     ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
         let _ = codegen;
         match &self.info {
-            LiteralInfo::Integer { .. } => {
-                return Ok(Some(
-                    ctx.i32_type()
-                        .const_int_from_string(&self.data, inkwell::types::StringRadix::Decimal)
-                        .unwrap()
-                        .into(),
-                ));
-            }
+            LiteralInfo::Integer { precision, .. } => match precision {
+                Some(prec) => match prec {
+                    32 => {
+                        return Ok(Some(
+                            ctx.i32_type()
+                                .const_int_from_string(
+                                    &self.data,
+                                    inkwell::types::StringRadix::Decimal,
+                                )
+                                .unwrap()
+                                .into(),
+                        ));
+                    }
+                    _ => unimplemented!(""),
+                },
+                None => {
+                    return Ok(Some(
+                        ctx.i32_type()
+                            .const_int_from_string(&self.data, inkwell::types::StringRadix::Decimal)
+                            .unwrap()
+                            .into(),
+                    ));
+                }
+            },
             LiteralInfo::String => {
                 let p = codegen
                     .builder
@@ -221,42 +266,117 @@ impl ExpressionIr for UnaryOperation {
     }
 }
 
+fn handle_ptr_ptr<'ctx>(
+    ctx: &'ctx Context,
+    codegen: &mut CodeGen<'ctx>,
+    a_val: BasicValueEnum<'ctx>,
+    b_val: BasicValueEnum<'ctx>,
+    operator: &BinaryOperator,
+) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
+    let a = a_val.into_pointer_value();
+    let b = b_val.into_pointer_value();
+
+    // let target_data = codegen.machine.get_target_data();
+    // let a =
+    //     codegen
+    //         .builder
+    //         .build_ptr_to_int(a_ptr, ctx.ptr_sized_int_type(&target_data, None), "")?;
+
+    // let b =
+    //     codegen
+    //         .builder
+    //         .build_ptr_to_int(b_ptr, ctx.ptr_sized_int_type(&target_data, None), "")?;
+
+    match operator {
+        BinaryOperator::Lesser => {
+            return Ok(Some(
+                codegen
+                    .builder
+                    .build_int_compare(inkwell::IntPredicate::SLT, a, b, "")?
+                    .into(),
+            ));
+        }
+
+        BinaryOperator::Equal => {
+            return Ok(Some(
+                codegen
+                    .builder
+                    .build_int_compare(inkwell::IntPredicate::EQ, a, b, "")?
+                    .into(),
+            ));
+        }
+        BinaryOperator::Addition => {
+            return Ok(Some(codegen.builder.build_int_add(a, b, "")?.into()));
+        }
+        un => unimplemented!("{un:?}"),
+    }
+}
+
+fn handle_int_int<'ctx>(
+    ctx: &'ctx Context,
+    codegen: &mut CodeGen<'ctx>,
+    a_val: BasicValueEnum<'ctx>,
+    b_val: BasicValueEnum<'ctx>,
+    operator: &BinaryOperator,
+) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
+    let a = a_val.into_int_value();
+    let b = b_val.into_int_value();
+
+    match operator {
+        BinaryOperator::Lesser => {
+            return Ok(Some(
+                codegen
+                    .builder
+                    .build_int_compare(inkwell::IntPredicate::SLT, a, b, "")?
+                    .into(),
+            ));
+        }
+
+        BinaryOperator::Equal => {
+            return Ok(Some(
+                codegen
+                    .builder
+                    .build_int_compare(inkwell::IntPredicate::EQ, a, b, "")?
+                    .into(),
+            ));
+        }
+        BinaryOperator::Addition => {
+            return Ok(Some(codegen.builder.build_int_add(a, b, "")?.into()));
+        }
+        un => unimplemented!("{un:?}"),
+    }
+}
+
 impl ExpressionIr for BinaryOperation {
     fn to_ir_value<'ctx>(
         &self,
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
     ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
-        let a = self.operands[0]
+        let a_val = self.operands[0]
             .to_ir_value(ctx, codegen)?
-            .ok_or_else(|| anyhow::anyhow!("left operand did not produce a value"))?
-            .into_int_value();
-        let b = self.operands[1]
+            .ok_or_else(|| anyhow::anyhow!("left operand did not produce a value"))?;
+        let b_val = self.operands[1]
             .to_ir_value(ctx, codegen)?
-            .ok_or_else(|| anyhow::anyhow!("right operand did not produce a value"))?
-            .into_int_value();
-        match &self.operator {
-            BinaryOperator::Lesser => {
-                return Ok(Some(
-                    codegen
-                        .builder
-                        .build_int_compare(inkwell::IntPredicate::SLT, a, b, "")?
-                        .into(),
-                ));
-            }
+            .ok_or_else(|| anyhow::anyhow!("left operand did not produce a value"))?;
 
-            BinaryOperator::Equal => {
-                return Ok(Some(
-                    codegen
-                        .builder
-                        .build_int_compare(inkwell::IntPredicate::EQ, a, b, "")?
-                        .into(),
-                ));
+        match (
+            self.operands[0].ret_ty.as_ref().unwrap(),
+            self.operands[1].ret_ty.as_ref().unwrap(),
+        ) {
+            (Type::Pointer(_), Type::Pointer(_)) => {
+                handle_ptr_ptr(ctx, codegen, a_val, b_val, &self.operator)
             }
-            BinaryOperator::Addition => {
-                return Ok(Some(codegen.builder.build_int_add(a, b, "")?.into()));
+            (Type::MutablePointer(_), Type::Pointer(_)) => {
+                handle_ptr_ptr(ctx, codegen, a_val, b_val, &self.operator)
             }
-            un => unimplemented!("{un:?}"),
+            (Type::MutablePointer(_), Type::MutablePointer(_)) => {
+                handle_ptr_ptr(ctx, codegen, a_val, b_val, &self.operator)
+            }
+            (Type::Primitive(PrimitiveType::Int(_)), Type::Primitive(PrimitiveType::Int(_))) => {
+                handle_int_int(ctx, codegen, a_val, b_val, &self.operator)
+            }
+            todo => todo!("{todo:#?}"),
         }
     }
 
@@ -368,7 +488,6 @@ impl ExpressionIr for Expression {
                     codegen.named_blocks.remove(name);
                 }
                 codegen.latest_block = None;
-                println!("cleaned loop labels");
 
                 // after loop
                 codegen.builder.build_unconditional_branch(body_bb)?;
@@ -384,8 +503,13 @@ impl ExpressionIr for Expression {
 
                 let cond_bb = ctx.insert_basic_block_after(current_block, "if.cond");
                 let body_bb = ctx.insert_basic_block_after(cond_bb, "if.then");
-                let else_bb = ctx.insert_basic_block_after(body_bb, "if.else");
-                let end_bb = ctx.insert_basic_block_after(else_bb, "if.end");
+                let (else_bb, end_bb) = if if_.else_.is_some() {
+                    let else_bb = ctx.insert_basic_block_after(body_bb, "if.else");
+                    (else_bb, ctx.insert_basic_block_after(else_bb, "if.end"))
+                } else {
+                    let end = ctx.insert_basic_block_after(body_bb, "if.end");
+                    (end, end)
+                };
 
                 codegen.builder.build_unconditional_branch(cond_bb)?;
 
@@ -404,6 +528,7 @@ impl ExpressionIr for Expression {
                 if match body_bb.get_last_instruction() {
                     Some(ins) => match ins.get_opcode() {
                         inkwell::values::InstructionOpcode::Br => false,
+                        inkwell::values::InstructionOpcode::Return => false,
                         _ => true,
                     },
                     None => true,
@@ -412,8 +537,8 @@ impl ExpressionIr for Expression {
                 }
 
                 // else block
-                codegen.builder.position_at_end(else_bb);
                 if let Some(ex) = &if_.else_ {
+                    codegen.builder.position_at_end(else_bb);
                     ex.to_ir_value(ctx, codegen)?;
                     codegen.builder.build_unconditional_branch(end_bb).unwrap();
                 }
@@ -421,6 +546,30 @@ impl ExpressionIr for Expression {
 
                 // fuck it I just want it to compiler rn
                 return Ok(None);
+            }
+            ExpressionKind::Index(exp, idx) => {
+                let ptr_val = exp.to_ir_value(ctx, codegen)?.unwrap();
+                let ptr = ptr_val.into_pointer_value();
+
+                let offset = idx.to_ir_value(ctx, codegen)?.unwrap();
+                let offset_ptr = unsafe {
+                    let ir_ty = exp
+                        .ret_ty
+                        .as_ref()
+                        .clone()
+                        .unwrap()
+                        .to_ir_type(ctx, codegen)?;
+
+                    codegen
+                        .builder
+                        .build_gep(ir_ty, ptr, &[offset.into_int_value()], "")?
+                };
+
+                return Ok(Some(codegen.builder.build_load(
+                    ctx.i32_type(),
+                    offset_ptr,
+                    "",
+                )?));
             }
             un => todo!("{un:?}"),
         }
@@ -433,6 +582,26 @@ impl ExpressionIr for Expression {
     ) -> anyhow::Result<PointerValue<'ctx>> {
         match &*self.kind {
             ExpressionKind::Identifier(id) => id.to_ir_place(ctx, codegen),
+            ExpressionKind::Index(exp, idx) => {
+                let ptr_val = exp.to_ir_value(ctx, codegen)?.unwrap();
+                let ptr = ptr_val.into_pointer_value();
+
+                let offset = idx.to_ir_value(ctx, codegen)?.unwrap();
+                let offset_ptr = unsafe {
+                    let ir_ty = exp
+                        .ret_ty
+                        .as_ref()
+                        .clone()
+                        .unwrap()
+                        .to_ir_type(ctx, codegen)?;
+
+                    codegen
+                        .builder
+                        .build_gep(ir_ty, ptr, &[offset.into_int_value()], "")?
+                };
+
+                return Ok(offset_ptr);
+            }
             un => todo!("{un:?}"),
         }
     }
@@ -458,7 +627,6 @@ impl StatementIr for Statement {
             }
             Statement::Break(break_) => match break_ {
                 Some(s) => {
-                    println!("named: {s:?}");
                     let end_bb = codegen
                         .named_blocks
                         .get(s)
@@ -541,14 +709,50 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
     let mut ccache = CCache::new(&clang)?;
 
     let context = Context::create();
+
+    let triple = TargetMachine::get_default_triple();
+
+    // creating code module
+    let module = context.create_module(&project.name);
+    module.set_triple(&triple);
+
+    // creating target machine
+    let target = Target::from_triple(&triple).unwrap();
+
+    let mut out_o = out.clone();
+    out_o.push("out");
+    out_o.set_extension("o");
+
+    let machine = target
+        .create_target_machine(
+            &triple,
+            "generic",
+            "",
+            inkwell::OptimizationLevel::None,
+            inkwell::targets::RelocMode::Default,
+            inkwell::targets::CodeModel::Default,
+        )
+        .ok_or(anyhow::anyhow!("failed to create machine"))?;
+    println!("generated machine");
+
     let mut codegen = CodeGen {
-        module: context.create_module(&project.name),
+        module: module,
+        machine: machine,
         builder: context.create_builder(),
         locals: HashMap::new(),
+        constants: HashMap::new(),
         functions: HashMap::new(),
         named_blocks: HashMap::new(),
         latest_block: None,
     };
+
+    codegen.constants.insert(
+        "nullptr".into(),
+        context
+            .ptr_type(AddressSpace::default())
+            .const_null()
+            .into(),
+    );
 
     for import in &project.root_module.imports {
         if import.c_import {
@@ -605,28 +809,9 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
     codegen.module.print_to_file(out_ll)?;
     println!("generated .ll output");
 
-    let triple = TargetMachine::get_default_triple();
-    codegen.module.set_triple(&triple);
-
-    let target = Target::from_triple(&triple).unwrap();
-
-    let mut out_o = out.clone();
-    out_o.push("out");
-    out_o.set_extension("o");
-
-    let machine = target
-        .create_target_machine(
-            &triple,
-            "generic",
-            "",
-            inkwell::OptimizationLevel::None,
-            inkwell::targets::RelocMode::Default,
-            inkwell::targets::CodeModel::Default,
-        )
-        .ok_or(anyhow::anyhow!("failed to create machine"))?;
-    println!("generated machine");
-
-    machine.write_to_file(&codegen.module, inkwell::targets::FileType::Object, &out_o)?;
+    codegen
+        .machine
+        .write_to_file(&codegen.module, inkwell::targets::FileType::Object, &out_o)?;
     println!("generated .o output");
 
     return Ok(());

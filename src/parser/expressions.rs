@@ -14,6 +14,17 @@ use crate::{
     general::naming::QualifiedNameSegment,
 };
 
+fn handle_index_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::index_access_postfix,
+        "a non Rule::index_access_postfix reached handle_index_access_postfix"
+    );
+    let mut inner = pair.into_inner();
+    let member = inner.next().unwrap();
+    return Ok(handle_expression(member)?);
+}
+
 fn handle_member_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNameSegment> {
     assert_eq!(
         pair.as_rule(),
@@ -55,6 +66,25 @@ fn handle_call_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Ve
     }
 
     return Ok(params);
+}
+
+fn handle_unary_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<UnaryOperator> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::unary_expression_postfix,
+        "a non Rule::unary_expression_postfix reached handle_unary_expression_postfix"
+    );
+
+    let mut inner = pair.into_inner();
+    let oper = inner.next().unwrap();
+    let operator = match &oper.as_rule() {
+        Rule::unary_return_error_postfix => UnaryOperator::EarlyRet,
+        Rule::unary_increase_postfix => UnaryOperator::Increase,
+        Rule::unary_decrease_postfix => UnaryOperator::Decrease,
+        un => unreachable!("{un:?}"),
+    };
+
+    return Ok(operator);
 }
 
 fn handle_binary_expression_postfix<'a>(
@@ -168,6 +198,7 @@ enum Operation {
     Call(Vec<Expression>),
     Assign(Expression),
     Access(QualifiedNameSegment),
+    Index(Expression),
     Unary(UnaryOperator),
     Binary(BinaryOperator),
 }
@@ -188,6 +219,8 @@ impl PartialOrd for Operation {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(match (self, other) {
             (Operation::Assign(_), _) => std::cmp::Ordering::Equal,
+            (Operation::Index(_), _) => std::cmp::Ordering::Equal,
+
             (Operation::Call(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
             (Operation::Call(_), _) => std::cmp::Ordering::Equal,
 
@@ -286,6 +319,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             Rule::binary_expression_postfix => {}
             Rule::unary_expression_postfix => {}
             Rule::member_access_postfix => {}
+            Rule::index_access_postfix => {}
             un => unreachable!("{un:?}"),
         }
         postfix_rules.push(postfix);
@@ -296,12 +330,13 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
     for p in postfix_rules {
         match p.as_rule() {
             Rule::binary_expression_postfix => {
-                let (a, b) = handle_binary_expression_postfix(p)?;
-                e_string.push(ExpressionString::Oper(Operation::Binary(a)));
-                e_string.push(ExpressionString::Val(b));
+                let (operator, postfix) = handle_binary_expression_postfix(p)?;
+                e_string.push(ExpressionString::Oper(Operation::Binary(operator)));
+                e_string.push(ExpressionString::Val(postfix));
             }
             Rule::unary_expression_postfix => {
-                todo!()
+                let operator = handle_unary_expression_postfix(p)?;
+                e_string.push(ExpressionString::Oper(Operation::Unary(operator)))
             }
             Rule::call_postfix => {
                 let params = handle_call_expression_postfix(p)?;
@@ -316,6 +351,10 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
                 e_string.push(ExpressionString::Oper(Operation::Assign(
                     handle_expression(ex.next().unwrap())?,
                 )));
+            }
+            Rule::index_access_postfix => {
+                let ex = handle_index_access_postfix(p)?;
+                e_string.push(ExpressionString::Oper(Operation::Index(ex)));
             }
             un => todo!("{un:?}:'{}'", p.as_str()),
         }
@@ -361,6 +400,10 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             }
         };
         match o {
+            Operation::Index(index) => {
+                let a = get_next_val()?;
+                return Ok(Expression::index_access(a, index));
+            }
             Operation::Access(ident) => {
                 let a = get_next_val()?;
 

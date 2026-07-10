@@ -43,6 +43,7 @@ pub enum Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionKind {
     MemberAccess(MemberAccess),
+    Index(Expression, Expression),
     Block(Block),
     If(Conditional),
     Loop(LoopExpression),
@@ -58,6 +59,7 @@ pub enum ExpressionKind {
 impl Display for ExpressionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            ExpressionKind::Index(a, b) => write!(f, "{}[{}]", a, b),
             ExpressionKind::MemberAccess(a) => write!(f, "{}", a),
             ExpressionKind::Block(a) => write!(f, "{}", a),
             ExpressionKind::If(a) => write!(f, "{}", a),
@@ -90,6 +92,14 @@ impl Expression {
     pub fn assignment(var: Expression, value: Expression) -> Self {
         return Self {
             kind: Box::new(ExpressionKind::Assignment(var, value)),
+            ret_ty: None,
+            constant: false,
+        };
+    }
+
+    pub fn index_access(val: Expression, index: Expression) -> Self {
+        return Self {
+            kind: Box::new(ExpressionKind::Index(val, index)),
             ret_ty: None,
             constant: false,
         };

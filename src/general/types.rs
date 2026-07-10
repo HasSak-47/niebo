@@ -26,8 +26,14 @@ pub struct VariantType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct Params {
+    name: Option<String>,
+    ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionType {
-    pub params: Vec<(String, Type)>,
+    pub params: Vec<Params>,
     pub ret_ty: Box<Type>,
     pub varidic: bool,
 }
@@ -54,6 +60,24 @@ pub enum Type {
     Alias(Box<Type>),
     // path to a type that should be resolved later
     Named(QualifiedName),
+}
+
+impl From<(String, Type)> for Params {
+    fn from(value: (String, Type)) -> Self {
+        return Params {
+            name: Some(value.0),
+            ty: value.1,
+        };
+    }
+}
+
+impl From<Type> for Params {
+    fn from(value: Type) -> Self {
+        return Params {
+            name: None,
+            ty: value,
+        };
+    }
 }
 
 impl Type {
@@ -109,9 +133,9 @@ impl Type {
         Self::Reference(Box::new(ty))
     }
 
-    pub fn function(params: Vec<(String, Type)>, ret_ty: Type, varidic: bool) -> Self {
+    pub fn function<I: Into<Params>>(params: Vec<I>, ret_ty: Type, varidic: bool) -> Self {
         Self::Function(FunctionType {
-            params,
+            params: params.into_iter().map(|a| a.into()).collect(),
             ret_ty: Box::new(ret_ty),
             varidic,
         })
@@ -119,6 +143,18 @@ impl Type {
 
     pub fn named(path: QualifiedName) -> Self {
         Self::Named(path)
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        match self {
+            Type::Pointer(_) => true,
+            Type::MutablePointer(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn sizeof(&self) -> u64 {
+        return 4;
     }
 }
 

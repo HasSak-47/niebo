@@ -7,6 +7,7 @@ use crate::{
     ast::{
         Definition, DefinitionKind,
         expressions::{
+            Statement,
             loops::{LoopExpression, WhileLoop},
             operations::BinaryOperation,
         },
@@ -55,6 +56,15 @@ impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation
         self.operand.validate(procesor)?;
         let operand_ty = self.operand.resolve_ret_ty(procesor)?;
         match self.operator {
+            UnaryOperator::EarlyRet => {
+                return Ok(());
+            }
+            UnaryOperator::Increase => {
+                return Ok(());
+            }
+            UnaryOperator::Decrease => {
+                return Ok(());
+            }
             UnaryOperator::Ref => {
                 return Ok(());
             }
@@ -74,6 +84,15 @@ impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation
         match self.operator {
             UnaryOperator::Ref => {
                 return Ok(Type::pointer(oper_ty));
+            }
+            UnaryOperator::Increase => {
+                return Ok(Type::int());
+            }
+            UnaryOperator::Decrease => {
+                return Ok(Type::int());
+            }
+            UnaryOperator::EarlyRet => {
+                todo!()
             }
             UnaryOperator::Deref => match self.operand.resolve_ret_ty(procesor)? {
                 Type::Pointer(ty) => return Ok(*ty),
@@ -111,7 +130,16 @@ impl ExpressionValidator for crate::ast::expressions::call::Call {
         return Ok(());
     }
     fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
-        return Ok(self.called.ret_ty.clone().unwrap());
+        let function_type = self.called.resolve_ret_ty(procesor)?;
+        for param in &mut self.parameters {
+            param.resolve_ret_ty(procesor)?;
+        }
+        if let Type::Function(f) = function_type {
+            return Ok(f.ret_ty.as_ref().clone());
+        }
+        return Err(anyhow::anyhow!(
+            "tried to call non function type: {function_type:?}"
+        ));
     }
 }
 
@@ -123,6 +151,9 @@ impl ExpressionValidator for crate::general::naming::QualifiedName {
         match ty {
             Symbol::Type(ty) => return Ok(ty),
             Symbol::Variable(ty) => return Ok(ty),
+            Symbol::Function { ret_ty, params } => {
+                return Ok(Type::function(params, ret_ty, false));
+            }
             td => todo!("{td:?}"),
         }
     }
@@ -178,7 +209,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
                 let bty = b.resolve_ret_ty(procesor)?;
 
                 if aty != bty {
-                    bail!("{aty:?} is different from {bty:?}");
+                    bail!("Assignment ({a} = {b}) = {aty:?} is different from {bty:?}");
                 }
 
                 Ok(())
@@ -186,6 +217,29 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
             ExpressionKind::UnaryOperation(unary) => unary.validate(procesor),
             ExpressionKind::Loop(loop_) => loop_.validate(procesor),
             ExpressionKind::If(if_) => if_.validate(procesor),
+            ExpressionKind::Index(exp, index) => {
+                exp.validate(procesor)?;
+                index.validate(procesor)?;
+
+                if let Some(ty) = &exp.ret_ty {
+                    match ty {
+                        Type::Array(_) => {}
+                        Type::Pointer(_) => {}
+                        Type::MutablePointer(_) => {}
+                        _ => bail!("cannot index non array types"),
+                    }
+                }
+
+                if let Some(ty) = &index.ret_ty {
+                    match ty {
+                        Type::Primitive(PrimitiveType::Uint(_))
+                        | Type::Primitive(PrimitiveType::Int(_)) => {}
+                        _ => bail!("cannot index with non int types: {index:?}"),
+                    }
+                }
+
+                Ok(())
+            }
             td => todo!("{td:?}"),
         }
     }
@@ -205,6 +259,15 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
                 ExpressionKind::UnaryOperation(unary) => unary.resolve_ret_ty(procesor),
                 ExpressionKind::Loop(loop_) => loop_.resolve_ret_ty(procesor),
                 ExpressionKind::If(if_) => if_.resolve_ret_ty(procesor),
+                ExpressionKind::Index(exp, index) => {
+                    index.resolve_ret_ty(procesor)?;
+                    match exp.resolve_ret_ty(procesor)? {
+                        Type::Array(t) => Ok(t.as_ref().clone()),
+                        Type::Pointer(t) => Ok(t.as_ref().clone()),
+                        Type::MutablePointer(t) => Ok(t.as_ref().clone()),
+                        u => unreachable!("{u:?}"),
+                    }
+                }
                 _ => todo!(),
             }?;
             self.ret_ty = Some(ty);
@@ -232,9 +295,11 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
                         );
                     }
                     DefinitionKind::Variable(var) => {
+                        var.value.validate(procesor)?;
+                        println!("{name} = {var:#?}");
                         procesor.register_local_symbol(
                             name.clone().into(),
-                            Symbol::Variable(var.ty.clone().unwrap()),
+                            Symbol::Variable(var.ty.clone().expect(&format!("stmt: {stmt:#?}"))),
                         );
                     }
                     _ => todo!(),
@@ -262,7 +327,16 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
         return Ok(());
     }
 
-    fn resolve_ret_ty(&mut self, _: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+        for stmt in &mut self.statements {
+            match stmt {
+                Statement::Expression(exp) => {
+                    exp.validate(procesor)?;
+                    exp.resolve_ret_ty(procesor)?;
+                }
+                _ => {}
+            }
+        }
         return Ok(Type::void());
     }
 }
@@ -291,9 +365,16 @@ impl ExpressionValidator for BinaryOperation {
 
         let a_ty = self.operands[0].resolve_ret_ty(procesor)?;
         let b_ty = self.operands[1].resolve_ret_ty(procesor)?;
+        if a_ty.is_pointer() && b_ty.is_pointer() {
+            return Ok(());
+        }
 
         if a_ty != b_ty {
-            anyhow::bail!("{a_ty:?} and {b_ty:?} are not the same type");
+            anyhow::bail!(
+                "{}::{a_ty:?} and {}::{b_ty:?} are not the same type",
+                self.operands[0],
+                self.operands[1]
+            );
         }
         return Ok(());
     }
@@ -350,6 +431,14 @@ impl ProjectPreprocessor {
 }
 
 impl ProjectPreprocessor {
+    pub fn new() -> Self {
+        let mut p = ProjectPreprocessor::default();
+        p.global_scope.insert(
+            "nullptr".into(),
+            Symbol::Variable(Type::pointer(Type::void())),
+        );
+        return p;
+    }
     // NOTE: ommit templates for now do to complexity
     pub fn process_project(&mut self, mut project: Project) -> Result<Project> {
         // - generate a registry to determine what is each Identifier/Path

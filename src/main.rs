@@ -44,7 +44,8 @@ fn main() -> anyhow::Result<()> {
         Mode::Project => Project::load(&cli.path)?,
     };
 
-    let mut ir = ProjectPreprocessor::default();
+    // println!("{project:#?}");
+    let mut ir = ProjectPreprocessor::new();
     let project = ir.process_project(project)?;
 
     compile(project, cli.out)?;

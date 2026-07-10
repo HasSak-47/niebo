@@ -70,6 +70,9 @@ pub enum UnaryOperator {
     Deref,
     Ref,
     Negation,
+    Increase,
+    Decrease,
+    EarlyRet,
 }
 
 impl Display for UnaryOperator {
@@ -78,6 +81,10 @@ impl Display for UnaryOperator {
             Self::Deref => write!(f, "*"),
             Self::Ref => write!(f, "&"),
             Self::Negation => write!(f, "!"),
+
+            Self::Increase => write!(f, "--"),
+            Self::Decrease => write!(f, "++"),
+            Self::EarlyRet => write!(f, "?"),
         }
     }
 }

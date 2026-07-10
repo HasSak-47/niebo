@@ -100,6 +100,13 @@ pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> 
                 next,
             )?)))
         }
+        Rule::mutable_pointer_type => {
+            let mut inner = ty.into_inner();
+            let next = inner.next().unwrap();
+            Ok(Type::MutablePointer(Box::new(handle_type_expression(
+                next,
+            )?)))
+        }
         Rule::path => Ok(Type::named(handle_path(ty)?)),
 
         un => unreachable!("{un:?}"),
