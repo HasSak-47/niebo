@@ -160,7 +160,14 @@ pub fn handle_statement<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Statement> {
             let value = expr.next().and_then(|k| handle_expression(k).ok());
             Statement::Return(value)
         }
-        Rule::break_statement => Statement::Break,
+        Rule::break_statement => {
+            let mut break_ = next.into_inner();
+            if let Some(name) = break_.next() {
+                Statement::Break(Some(name.as_str().to_string()))
+            } else {
+                Statement::Break(None)
+            }
+        }
         Rule::import | Rule::const_definition | Rule::continue_statement => todo!(),
         un => unreachable!("{un:?}"),
     });
@@ -503,7 +510,7 @@ mod test {
         let if_then = if_.next().unwrap();
         assert_eq!(if_then.as_rule(), Rule::block_expression);
         let exp = handle_block_expression(if_then)?;
-        if let Statement::Break = exp.statements[1] {
+        if let Statement::Break(None) = exp.statements[1] {
             return Ok(());
         }
         anyhow::bail!("break statement not found");

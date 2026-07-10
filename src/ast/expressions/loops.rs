@@ -4,24 +4,30 @@ use super::Expression;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoopExpression {
+    pub label: Option<String>,
     pub body: Expression,
 }
 
 impl LoopExpression {
     pub fn new(body: Expression) -> Self {
-        Self { body }
+        Self { body, label: None }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WhileLoop {
+    pub label: Option<String>,
     pub condition: Expression,
     pub then: Expression,
 }
 
 impl WhileLoop {
     pub fn new(condition: Expression, then: Expression) -> Self {
-        Self { condition, then }
+        Self {
+            condition,
+            then,
+            label: None,
+        }
     }
 }
 

@@ -145,10 +145,22 @@ fn handle_loop_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<LoopExpres
         "a non Rule::loop_expression reached handle_loop_expression"
     );
     let mut inner = pair.into_inner();
-    let body = inner.next().unwrap();
-    return Ok(LoopExpression::new(Expression::block(
-        handle_block_expression(body)?,
-    )));
+    let next = inner.next().unwrap();
+    let mut ident = String::new();
+    let body = match next.as_rule() {
+        Rule::identifier => {
+            ident = next.as_str().to_string();
+            inner.next().unwrap()
+        }
+        Rule::expression => next,
+        u => unreachable!("{u:?}"),
+    };
+    let mut exp = LoopExpression::new(Expression::block(handle_block_expression(body)?));
+
+    if !ident.is_empty() {
+        exp.label = Some(ident);
+    }
+    return Ok(exp);
 }
 
 #[derive(Debug)]

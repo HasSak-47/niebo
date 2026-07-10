@@ -1,11 +1,12 @@
 pub mod cimports;
 pub mod validator;
 
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
 use clang::Clang;
 use inkwell::{
     AddressSpace,
+    basic_block::BasicBlock,
     builder::Builder,
     context::Context,
     module::Module,
@@ -38,6 +39,9 @@ pub struct CodeGen<'ctx> {
     builder: Builder<'ctx>,
     locals: HashMap<QualifiedName, PointerValue<'ctx>>,
     functions: HashMap<QualifiedName, FunctionValue<'ctx>>,
+
+    named_blocks: HashMap<String, Rc<BasicBlock<'ctx>>>,
+    latest_block: Option<Rc<BasicBlock<'ctx>>>,
 }
 
 trait TypeIr {
@@ -110,7 +114,7 @@ impl TypeIr for Type {
                 PrimitiveType::Void => unreachable!(),
                 un => unimplemented!("{un:?}"),
             },
-            Type::Pointer(ptr) => ptr.to_ir_type(ctx, codegen),
+            Type::Pointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
             un => unimplemented!("{un:?}"),
         }
     }
@@ -278,13 +282,14 @@ impl ExpressionIr for Expression {
                     .builder
                     .get_insert_block()
                     .ok_or_else(|| anyhow::anyhow!("builder has no insertion block"))?;
-                let function = current_block
-                    .get_parent()
-                    .ok_or_else(|| anyhow::anyhow!("insertion block has no parent function"))?;
 
-                let cond_bb = ctx.append_basic_block(function, "while.cond");
-                let body_bb = ctx.append_basic_block(function, "while.body");
-                let end_bb = ctx.append_basic_block(function, "while.end");
+                let cond_bb = ctx.insert_basic_block_after(current_block, "while.cond");
+                let body_bb = ctx.insert_basic_block_after(current_block, "while.body");
+                let end_bb = Rc::new(ctx.insert_basic_block_after(body_bb, "while.end"));
+                if let Some(name) = &while_.label {
+                    codegen.named_blocks.insert(name.clone(), end_bb.clone());
+                }
+                codegen.latest_block = Some(end_bb.clone());
 
                 codegen.builder.build_unconditional_branch(cond_bb)?;
                 codegen.builder.position_at_end(cond_bb);
@@ -293,14 +298,14 @@ impl ExpressionIr for Expression {
                 let con = while_.condition.to_ir_value(ctx, codegen)?.unwrap();
                 codegen
                     .builder
-                    .build_conditional_branch(con.into_int_value(), body_bb, end_bb)?;
+                    .build_conditional_branch(con.into_int_value(), body_bb, *end_bb)?;
                 codegen.builder.position_at_end(body_bb);
                 // continue loop
                 while_.then.to_ir_value(ctx, codegen)?;
                 codegen.builder.build_unconditional_branch(cond_bb).unwrap();
 
                 // after loop
-                codegen.builder.position_at_end(end_bb);
+                codegen.builder.position_at_end(*end_bb);
 
                 return Ok(None);
             }
@@ -340,26 +345,52 @@ impl ExpressionIr for Expression {
                 return Ok(Some(unary.to_ir_value(ctx, codegen)?.unwrap()));
             }
             ExpressionKind::Loop(loop_) => {
-                return Ok(loop_.body.to_ir_value(ctx, codegen)?);
+                let current_block = codegen
+                    .builder
+                    .get_insert_block()
+                    .ok_or_else(|| anyhow::anyhow!("builder has no insertion block"))?;
+
+                let body_bb = ctx.insert_basic_block_after(current_block, "loop.body");
+                let end_bb = Rc::new(ctx.insert_basic_block_after(body_bb, "loop.end"));
+
+                if let Some(name) = &loop_.label {
+                    codegen.named_blocks.insert(name.clone(), end_bb.clone());
+                }
+                codegen.latest_block = Some(end_bb.clone());
+
+                // continue loop
+                codegen.builder.build_unconditional_branch(body_bb)?;
+                codegen.builder.position_at_end(body_bb);
+
+                loop_.body.to_ir_value(ctx, codegen)?;
+
+                if let Some(name) = &loop_.label {
+                    codegen.named_blocks.remove(name);
+                }
+                codegen.latest_block = None;
+                println!("cleaned loop labels");
+
+                // after loop
+                codegen.builder.build_unconditional_branch(body_bb)?;
+                codegen.builder.position_at_end(*end_bb);
+
+                return Ok(None);
             }
             ExpressionKind::If(if_) => {
                 let current_block = codegen
                     .builder
                     .get_insert_block()
                     .ok_or_else(|| anyhow::anyhow!("builder has no insertion block"))?;
-                let function = current_block
-                    .get_parent()
-                    .ok_or_else(|| anyhow::anyhow!("insertion block has no parent function"))?;
 
-                let cond_bb = ctx.append_basic_block(function, "if.cond");
-                let body_bb = ctx.append_basic_block(function, "if.body");
-                let else_bb = ctx.append_basic_block(function, "if.else");
-                let end_bb = ctx.append_basic_block(function, "if.end");
+                let cond_bb = ctx.insert_basic_block_after(current_block, "if.cond");
+                let body_bb = ctx.insert_basic_block_after(cond_bb, "if.then");
+                let else_bb = ctx.insert_basic_block_after(body_bb, "if.else");
+                let end_bb = ctx.insert_basic_block_after(else_bb, "if.end");
 
                 codegen.builder.build_unconditional_branch(cond_bb)?;
-                codegen.builder.position_at_end(cond_bb);
 
                 // condition
+                codegen.builder.position_at_end(cond_bb);
                 let con = if_.condition.to_ir_value(ctx, codegen)?.unwrap();
                 codegen
                     .builder
@@ -368,14 +399,25 @@ impl ExpressionIr for Expression {
                 // then block
                 codegen.builder.position_at_end(body_bb);
                 if_.then.to_ir_value(ctx, codegen)?;
-                codegen.builder.build_unconditional_branch(end_bb).unwrap();
+
+                // if last instruction of block is a br do not add an aditional br to if.end
+                if match body_bb.get_last_instruction() {
+                    Some(ins) => match ins.get_opcode() {
+                        inkwell::values::InstructionOpcode::Br => false,
+                        _ => true,
+                    },
+                    None => true,
+                } {
+                    codegen.builder.build_unconditional_branch(end_bb).unwrap();
+                }
 
                 // else block
-                codegen.builder.position_at_end(body_bb);
+                codegen.builder.position_at_end(else_bb);
                 if let Some(ex) = &if_.else_ {
                     ex.to_ir_value(ctx, codegen)?;
-                    codegen.builder.position_at_end(end_bb);
+                    codegen.builder.build_unconditional_branch(end_bb).unwrap();
                 }
+                codegen.builder.position_at_end(end_bb);
 
                 // fuck it I just want it to compiler rn
                 return Ok(None);
@@ -414,6 +456,19 @@ impl StatementIr for Statement {
                 let _ = name;
                 let _ = exp.to_ir_value(ctx, codegen)?;
             }
+            Statement::Break(break_) => match break_ {
+                Some(s) => {
+                    println!("named: {s:?}");
+                    let end_bb = codegen
+                        .named_blocks
+                        .get(s)
+                        .expect(&format!("{:?}", codegen.named_blocks));
+                    codegen.builder.build_unconditional_branch(**end_bb)?;
+                }
+                None => {
+                    unimplemented!()
+                }
+            },
             Statement::Return(ex) => {
                 match ex {
                     Some(s) => {
@@ -477,7 +532,6 @@ impl StatementIr for Function {
             stmt.to_ir(String::new(), ctx, codegen)?;
         }
 
-        codegen.builder.build_return(None)?;
         return Ok(());
     }
 }
@@ -492,6 +546,8 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
         builder: context.create_builder(),
         locals: HashMap::new(),
         functions: HashMap::new(),
+        named_blocks: HashMap::new(),
+        latest_block: None,
     };
 
     for import in &project.root_module.imports {
@@ -547,6 +603,8 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
     out_ll.set_extension("ll");
 
     codegen.module.print_to_file(out_ll)?;
+    println!("generated .ll output");
+
     let triple = TargetMachine::get_default_triple();
     codegen.module.set_triple(&triple);
 
@@ -565,11 +623,11 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
             inkwell::targets::RelocMode::Default,
             inkwell::targets::CodeModel::Default,
         )
-        .unwrap();
+        .ok_or(anyhow::anyhow!("failed to create machine"))?;
+    println!("generated machine");
 
-    machine
-        .write_to_file(&codegen.module, inkwell::targets::FileType::Object, &out_o)
-        .unwrap();
+    machine.write_to_file(&codegen.module, inkwell::targets::FileType::Object, &out_o)?;
+    println!("generated .o output");
 
     return Ok(());
 }

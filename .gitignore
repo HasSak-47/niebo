@@ -2,3 +2,5 @@
 output.o
 a.out
 output.ll
+out.ll
+out.o

@@ -33,7 +33,7 @@ pub enum Statement {
     Import(Import),
     Definition(Definition),
     Expression(Expression),
-    Break,
+    Break(Option<String>),
     Continue,
     Use(QualifiedName),
     Return(Option<Expression>),
