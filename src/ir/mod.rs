@@ -12,7 +12,7 @@ use inkwell::{
     module::Module,
     targets::{Target, TargetMachine},
     types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType},
-    values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
+    values::{BasicValueEnum, FunctionValue, PointerValue},
 };
 
 use crate::{
@@ -159,18 +159,20 @@ impl ExpressionIr for QualifiedName {
         let ptr = self.to_ir_place(ctx, codegen)?;
         return Ok(Some(match codegen.locals[self].1 {
             Type::Primitive(PrimitiveType::Int(32)) => {
-                codegen.builder.build_load(ctx.i32_type(), ptr, "")?
-            }
-            Type::Pointer(_) => {
                 codegen
                     .builder
-                    .build_load(ctx.ptr_type(AddressSpace::default()), ptr, "")?
+                    .build_load(ctx.i32_type(), ptr, "load_i32")?
             }
-            Type::MutablePointer(_) => {
-                codegen
-                    .builder
-                    .build_load(ctx.ptr_type(AddressSpace::default()), ptr, "")?
-            }
+            Type::Pointer(_) => codegen.builder.build_load(
+                ctx.ptr_type(AddressSpace::default()),
+                ptr,
+                "load_ptr",
+            )?,
+            Type::MutablePointer(_) => codegen.builder.build_load(
+                ctx.ptr_type(AddressSpace::default()),
+                ptr,
+                "load_mut_ptr",
+            )?,
             _ => todo!(),
         }));
     }
@@ -223,7 +225,7 @@ impl ExpressionIr for Literal {
             LiteralInfo::String => {
                 let p = codegen
                     .builder
-                    .build_global_string_ptr(&self.data, "")?
+                    .build_global_string_ptr(&self.data, "global_string")?
                     .as_pointer_value();
 
                 return Ok(Some(p.into()));
@@ -275,17 +277,6 @@ fn handle_ptr_ptr<'ctx>(
 ) -> anyhow::Result<Option<BasicValueEnum<'ctx>>> {
     let a = a_val.into_pointer_value();
     let b = b_val.into_pointer_value();
-
-    // let target_data = codegen.machine.get_target_data();
-    // let a =
-    //     codegen
-    //         .builder
-    //         .build_ptr_to_int(a_ptr, ctx.ptr_sized_int_type(&target_data, None), "")?;
-
-    // let b =
-    //     codegen
-    //         .builder
-    //         .build_ptr_to_int(b_ptr, ctx.ptr_sized_int_type(&target_data, None), "")?;
 
     match operator {
         BinaryOperator::Lesser => {
@@ -342,6 +333,9 @@ fn handle_int_int<'ctx>(
         }
         BinaryOperator::Addition => {
             return Ok(Some(codegen.builder.build_int_add(a, b, "")?.into()));
+        }
+        BinaryOperator::Multiplication => {
+            return Ok(Some(codegen.builder.build_int_mul(a, b, "")?.into()));
         }
         un => unimplemented!("{un:?}"),
     }
@@ -548,10 +542,9 @@ impl ExpressionIr for Expression {
                 return Ok(None);
             }
             ExpressionKind::Index(exp, idx) => {
-                let ptr_val = exp.to_ir_value(ctx, codegen)?.unwrap();
-                let ptr = ptr_val.into_pointer_value();
-
                 let offset = idx.to_ir_value(ctx, codegen)?.unwrap();
+                let ptr = exp.to_ir_value(ctx, codegen)?.unwrap().into_pointer_value();
+
                 let offset_ptr = unsafe {
                     let ir_ty = exp
                         .ret_ty
@@ -559,10 +552,12 @@ impl ExpressionIr for Expression {
                         .clone()
                         .unwrap()
                         .to_ir_type(ctx, codegen)?;
-
-                    codegen
-                        .builder
-                        .build_gep(ir_ty, ptr, &[offset.into_int_value()], "")?
+                    codegen.builder.build_gep(
+                        ir_ty,
+                        ptr,
+                        &[offset.into_int_value()],
+                        "ir_value_pointer_access",
+                    )?
                 };
 
                 return Ok(Some(codegen.builder.build_load(
@@ -583,21 +578,23 @@ impl ExpressionIr for Expression {
         match &*self.kind {
             ExpressionKind::Identifier(id) => id.to_ir_place(ctx, codegen),
             ExpressionKind::Index(exp, idx) => {
-                let ptr_val = exp.to_ir_value(ctx, codegen)?.unwrap();
-                let ptr = ptr_val.into_pointer_value();
-
                 let offset = idx.to_ir_value(ctx, codegen)?.unwrap();
-                let offset_ptr = unsafe {
-                    let ir_ty = exp
-                        .ret_ty
-                        .as_ref()
-                        .clone()
-                        .unwrap()
-                        .to_ir_type(ctx, codegen)?;
+                let ptr_val = exp.to_ir_value(ctx, codegen)?.unwrap().into_pointer_value();
 
-                    codegen
-                        .builder
-                        .build_gep(ir_ty, ptr, &[offset.into_int_value()], "")?
+                let offset_ptr = unsafe {
+                    let ir_ty = match exp.ret_ty.clone().unwrap() {
+                        Type::Array(r) => *r,
+                        Type::MutablePointer(r) => *r,
+                        _ => unreachable!(),
+                    }
+                    .to_ir_type(ctx, codegen)?;
+
+                    codegen.builder.build_gep(
+                        ir_ty,
+                        ptr_val,
+                        &[offset.into_int_value()],
+                        "ir_place_pointer_access",
+                    )?
                 };
 
                 return Ok(offset_ptr);
@@ -693,7 +690,7 @@ impl StatementIr for Function {
         let fn_type = ctx.void_type().fn_type(&[], false);
         let func = codegen.module.add_function(&name, fn_type, None);
         codegen.functions.insert(name.into(), func);
-        let basic_block = ctx.append_basic_block(func, "");
+        let basic_block = ctx.append_basic_block(func, "statement_block");
         codegen.builder.position_at_end(basic_block);
 
         for stmt in &self.body.statements {

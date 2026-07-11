@@ -1,17 +1,11 @@
-use std::{collections::HashMap, fmt::Debug, fs::File, io::Read};
+use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::{Result, bail};
 use clang::Clang;
 
 use crate::{
     ast::{
-        Definition, DefinitionKind,
-        expressions::{
-            Statement,
-            loops::{LoopExpression, WhileLoop},
-            operations::BinaryOperation,
-        },
-        module::{Module, ModuleKind},
+        expressions::{Statement, loops::WhileLoop, operations::BinaryOperation},
         project::Project,
     },
     general::{
@@ -19,8 +13,11 @@ use crate::{
         types::{PrimitiveType, Type},
     },
     ir::cimports::CCache,
-    parser::parse_module,
 };
+
+struct TypeData {
+    extends: Vec<QualifiedName>,
+}
 
 #[derive(Debug, Clone)]
 enum Symbol {

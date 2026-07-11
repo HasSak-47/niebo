@@ -103,6 +103,7 @@ fn handle_binary_expression_postfix<'a>(
         Rule::boolean_le => BinaryOperator::Lesser,
         Rule::boolean_eq => BinaryOperator::Equal,
         Rule::arithmetic_add => BinaryOperator::Addition,
+        Rule::arithmetic_mul => BinaryOperator::Multiplication,
         un => unreachable!("{un:?}"),
     };
     let exp = handle_expression(oper.into_inner().next().unwrap())?;

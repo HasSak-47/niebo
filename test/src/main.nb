@@ -18,13 +18,13 @@ fn main() -> i32 {
             break main_loop;
         }
         else {
-            sum = sum + i;
-            let aux : *mut i32 = realloc(numbers, count + count + 1);
+            let aux : *mut i32 = realloc(numbers, 4 * (count + 1));
             if(aux == nullptr){
                 printf("realloc failed! : %p %p\n", numbers, aux);
                 return;
             }
 
+            sum = sum + i;
             numbers = aux;
             numbers[count] = i;
         }
