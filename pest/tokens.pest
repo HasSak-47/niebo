@@ -10,9 +10,9 @@ use_statement = { "use" ~ identifier ~ "as" ~ path ~ ";" }
 
 visibility = { "pub" | "module" }
 
-definitions = { definition }
+definitions = { definition+ }
 
-definition = { visibility? ~ (fn_definition | fn_declaration | type_definition | const_definition | trait_definition | module_definition) }
+definition = { visibility? ~ (fn_definition | fn_declaration | type_declaration | type_definition | const_definition | trait_definition | module_definition) }
 
 implementation = {
     "methods" ~ path ~ "{" ~ fn_definition* ~ "}"
@@ -35,9 +35,9 @@ union_declaration   = {"union" ~ identifier}
 variant_declaration = {"variant" ~ identifier}
 alias_declaration   = {"type" ~ identifier}
 
-struct_definition  = {"struct" ~ identifier ~ "{" ~ "}" }
-union_definition   = {"union" ~ identifier~ "{" ~ "}" }
-variant_definition = {"variant" ~ identifier ~ "{" ~ "}"}
+struct_definition  = { struct_declaration ~ "{" ~ (param ~ ",") * ~ param? ~ "}" }
+union_definition   = { union_declaration ~ "{" ~ (param ~ ",") * ~ param? ~ "}" }
+variant_definition = { variant_declaration ~ "{" ~(param ~ ",") * ~ param? ~ "}"}
 alias_definition   = {"type" ~ identifier ~ "=" ~ type_expr ~ ";"}
 
 type_declaration = { (struct_declaration | union_declaration | variant_declaration | alias_declaration) ~ ";"}
@@ -188,9 +188,6 @@ type_expr = {
   | pointer_type
   | mutable_reference_type
   | reference_type
-  | struct_type
-  | union_type
-  | variant_type
   | template_type
   | path
   | "(" ~ type_expr ~ ")"
@@ -205,10 +202,6 @@ mutable_pointer_type   = { "*" ~ "mut" ~ type_expr }
 reference_type         = { "&" ~ type_expr }
 mutable_reference_type = { "&" ~ "mut" ~ type_expr }
 
-struct_type   = { "struct" ~ "{" ~ struct_member* ~ "}" }
-union_type    = { "union" ~ "{" ~ struct_member* ~ "}" }
-variant_type  = { "variant" ~ "{" ~ struct_member* ~ "}" }
-struct_member = { identifier ~ ":" ~ type_expr ~ ","? }
 
 template_type      =  { "template" ~ "<" ~ (identifier ~ ",")* ~ identifier ~ ","? ~ ">" }
 primitive_type     =  { int_type | uint_type | float_type | "bool" | "int" | "uint" | "float" | "string" | "void" }

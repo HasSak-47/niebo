@@ -69,6 +69,20 @@ pub fn handle_fn_param<'a>(
     return Ok(builder.add_param(id_p.as_str(), handle_type_expression(pt_p)?));
 }
 
+pub fn handle_params<'a>(
+    pair: Pair<'a, Rule>,
+    mut builder: FunctionBuilder,
+) -> anyhow::Result<FunctionBuilder> {
+    assert_eq!(pair.as_rule(), Rule::params);
+    let inner = pair.into_inner();
+
+    for param in inner {
+        builder = handle_fn_param(param, builder)?;
+    }
+
+    return Ok(inner.map(handle_fn_param.));
+}
+
 pub fn handle_fn_params<'a>(
     pair: Pair<'a, Rule>,
     mut builder: FunctionBuilder,

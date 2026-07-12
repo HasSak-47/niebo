@@ -10,7 +10,7 @@ pub enum PrimitiveType {
     Void,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct StructType {
     pub members: Vec<(String, Type)>,
 }

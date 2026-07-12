@@ -1,5 +1,5 @@
 pub mod cimports;
-pub mod validator;
+pub mod lowerer;
 
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
 

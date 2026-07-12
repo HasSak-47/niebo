@@ -2,7 +2,7 @@ use pest::iterators::Pair;
 
 use crate::{
     ast::{Definition, Visibility},
-    general::types::{PrimitiveType, Type},
+    general::types::{PrimitiveType, StructType, Type},
     parser::*,
 };
 
@@ -46,7 +46,21 @@ pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Resul
         Rule::struct_definition,
         "handle_type_struct_definitions got a non struct_definition"
     );
-    todo!()
+
+    let mut inner = pair.into_inner();
+    let name = inner.next().unwrap();
+    assert_eq!(name.as_rule(), Rule::identifier);
+    let ident = name.as_str().to_string();
+    let mut s = StructType::default();
+
+    let mut fields = inner.next().unwrap().into_inner();
+    handle_fn_params(pair, builder)
+
+    return Ok(Definition::type_def(
+        ident,
+        Type::Struct(s),
+        Visibility::Public,
+    ));
 }
 
 pub fn handle_type_union_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
