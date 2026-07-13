@@ -35,9 +35,9 @@ union_declaration   = {"union" ~ identifier}
 variant_declaration = {"variant" ~ identifier}
 alias_declaration   = {"type" ~ identifier}
 
-struct_definition  = { struct_declaration ~ "{" ~ (param ~ ",") * ~ param? ~ "}" }
-union_definition   = { union_declaration ~ "{" ~ (param ~ ",") * ~ param? ~ "}" }
-variant_definition = { variant_declaration ~ "{" ~(param ~ ",") * ~ param? ~ "}"}
+struct_definition  = { struct_declaration ~ "{" ~ params ~ "}" }
+union_definition   = { union_declaration ~ "{" ~ params ~ "}" }
+variant_definition = { variant_declaration ~ "{" ~ params ~ "}" }
 alias_definition   = {"type" ~ identifier ~ "=" ~ type_expr ~ ";"}
 
 type_declaration = { (struct_declaration | union_declaration | variant_declaration | alias_declaration) ~ ";"}
@@ -166,7 +166,7 @@ mutable_modifier = { "mut" }
 
 const_definition = { "const" ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expression }
 
-params  = { (param ~ ",")* ~ param ~ ","? ~ varidic? }
+params  = { (param ~ ",")* ~ param?  }
 param   = { identifier ~ ":" ~ type_expr }
 varidic = { "..." }
 

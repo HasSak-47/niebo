@@ -40,6 +40,19 @@ pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result
     ));
 }
 
+pub fn handle_type_struct_declaration<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<String> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::struct_declaration,
+        "handle_type_struct_definitions got a non struct_definition"
+    );
+    let mut inner = pair.into_inner();
+    let ident = inner.next().unwrap();
+    assert_eq!(ident.as_rule(), Rule::identifier);
+
+    return Ok(ident.as_str().to_string());
+}
+
 pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     assert_eq!(
         pair.as_rule(),
@@ -48,13 +61,15 @@ pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Resul
     );
 
     let mut inner = pair.into_inner();
-    let name = inner.next().unwrap();
-    assert_eq!(name.as_rule(), Rule::identifier);
-    let ident = name.as_str().to_string();
+    let declaration = inner.next().unwrap();
+    assert_eq!(declaration.as_rule(), Rule::struct_declaration);
+
+    let ident = handle_type_struct_declaration(declaration)?;
+
     let mut s = StructType::default();
 
-    let mut fields = inner.next().unwrap().into_inner();
-    handle_fn_params(pair, builder)
+    let fields = inner.next().unwrap();
+    handle_params(fields);
 
     return Ok(Definition::type_def(
         ident,

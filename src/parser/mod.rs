@@ -53,10 +53,7 @@ struct Token {
     col: usize,
 }
 
-pub fn handle_fn_param<'a>(
-    pair: Pair<'a, Rule>,
-    builder: FunctionBuilder,
-) -> anyhow::Result<FunctionBuilder> {
+pub fn handle_param<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<(String, Type)> {
     assert_eq!(pair.as_rule(), Rule::param);
     let mut inner = pair.into_inner();
 
@@ -66,21 +63,20 @@ pub fn handle_fn_param<'a>(
     let pt_p = inner.next().unwrap();
     assert_eq!(pt_p.as_rule(), Rule::type_expr);
 
-    return Ok(builder.add_param(id_p.as_str(), handle_type_expression(pt_p)?));
+    return Ok((id_p.as_str().to_string(), handle_type_expression(pt_p)?));
 }
 
-pub fn handle_params<'a>(
-    pair: Pair<'a, Rule>,
-    mut builder: FunctionBuilder,
-) -> anyhow::Result<FunctionBuilder> {
+pub fn handle_params<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<(String, Type)>> {
     assert_eq!(pair.as_rule(), Rule::params);
     let inner = pair.into_inner();
+    let mut v = Vec::new();
 
     for param in inner {
-        builder = handle_fn_param(param, builder)?;
+        let (ident, ty) = handle_param(param)?;
+        v.push((ident, ty));
     }
 
-    return Ok(inner.map(handle_fn_param.));
+    return Ok(v);
 }
 
 pub fn handle_fn_params<'a>(
@@ -88,10 +84,8 @@ pub fn handle_fn_params<'a>(
     mut builder: FunctionBuilder,
 ) -> anyhow::Result<FunctionBuilder> {
     assert_eq!(pair.as_rule(), Rule::params);
-    let inner = pair.into_inner();
-
-    for param in inner {
-        builder = handle_fn_param(param, builder)?;
+    for (ident, ty) in handle_params(pair)? {
+        builder = builder.add_param(ident, ty);
     }
 
     return Ok(builder);
