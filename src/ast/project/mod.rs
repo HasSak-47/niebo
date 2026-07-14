@@ -71,13 +71,11 @@ impl Project {
                 path.push(name);
                 path.set_extension("nb");
 
-                println!("loading module: {}", path.display());
                 let mut file = File::open(path)?;
                 let mut buffer = String::new();
                 file.read_to_string(&mut buffer)?;
 
                 *md = parse_module(buffer)?;
-                println!("module: {md:?}");
                 Self::load_modules(md, cur_path)?
             }
         }

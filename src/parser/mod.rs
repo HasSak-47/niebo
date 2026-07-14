@@ -4,54 +4,25 @@ mod type_handling;
 use expressions::{handle_block_expression, handle_expression};
 use type_handling::*;
 
-use pest::{Parser, RuleType, iterators::Pair};
+use pest::{Parser, iterators::Pair};
 use pest_derive::Parser;
 
 use crate::{
     ast::{
-        self, Definition, Implementation, Import, TraitImplementation, Variable, Visibility,
-        expressions::{
-            Expression, Statement,
-            block::Block,
-            literal::Literal,
-            loops::WhileLoop,
-            operations::{BinaryOperation, BinaryOperator, UnaryOperator},
-        },
+        Definition, Implementation, Import, TraitImplementation, Visibility,
+        expressions::Statement,
         function::FunctionBuilder,
         module::{Module, ModuleKind},
     },
     general::{
         naming::{QualifiedName, QualifiedNameSegment},
-        types::{PrimitiveType, Type},
+        types::Type,
     },
 };
 
 #[derive(Parser)]
 #[grammar = "./pest/tokens.pest"]
 pub struct TokenStream;
-
-#[derive(Debug, Default)]
-struct Identifier {
-    path: Vec<String>,
-}
-
-#[derive(Debug, Default)]
-enum TokenKind {
-    Identifier(Identifier),
-    Number,
-    #[default]
-    Symbol,
-}
-
-#[derive(Debug, Default)]
-struct Token {
-    kind: TokenKind,
-    start: usize,
-    end: usize,
-
-    line: usize,
-    col: usize,
-}
 
 pub fn handle_param<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<(String, Type)> {
     assert_eq!(pair.as_rule(), Rule::param);
@@ -91,7 +62,7 @@ pub fn handle_fn_params<'a>(
     return Ok(builder);
 }
 
-pub fn handle_template_def<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<()> {
+pub fn handle_template_def<'a>(_pair: Pair<'a, Rule>) -> anyhow::Result<()> {
     todo!()
 }
 
@@ -195,14 +166,14 @@ pub fn handle_fn_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definit
     return Ok(function.build_def());
 }
 
-pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+pub fn handle_trait_definitions<'a>(_pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     todo!("implement into the trait definition ast")
 }
 
 pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNameSegment> {
     let mut inner = pair.into_inner();
     let ident = inner.next().unwrap().as_str().to_string();
-    if let Some(tm) = inner.next() {
+    if let Some(_) = inner.next() {
         todo!("handle template specialization");
     }
 
@@ -212,10 +183,9 @@ pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNa
     });
 }
 
-pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedName> {
-    let mut inner = pair.into_inner();
+pub fn handle_qualified_name<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedName> {
+    let inner = pair.into_inner();
     let next = inner.peek().unwrap();
-    let mut path = QualifiedName::new();
 
     if let Rule::rel_path = next.as_rule() {
         todo!("handle relative paths...");
@@ -232,7 +202,7 @@ pub fn handle_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedName> {
 pub fn handle_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Implementation> {
     assert_eq!(pair.as_rule(), Rule::implementation);
     let mut inner = pair.into_inner();
-    let target = handle_path(inner.next().unwrap())?;
+    let target = handle_qualified_name(inner.next().unwrap())?;
     let mut definitions = Vec::new();
 
     while let Some(ok) = inner.next() {
@@ -250,8 +220,8 @@ pub fn handle_trait_implementation<'a>(
 ) -> anyhow::Result<TraitImplementation> {
     assert_eq!(pair.as_rule(), Rule::trait_implementation);
     let mut inner = pair.into_inner();
-    let target = handle_path(inner.next().unwrap())?;
-    let trait_path = handle_path(inner.next().unwrap())?;
+    let target = handle_qualified_name(inner.next().unwrap())?;
+    let trait_path = handle_qualified_name(inner.next().unwrap())?;
     let mut definitions = Vec::new();
 
     while let Some(ok) = inner.next() {
@@ -264,6 +234,7 @@ pub fn handle_trait_implementation<'a>(
         definitions,
     })
 }
+
 pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     assert_eq!(pair.as_rule(), Rule::module_definition);
     let mut inner = pair.into_inner();
@@ -279,13 +250,13 @@ pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     return Ok(Definition::module(ident.as_str(), md));
 }
 
-pub fn handle_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+pub fn handle_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
     assert_eq!(
         pair.as_rule(),
-        Rule::definitions,
+        Rule::definition,
         "a non Rule::definition reached handle_definitions"
     );
-    let mut inner = pair.into_inner().next().unwrap().into_inner();
+    let mut inner = pair.into_inner();
 
     let vis = if let Rule::visibility = inner.peek().unwrap().as_rule() {
         // TODO: handle global public vs module public
@@ -313,7 +284,7 @@ pub fn handle_c_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
     let inner = pair.into_inner().next().unwrap();
     assert_eq!(inner.as_rule(), Rule::path);
 
-    return Ok(Import::c_import(handle_path(inner)?));
+    return Ok(Import::c_import(handle_qualified_name(inner)?));
 }
 
 pub fn handle_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
@@ -337,8 +308,8 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
         .into_inner();
     for t in ts {
         match t.as_rule() {
-            Rule::definitions => {
-                md.definitions.push(handle_definitions(t)?);
+            Rule::definition => {
+                md.definitions.push(handle_definition(t)?);
             }
             Rule::import => {
                 md.imports.push(handle_imports(t)?);
@@ -362,6 +333,9 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::ast::expressions::literal::*;
+    use crate::ast::expressions::operations::*;
+    use crate::ast::expressions::*;
     #[test]
     fn test_operator_precedence() -> anyhow::Result<()> {
         let k = TokenStream::parse(Rule::expression, "a().b + c.d()")?
@@ -426,7 +400,7 @@ mod test {
     #[test]
     fn test_traits() -> anyhow::Result<()> {
         TokenStream::parse(
-            Rule::definitions,
+            Rule::definition,
             "inter TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfunc func() -> Type;\n}",
         )?;
 

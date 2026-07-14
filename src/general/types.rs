@@ -26,7 +26,7 @@ pub struct VariantType {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Params {
+pub struct Params {
     name: Option<String>,
     ty: Type,
 }

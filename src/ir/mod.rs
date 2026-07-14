@@ -121,6 +121,15 @@ impl TypeIr for Type {
             },
             Type::Pointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
             Type::MutablePointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
+            Type::Struct(s) => {
+                let fields: Vec<_> = s
+                    .members
+                    .iter()
+                    .map(|m| m.1.to_ir_type(&ctx, codegen).unwrap())
+                    .collect();
+
+                Ok(ctx.struct_type(fields.as_slice(), false).into())
+            }
             un => unimplemented!("{un:?}"),
         }
     }
@@ -791,10 +800,14 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
     }
 
     for def in &project.root_module.definitions {
+        println!("generating def {}", def.name);
         match &def.kind {
             ast::DefinitionKind::Function(f) => {
                 f.to_ir(def.name.clone(), &context, &mut codegen)?
             }
+            // do jackshit the types are handled when needed
+            // probably would be smart to keep a registry of them
+            ast::DefinitionKind::Type(_) => {}
             _ => unimplemented!(),
         }
     }

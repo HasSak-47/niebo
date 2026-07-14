@@ -1,12 +1,13 @@
-use super::{Rule, handle_path, handle_statement};
+use super::{Rule, handle_qualified_name, handle_statement};
 
 use pest::iterators::Pair;
 
 use crate::{
     ast::expressions::{
-        Expression,
+        Expression, ExpressionKind,
         block::Block,
         conditional::{Conditional, ConditionalBuilder},
+        init::StructInit,
         literal::Literal,
         loops::{LoopExpression, WhileLoop},
         operations::{BinaryOperator, UnaryOperator},
@@ -281,7 +282,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
                 _ => unreachable!(""),
             }
         }
-        Rule::path => Expression::identifier(handle_path(next)?),
+        Rule::path => Expression::identifier(handle_qualified_name(next)?),
         Rule::block_expression => Expression::block(handle_block_expression(next)?),
         Rule::loop_expression => Expression::loop_(handle_loop_expression(next)?),
         Rule::if_expression => Expression::if_(handle_if_expression(next)?),
@@ -305,6 +306,21 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
                 oper,
                 handle_expression(inner.next().unwrap())?,
             ));
+        }
+        Rule::struct_expression => {
+            let mut s = StructInit::default();
+            let mut inner = next.into_inner();
+            s.ident = handle_qualified_name(inner.next().unwrap())?;
+
+            for i in inner {
+                let mut named_field = i.into_inner();
+                let ident = named_field.next().unwrap().as_str().to_string();
+                let exp = handle_expression(named_field.next().unwrap())?;
+
+                s.params.push((ident, exp));
+            }
+
+            return Ok(Expression::new(ExpressionKind::StructInit(s)));
         }
         un => unreachable!("\"{}\": {un:?}", pair.as_str()),
     };

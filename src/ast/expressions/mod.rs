@@ -1,6 +1,7 @@
 pub mod block;
 pub mod call;
 pub mod conditional;
+pub mod init;
 pub mod literal;
 pub mod loops;
 pub mod member_access;
@@ -15,6 +16,7 @@ use crate::{
             block::Block,
             call::Call,
             conditional::Conditional,
+            init::StructInit,
             literal::Literal,
             loops::{LoopExpression, WhileLoop},
             member_access::MemberAccess,
@@ -44,6 +46,7 @@ pub enum Statement {
 pub enum ExpressionKind {
     MemberAccess(MemberAccess),
     Index(Expression, Expression),
+    StructInit(StructInit),
     Block(Block),
     If(Conditional),
     Loop(LoopExpression),
@@ -71,6 +74,7 @@ impl Display for ExpressionKind {
             ExpressionKind::UnaryOperation(a) => write!(f, "{}", a),
             ExpressionKind::Call(a) => write!(f, "{}", a),
             ExpressionKind::Assignment(a, b) => write!(f, "({} = {})", a, b),
+            ExpressionKind::StructInit(a) => write!(f, "{}", a),
         }
     }
 }

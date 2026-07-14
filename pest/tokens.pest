@@ -1,5 +1,5 @@
 module = { SOI ~ stream ~ EOI }
-stream = { (import | definitions | impls)* }
+stream = { (import | definition | impls)* }
 
 impls  = { implementation | trait_implementation }
 import = { c_import | niebo_import }
@@ -9,8 +9,6 @@ niebo_import  = { "import" ~ path ~ ";" }
 use_statement = { "use" ~ identifier ~ "as" ~ path ~ ";" }
 
 visibility = { "pub" | "module" }
-
-definitions = { definition+ }
 
 definition = { visibility? ~ (fn_definition | fn_declaration | type_declaration | type_definition | const_definition | trait_definition | module_definition) }
 
@@ -35,7 +33,7 @@ union_declaration   = {"union" ~ identifier}
 variant_declaration = {"variant" ~ identifier}
 alias_declaration   = {"type" ~ identifier}
 
-struct_definition  = { struct_declaration ~ "{" ~ params ~ "}" }
+struct_definition  = { "struct" ~ identifier ~ "{" ~ params ~ "}" }
 union_definition   = { union_declaration ~ "{" ~ params ~ "}" }
 variant_definition = { variant_declaration ~ "{" ~ params ~ "}" }
 alias_definition   = {"type" ~ identifier ~ "=" ~ type_expr ~ ";"}
@@ -53,6 +51,7 @@ block_expression = { "{" ~ statement* ~ "}" }
 return_statement   = { "return" ~ expression? }
 value_statement    = { "value" ~ expression? }
 
+
 statement = {
     (import ~ ";")
   | (use_statement ~ ";")
@@ -68,7 +67,7 @@ statement = {
 
 expression_priority = { "(" ~ expression ~ ")" }
 expression = {
-    (intrisic_expression | expression_priority | if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression |  block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix*
+    (expression_priority  | intrisic_expression | struct_expression | if_expression | literal_expression | while_expression | for_expression | match_expression | loop_expression |  block_expression | prefix_unary_operation_expression | path ) ~ expression_postfix*
 }
 
 prefix_unary_operation_expression = { prefix_unary_operator ~ expression }
@@ -83,6 +82,10 @@ match_arm           = { pattern ~ "=>" ~ (block_expression | expression) ~ ","? 
 pattern             = { identifier | path | number | string | "_" }
 
 loop_expression    = { ( identifier ~ ":" )? ~ "loop" ~  block_expression }
+
+struct_named_field = { identifier ~ ":" ~ expression }
+struct_expression  = { path ~ "{" ~  (struct_named_field ~ ",")* ~ struct_named_field? ~ "}"}
+
 break_statement    = { "break" ~ identifier? }
 continue_statement = { "continue" ~ identifier? }
 

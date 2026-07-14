@@ -61,15 +61,15 @@ pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Resul
     );
 
     let mut inner = pair.into_inner();
-    let declaration = inner.next().unwrap();
-    assert_eq!(declaration.as_rule(), Rule::struct_declaration);
 
-    let ident = handle_type_struct_declaration(declaration)?;
-
+    let ident = inner.next().unwrap().as_str().to_string();
     let mut s = StructType::default();
 
     let fields = inner.next().unwrap();
-    handle_params(fields);
+    let params = handle_params(fields)?;
+    for param in params {
+        s.members.push(param);
+    }
 
     return Ok(Definition::type_def(
         ident,
@@ -136,7 +136,7 @@ pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> 
                 next,
             )?)))
         }
-        Rule::path => Ok(Type::named(handle_path(ty)?)),
+        Rule::path => Ok(Type::named(handle_qualified_name(ty)?)),
 
         un => unreachable!("{un:?}"),
     };

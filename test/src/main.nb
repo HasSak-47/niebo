@@ -5,16 +5,22 @@ header stdlib::free;
 header stdlib::realloc;
 
 struct Data {
-    average: f32,
     max: i32,
     min: i32,
-    std: f32,
+    average: f32,
+    std: f32
 }
 
 fn main() -> i32 {
     let mut sum : i32 = 0;
     let mut numbers: *mut i32 = nullptr;
     let mut count : i32 = 0;
+    let mut data = Data {
+        average : 0,
+        max : 0,
+        min : 0,
+        std : 0,
+    };
     printf("sum all positive integers, 0 to exit\n");
 
     main_loop: loop {
