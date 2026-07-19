@@ -1,4 +1,4 @@
-use super::{ProjectPreprocessor, Symbol};
+use super::{Symbol, Validator};
 use anyhow::bail;
 
 use crate::{
@@ -7,22 +7,22 @@ use crate::{
 };
 
 pub(super) trait ExpressionValidator {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()>;
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type>;
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()>;
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type>;
 }
 
 impl ExpressionValidator for crate::ast::expressions::loops::LoopExpression {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         self.body.validate(procesor)
     }
 
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         self.body.resolve_ret_ty(procesor)
     }
 }
 
 impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         use crate::ast::expressions::operations::UnaryOperator;
         self.operand.validate(procesor)?;
         let operand_ty = self.operand.resolve_ret_ty(procesor)?;
@@ -49,7 +49,7 @@ impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation
         }
     }
 
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         use crate::ast::expressions::operations::UnaryOperator;
         let oper_ty = self.operand.resolve_ret_ty(procesor)?;
         match self.operator {
@@ -77,7 +77,7 @@ impl ExpressionValidator for crate::ast::expressions::operations::UnaryOperation
 }
 
 impl ExpressionValidator for crate::ast::expressions::literal::Literal {
-    fn resolve_ret_ty(&mut self, _: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, _: &mut Validator) -> anyhow::Result<Type> {
         use crate::ast::expressions::literal::LiteralInfo;
         return Ok(match self.info {
             LiteralInfo::String => Type::string(),
@@ -86,13 +86,13 @@ impl ExpressionValidator for crate::ast::expressions::literal::Literal {
         });
     }
 
-    fn validate(&mut self, _: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, _: &mut Validator) -> anyhow::Result<()> {
         return Ok(());
     }
 }
 
 impl ExpressionValidator for crate::ast::expressions::call::Call {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         self.called.validate(procesor)?;
         for param in &mut self.parameters {
             param.validate(procesor)?;
@@ -100,7 +100,7 @@ impl ExpressionValidator for crate::ast::expressions::call::Call {
 
         return Ok(());
     }
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         let function_type = self.called.resolve_ret_ty(procesor)?;
         for param in &mut self.parameters {
             param.resolve_ret_ty(procesor)?;
@@ -115,7 +115,7 @@ impl ExpressionValidator for crate::ast::expressions::call::Call {
 }
 
 impl ExpressionValidator for crate::general::naming::QualifiedName {
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         let ty = procesor
             .find_symbol(self.clone())
             .ok_or(anyhow::anyhow!("failed to find symbol: {}", self))?;
@@ -129,7 +129,7 @@ impl ExpressionValidator for crate::general::naming::QualifiedName {
         }
     }
 
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         procesor
             .find_symbol(self.clone().into())
             .ok_or(anyhow::anyhow!("failed to find symbol: {}", self))?;
@@ -139,11 +139,11 @@ impl ExpressionValidator for crate::general::naming::QualifiedName {
 }
 
 impl ExpressionValidator for crate::ast::expressions::conditional::Conditional {
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         return self.then.resolve_ret_ty(procesor);
     }
 
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         self.condition.validate(procesor)?;
         self.then.validate(procesor)?;
         match &mut self.else_ {
@@ -163,7 +163,7 @@ impl ExpressionValidator for crate::ast::expressions::conditional::Conditional {
 }
 
 impl ExpressionValidator for crate::ast::expressions::Expression {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         use crate::ast::expressions::ExpressionKind;
 
         match self.kind.as_mut() {
@@ -215,7 +215,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
         }
     }
 
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         use crate::ast::expressions::ExpressionKind;
         if self.ret_ty.is_none() {
             let ty = match self.kind.as_mut() {
@@ -249,7 +249,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
 }
 
 impl ExpressionValidator for crate::ast::expressions::block::Block {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         use crate::ast::{Definition, DefinitionKind, expressions::Statement};
 
         procesor.push_scope();
@@ -298,7 +298,7 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
         return Ok(());
     }
 
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         for stmt in &mut self.statements {
             match stmt {
                 Statement::Expression(exp) => {
@@ -313,7 +313,7 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
 }
 
 impl ExpressionValidator for WhileLoop {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         self.condition.validate(procesor)?;
         self.then.validate(procesor)?;
         let ty = self.condition.resolve_ret_ty(procesor)?;
@@ -324,13 +324,13 @@ impl ExpressionValidator for WhileLoop {
         return Ok(());
     }
 
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         return self.then.resolve_ret_ty(procesor);
     }
 }
 
 impl ExpressionValidator for BinaryOperation {
-    fn validate(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<()> {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         self.operands[0].validate(procesor)?;
         self.operands[1].validate(procesor)?;
 
@@ -350,7 +350,7 @@ impl ExpressionValidator for BinaryOperation {
         return Ok(());
     }
 
-    fn resolve_ret_ty(&mut self, procesor: &mut ProjectPreprocessor) -> anyhow::Result<Type> {
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         use crate::ast::expressions::operations::BinaryOperator;
         self.validate(procesor)?;
         return Ok(match self.operator {

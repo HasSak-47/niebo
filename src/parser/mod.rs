@@ -1,5 +1,6 @@
 mod expressions;
 mod type_handling;
+pub mod validator;
 
 use expressions::{handle_block_expression, handle_expression};
 use type_handling::*;
@@ -330,6 +331,7 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
 
     return Ok(md);
 }
+
 #[cfg(test)]
 mod test {
     use super::*;

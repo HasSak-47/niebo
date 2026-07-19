@@ -3,12 +3,11 @@ use std::{env::current_dir, path::PathBuf};
 use clap::{Parser, ValueEnum};
 use pretty_env_logger::init_custom_env;
 
-use crate::{ast::project::Project, ir::compile, lexer::ProjectPreprocessor};
+use crate::{ast::project::Project, ir::compile, parser::validator::Validator};
 
 mod ast;
 mod general;
 mod ir;
-mod lexer;
 mod parser;
 
 #[derive(Parser, Debug)]
@@ -42,8 +41,8 @@ fn main() -> anyhow::Result<()> {
         Mode::Project => Project::load(&cli.path)?,
     };
 
-    let mut ir = ProjectPreprocessor::new();
-    let project = ir.process_project(project)?;
+    let mut v = Validator::new();
+    let project = v.process_project(project)?;
 
     compile(project, cli.out)?;
 

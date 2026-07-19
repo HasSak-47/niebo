@@ -29,12 +29,12 @@ enum Symbol {
 }
 
 #[derive(Debug, Default)]
-pub struct ProjectPreprocessor {
+pub struct Validator {
     local_scope: Vec<HashMap<QualifiedName, Symbol>>,
     global_scope: HashMap<QualifiedName, Symbol>,
 }
 
-impl ProjectPreprocessor {
+impl Validator {
     fn push_scope(&mut self) {
         self.local_scope.push(HashMap::new());
     }
@@ -70,9 +70,9 @@ impl ProjectPreprocessor {
     }
 }
 
-impl ProjectPreprocessor {
+impl Validator {
     pub fn new() -> Self {
-        let mut p = ProjectPreprocessor::default();
+        let mut p = Validator::default();
         p.global_scope.insert(
             "nullptr".into(),
             Symbol::Variable(Type::pointer(Type::void())),
