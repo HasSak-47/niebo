@@ -120,11 +120,12 @@ impl ExpressionValidator for crate::general::naming::QualifiedName {
             .find_symbol(self.clone())
             .ok_or(anyhow::anyhow!("failed to find symbol: {}", self))?;
         match ty {
-            Symbol::Type { ty, .. } => return Ok(ty),
+            Symbol::Type(ty) => return Ok(ty),
             Symbol::Variable(ty) => return Ok(ty),
             Symbol::Function { ret_ty, params } => {
                 return Ok(Type::function(params, ret_ty, false));
             }
+            #[allow(unreachable_patterns)]
             td => todo!("{td:?}"),
         }
     }
@@ -211,6 +212,16 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
 
                 Ok(())
             }
+            ExpressionKind::StructInit(init) => {
+                if let None = procesor.find_symbol(init.ident.clone()) {
+                    bail!("type not found: {init:?}");
+                }
+                for param in &mut init.params {
+                    param.1.validate(procesor)?;
+                }
+
+                Ok(())
+            }
             td => todo!("{td:?}"),
         }
     }
@@ -255,29 +266,11 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
         procesor.push_scope();
         for stmt in &mut self.statements {
             match stmt {
-                Statement::Definition(Definition { kind, name, .. }) => match kind {
-                    DefinitionKind::Function(func) => {
-                        procesor.register_local_symbol(
-                            name.clone().into(),
-                            Symbol::Function {
-                                ret_ty: func.return_ty.clone().unwrap(),
-                                params: func.parameters.iter().map(|a| a.1.clone()).collect(),
-                            },
-                        );
-                    }
-                    DefinitionKind::Variable(var) => {
-                        var.value.validate(procesor)?;
-                        println!("{name} = {var:#?}");
-                        procesor.register_local_symbol(
-                            name.clone().into(),
-                            Symbol::Variable(var.ty.clone().expect(&format!("stmt: {stmt:#?}"))),
-                        );
-                    }
-                    _ => todo!(),
-                },
+                Statement::Definition(def) => procesor.validate_local_definition(def)?,
                 Statement::Expression(ex) => {
                     ex.validate(procesor)?;
                 }
+                // WARN: BAD! procesor is not aware if it is inside a function block!
                 Statement::Return(ex) => {
                     match ex {
                         Some(s) => s.validate(procesor)?,
@@ -286,7 +279,7 @@ impl ExpressionValidator for crate::ast::expressions::block::Block {
 
                     return Ok(());
                 }
-                // WARN: BAD! procesor is not aware when is inside a breakable block!
+                // WARN: BAD! procesor is not aware if it is inside a breakable block!
                 Statement::Break(_) => {
                     return Ok(());
                 }

@@ -41,6 +41,7 @@ pub struct CodeGen<'ctx> {
     locals: HashMap<QualifiedName, (PointerValue<'ctx>, Type)>,
     constants: HashMap<QualifiedName, BasicValueEnum<'ctx>>,
     functions: HashMap<QualifiedName, FunctionValue<'ctx>>,
+    types: HashMap<QualifiedName, Type>,
 
     named_blocks: HashMap<String, Rc<BasicBlock<'ctx>>>,
     latest_block: Option<Rc<BasicBlock<'ctx>>>,
@@ -116,6 +117,7 @@ impl TypeIr for Type {
             Type::Primitive(p) => match p {
                 PrimitiveType::Int(_) => Ok(ctx.i32_type().into()),
                 PrimitiveType::String => Ok(ctx.ptr_type(AddressSpace::default()).into()),
+                PrimitiveType::Float(_) => Ok(ctx.f32_type().into()),
                 PrimitiveType::Void => unreachable!(),
                 un => unimplemented!("{un:?}"),
             },
@@ -129,6 +131,14 @@ impl TypeIr for Type {
                     .collect();
 
                 Ok(ctx.struct_type(fields.as_slice(), false).into())
+            }
+            Type::Named(named) => {
+                let ty = codegen
+                    .types
+                    .get(named)
+                    .expect(&format!("no type named: {named}"))
+                    .clone();
+                Ok(ty.to_ir_type(ctx, codegen)?)
             }
             un => unimplemented!("{un:?}"),
         }
@@ -575,6 +585,9 @@ impl ExpressionIr for Expression {
                     "",
                 )?));
             }
+            ExpressionKind::StructInit(init) => {
+                todo!()
+            }
             un => todo!("{un:?}"),
         }
     }
@@ -742,6 +755,7 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
     println!("generated machine");
 
     let mut codegen = CodeGen {
+        types: HashMap::new(),
         module: module,
         machine: machine,
         builder: context.create_builder(),
@@ -807,7 +821,10 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
             }
             // do jackshit the types are handled when needed
             // probably would be smart to keep a registry of them
-            ast::DefinitionKind::Type(_) => {}
+            ast::DefinitionKind::Type(ty) => {
+                codegen.types.insert(def.name.clone().into(), ty.clone());
+                println!("{ty:?}");
+            }
             _ => unimplemented!(),
         }
     }

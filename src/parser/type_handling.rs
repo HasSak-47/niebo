@@ -19,6 +19,10 @@ fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveTy
             let prec = next.into_inner().next().unwrap().as_str().parse()?;
             return Ok(PrimitiveType::Int(prec));
         }
+        Rule::float_type => {
+            let prec = next.into_inner().next().unwrap().as_str().parse()?;
+            return Ok(PrimitiveType::Float(prec));
+        }
         un => unreachable!("{un:?}"),
     }
 }

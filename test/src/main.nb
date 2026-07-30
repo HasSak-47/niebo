@@ -15,7 +15,7 @@ fn main() -> i32 {
     let mut sum : i32 = 0;
     let mut numbers: *mut i32 = nullptr;
     let mut count : i32 = 0;
-    let mut data = Data {
+    let mut data : Data = Data {
         average : 0,
         max : 0,
         min : 0,

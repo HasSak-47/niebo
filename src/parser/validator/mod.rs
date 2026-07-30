@@ -7,7 +7,7 @@ use anyhow::Result;
 use clang::Clang;
 
 use crate::{
-    ast::project::Project,
+    ast::{Definition, DefinitionKind, project::Project},
     general::{naming::QualifiedName, types::Type},
     ir::cimports::CCache,
 };
@@ -18,14 +18,8 @@ use validator::ExpressionValidator;
 #[derive(Debug, Clone)]
 enum Symbol {
     Variable(Type),
-    Type {
-        ty: Type,
-        extends: HashSet<QualifiedName>,
-    },
-    Function {
-        ret_ty: Type,
-        params: Vec<Type>,
-    },
+    Type(Type),
+    Function { ret_ty: Type, params: Vec<Type> },
 }
 
 #[derive(Debug, Default)]
@@ -79,6 +73,59 @@ impl Validator {
         );
         return p;
     }
+
+    pub fn validate_global_definition(&mut self, def: &mut Definition) -> Result<()> {
+        match &mut def.kind {
+            DefinitionKind::Function(func) => {
+                self.register_global_symbol(
+                    def.name.clone().into(),
+                    Symbol::Function {
+                        ret_ty: func.return_ty.clone().unwrap(),
+                        params: func.parameters.iter().map(|a| a.1.clone()).collect(),
+                    },
+                );
+            }
+            DefinitionKind::Variable(var) => {
+                var.value.validate(self)?;
+                self.register_global_symbol(
+                    def.name.clone().into(),
+                    Symbol::Variable(var.ty.clone().unwrap()),
+                );
+            }
+            DefinitionKind::Type(ty) => {
+                self.register_global_symbol(def.name.clone().into(), Symbol::Type(ty.clone()));
+            }
+            _ => todo!(),
+        };
+        return Ok(());
+    }
+
+    pub fn validate_local_definition(&mut self, def: &mut Definition) -> Result<()> {
+        match &mut def.kind {
+            DefinitionKind::Function(func) => {
+                self.register_local_symbol(
+                    def.name.clone().into(),
+                    Symbol::Function {
+                        ret_ty: func.return_ty.clone().unwrap(),
+                        params: func.parameters.iter().map(|a| a.1.clone()).collect(),
+                    },
+                );
+            }
+            DefinitionKind::Variable(var) => {
+                var.value.validate(self)?;
+                self.register_local_symbol(
+                    def.name.clone().into(),
+                    Symbol::Variable(var.ty.clone().unwrap()),
+                );
+            }
+            DefinitionKind::Type(ty) => {
+                self.register_local_symbol(def.name.clone().into(), Symbol::Type(ty.clone()));
+            }
+            _ => todo!(),
+        };
+        return Ok(());
+    }
+
     // NOTE: ommit templates for now do to complexity
     pub fn process_project(&mut self, mut project: Project) -> Result<Project> {
         // - generate a registry to determine what is each Identifier/Path
@@ -129,21 +176,7 @@ impl Validator {
         }
 
         for def in &mut project.root_module.definitions {
-            use crate::ast::DefinitionKind;
-            match &mut def.kind {
-                DefinitionKind::Function(func) => {
-                    func.body.validate(self)?;
-                    let ret_ty = func.body.resolve_ret_ty(self)?;
-                    self.register_global_symbol(
-                        def.name.clone().into(),
-                        Symbol::Function {
-                            ret_ty: ret_ty,
-                            params: func.parameters.iter().map(|a| a.1.clone()).collect(),
-                        },
-                    );
-                }
-                _ => {}
-            }
+            self.validate_global_definition(def)?;
         }
 
         return Ok(project);

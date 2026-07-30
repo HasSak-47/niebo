@@ -211,7 +211,7 @@ primitive_type     =  { int_type | uint_type | float_type | "bool" | "int" | "ui
 prec               = @{ASCII_DIGIT+}
 int_type           =  { "i" ~ prec }
 uint_type          =  { "u" ~ prec }
-float_type         =  { "float" ~ prec }
+float_type         =  { "f" ~ prec }
 literal_expression =  { number | string }
 
 number       = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
