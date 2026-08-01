@@ -151,4 +151,11 @@ impl Import {
             path,
         };
     }
+
+    pub fn niebo_import(path: QualifiedName) -> Self {
+        return Self {
+            c_import: false,
+            path,
+        };
+    }
 }

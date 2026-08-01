@@ -1,8 +1,5 @@
-header stdio::printf;
-header stdio::scanf;
-header stdlib::malloc;
-header stdlib::free;
-header stdlib::realloc;
+header stdio::{printf, scanf};
+header stdlib::{malloc, free, realloc};
 
 struct Data {
     max: i32,

@@ -4,8 +4,8 @@ stream = { (import | definition | impls)* }
 impls  = { implementation | trait_implementation }
 import = { c_import | niebo_import }
 
-c_import      = { "header" ~ path ~ ";" }
-niebo_import  = { "import" ~ path ~ ";" }
+c_import      = { "header" ~ import_path ~ ";" }
+niebo_import  = { "import" ~ import_path ~ ";" }
 use_statement = { "use" ~ identifier ~ "as" ~ path ~ ";" }
 
 visibility = { "pub" | "module" }
@@ -172,6 +172,10 @@ const_definition = { "const" ~ identifier ~ (":" ~ type_expr)? ~ "=" ~ expressio
 params  = { (param ~ ",")* ~ param?  }
 param   = { identifier ~ ":" ~ type_expr }
 varidic = { "..." }
+
+import_path = { grouped_import_path | path }
+grouped_import_path = { path ~ "::" ~ import_group }
+import_group = { "{" ~ (ident_root ~ ",")* ~ ident_root? ~ "}" }
 
 path       =  { rel_path? ~ ident_root ~ ("::" ~ ident_root)* }
 rel_path   =  { "global::" | (("super" | "project") ~ "::")+ }
