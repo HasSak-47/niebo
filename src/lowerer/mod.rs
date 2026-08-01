@@ -1,5 +1,4 @@
 pub mod cimports;
-pub mod lowerer;
 
 use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
@@ -31,8 +30,9 @@ use crate::{
         naming::QualifiedName,
         types::{PrimitiveType, Type},
     },
-    ir::cimports::CCache,
 };
+
+use cimports::CCache;
 
 pub struct CodeGen<'ctx> {
     module: Module<'ctx>,

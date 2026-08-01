@@ -9,7 +9,7 @@ use clang::Clang;
 use crate::{
     ast::{Definition, DefinitionKind, project::Project},
     general::{naming::QualifiedName, types::Type},
-    ir::cimports::CCache,
+    lowerer::cimports::CCache,
 };
 
 mod validator;
