@@ -1,0 +1,441 @@
+import core::traits::{Add, Sub, Mul, Div, Eq, NEq, LEq, GEq, Les, Gre, Copy};
+
+extend i8 as Copy {
+    fn copy(self: i8) -> i8 { return @copy(self); }
+}
+
+extend i8 as Add {
+    fn add(self: i8, other: i8) -> i8 { return @add_i8(self, other); }
+}
+
+extend i8 as Sub {
+    fn sub(self: i8, other: i8) -> i8 { return @sub_i8(self, other); }
+}
+
+extend i8 as Mul {
+    fn mul(self: i8, other: i8) -> i8 { return @mul_i8(self, other); }
+}
+
+extend i8 as Div {
+    fn div(self: i8, other: i8) -> i8 { return @div_i8(self, other); }
+}
+
+extend i8 as Eq {
+    fn eq(self: i8, other: i8) -> bool { return @eq_i8(self, other); }
+}
+
+extend i8 as NEq {
+    fn neq(self: i8, other: i8) -> bool { return @neq_i8(self, other); }
+}
+
+extend i8 as LEq {
+    fn leq(self: i8, other: i8) -> bool { return @leq_i8(self, other); }
+}
+
+extend i8 as GEq {
+    fn geq(self: i8, other: i8) -> bool { return @geq_i8(self, other); }
+}
+
+extend i8 as Les {
+    fn les(self: i8, other: i8) -> bool { return @les_i8(self, other); }
+}
+
+extend i8 as Gre {
+    fn gre(self: i8, other: i8) -> bool { return @gre_i8(self, other); }
+}
+
+extend i16 as Copy {
+    fn copy(self: i16) -> i16 { return @copy(self); }
+}
+
+extend i16 as Add {
+    fn add(self: i16, other: i16) -> i16 { return @add_i16(self, other); }
+}
+
+extend i16 as Sub {
+    fn sub(self: i16, other: i16) -> i16 { return @sub_i16(self, other); }
+}
+
+extend i16 as Mul {
+    fn mul(self: i16, other: i16) -> i16 { return @mul_i16(self, other); }
+}
+
+extend i16 as Div {
+    fn div(self: i16, other: i16) -> i16 { return @div_i16(self, other); }
+}
+
+extend i16 as Eq {
+    fn eq(self: i16, other: i16) -> bool { return @eq_i16(self, other); }
+}
+
+extend i16 as NEq {
+    fn neq(self: i16, other: i16) -> bool { return @neq_i16(self, other); }
+}
+
+extend i16 as LEq {
+    fn leq(self: i16, other: i16) -> bool { return @leq_i16(self, other); }
+}
+
+extend i16 as GEq {
+    fn geq(self: i16, other: i16) -> bool { return @geq_i16(self, other); }
+}
+
+extend i16 as Les {
+    fn les(self: i16, other: i16) -> bool { return @les_i16(self, other); }
+}
+
+extend i16 as Gre {
+    fn gre(self: i16, other: i16) -> bool { return @gre_i16(self, other); }
+}
+
+extend i32 as Copy {
+    fn copy(self: i32) -> i32 { return @copy(self); }
+}
+
+extend i32 as Add {
+    fn add(self: i32, other: i32) -> i32 { return @add_i32(self, other); }
+}
+
+extend i32 as Sub {
+    fn sub(self: i32, other: i32) -> i32 { return @sub_i32(self, other); }
+}
+
+extend i32 as Mul {
+    fn mul(self: i32, other: i32) -> i32 { return @mul_i32(self, other); }
+}
+
+extend i32 as Div {
+    fn div(self: i32, other: i32) -> i32 { return @div_i32(self, other); }
+}
+
+extend i32 as Eq {
+    fn eq(self: i32, other: i32) -> bool { return @eq_i32(self, other); }
+}
+
+extend i32 as NEq {
+    fn neq(self: i32, other: i32) -> bool { return @neq_i32(self, other); }
+}
+
+extend i32 as LEq {
+    fn leq(self: i32, other: i32) -> bool { return @leq_i32(self, other); }
+}
+
+extend i32 as GEq {
+    fn geq(self: i32, other: i32) -> bool { return @geq_i32(self, other); }
+}
+
+extend i32 as Les {
+    fn les(self: i32, other: i32) -> bool { return @les_i32(self, other); }
+}
+
+extend i32 as Gre {
+    fn gre(self: i32, other: i32) -> bool { return @gre_i32(self, other); }
+}
+
+extend i64 as Copy {
+    fn copy(self: i64) -> i64 { return @copy(self); }
+}
+
+extend i64 as Add {
+    fn add(self: i64, other: i64) -> i64 { return @add_i64(self, other); }
+}
+
+extend i64 as Sub {
+    fn sub(self: i64, other: i64) -> i64 { return @sub_i64(self, other); }
+}
+
+extend i64 as Mul {
+    fn mul(self: i64, other: i64) -> i64 { return @mul_i64(self, other); }
+}
+
+extend i64 as Div {
+    fn div(self: i64, other: i64) -> i64 { return @div_i64(self, other); }
+}
+
+extend i64 as Eq {
+    fn eq(self: i64, other: i64) -> bool { return @eq_i64(self, other); }
+}
+
+extend i64 as NEq {
+    fn neq(self: i64, other: i64) -> bool { return @neq_i64(self, other); }
+}
+
+extend i64 as LEq {
+    fn leq(self: i64, other: i64) -> bool { return @leq_i64(self, other); }
+}
+
+extend i64 as GEq {
+    fn geq(self: i64, other: i64) -> bool { return @geq_i64(self, other); }
+}
+
+extend i64 as Les {
+    fn les(self: i64, other: i64) -> bool { return @les_i64(self, other); }
+}
+
+extend i64 as Gre {
+    fn gre(self: i64, other: i64) -> bool { return @gre_i64(self, other); }
+}
+
+extend u8 as Copy {
+    fn copy(self: u8) -> u8 { return @copy(self); }
+}
+
+extend u8 as Add {
+    fn add(self: u8, other: u8) -> u8 { return @add_u8(self, other); }
+}
+
+extend u8 as Sub {
+    fn sub(self: u8, other: u8) -> u8 { return @sub_u8(self, other); }
+}
+
+extend u8 as Mul {
+    fn mul(self: u8, other: u8) -> u8 { return @mul_u8(self, other); }
+}
+
+extend u8 as Div {
+    fn div(self: u8, other: u8) -> u8 { return @div_u8(self, other); }
+}
+
+extend u8 as Eq {
+    fn eq(self: u8, other: u8) -> bool { return @eq_u8(self, other); }
+}
+
+extend u8 as NEq {
+    fn neq(self: u8, other: u8) -> bool { return @neq_u8(self, other); }
+}
+
+extend u8 as LEq {
+    fn leq(self: u8, other: u8) -> bool { return @leq_u8(self, other); }
+}
+
+extend u8 as GEq {
+    fn geq(self: u8, other: u8) -> bool { return @geq_u8(self, other); }
+}
+
+extend u8 as Les {
+    fn les(self: u8, other: u8) -> bool { return @les_u8(self, other); }
+}
+
+extend u8 as Gre {
+    fn gre(self: u8, other: u8) -> bool { return @gre_u8(self, other); }
+}
+
+extend u16 as Copy {
+    fn copy(self: u16) -> u16 { return @copy(self); }
+}
+
+extend u16 as Add {
+    fn add(self: u16, other: u16) -> u16 { return @add_u16(self, other); }
+}
+
+extend u16 as Sub {
+    fn sub(self: u16, other: u16) -> u16 { return @sub_u16(self, other); }
+}
+
+extend u16 as Mul {
+    fn mul(self: u16, other: u16) -> u16 { return @mul_u16(self, other); }
+}
+
+extend u16 as Div {
+    fn div(self: u16, other: u16) -> u16 { return @div_u16(self, other); }
+}
+
+extend u16 as Eq {
+    fn eq(self: u16, other: u16) -> bool { return @eq_u16(self, other); }
+}
+
+extend u16 as NEq {
+    fn neq(self: u16, other: u16) -> bool { return @neq_u16(self, other); }
+}
+
+extend u16 as LEq {
+    fn leq(self: u16, other: u16) -> bool { return @leq_u16(self, other); }
+}
+
+extend u16 as GEq {
+    fn geq(self: u16, other: u16) -> bool { return @geq_u16(self, other); }
+}
+
+extend u16 as Les {
+    fn les(self: u16, other: u16) -> bool { return @les_u16(self, other); }
+}
+
+extend u16 as Gre {
+    fn gre(self: u16, other: u16) -> bool { return @gre_u16(self, other); }
+}
+
+extend u32 as Copy {
+    fn copy(self: u32) -> u32 { return @copy(self); }
+}
+
+extend u32 as Add {
+    fn add(self: u32, other: u32) -> u32 { return @add_u32(self, other); }
+}
+
+extend u32 as Sub {
+    fn sub(self: u32, other: u32) -> u32 { return @sub_u32(self, other); }
+}
+
+extend u32 as Mul {
+    fn mul(self: u32, other: u32) -> u32 { return @mul_u32(self, other); }
+}
+
+extend u32 as Div {
+    fn div(self: u32, other: u32) -> u32 { return @div_u32(self, other); }
+}
+
+extend u32 as Eq {
+    fn eq(self: u32, other: u32) -> bool { return @eq_u32(self, other); }
+}
+
+extend u32 as NEq {
+    fn neq(self: u32, other: u32) -> bool { return @neq_u32(self, other); }
+}
+
+extend u32 as LEq {
+    fn leq(self: u32, other: u32) -> bool { return @leq_u32(self, other); }
+}
+
+extend u32 as GEq {
+    fn geq(self: u32, other: u32) -> bool { return @geq_u32(self, other); }
+}
+
+extend u32 as Les {
+    fn les(self: u32, other: u32) -> bool { return @les_u32(self, other); }
+}
+
+extend u32 as Gre {
+    fn gre(self: u32, other: u32) -> bool { return @gre_u32(self, other); }
+}
+
+extend u64 as Copy {
+    fn copy(self: u64) -> u64 { return @copy(self); }
+}
+
+extend u64 as Add {
+    fn add(self: u64, other: u64) -> u64 { return @add_u64(self, other); }
+}
+
+extend u64 as Sub {
+    fn sub(self: u64, other: u64) -> u64 { return @sub_u64(self, other); }
+}
+
+extend u64 as Mul {
+    fn mul(self: u64, other: u64) -> u64 { return @mul_u64(self, other); }
+}
+
+extend u64 as Div {
+    fn div(self: u64, other: u64) -> u64 { return @div_u64(self, other); }
+}
+
+extend u64 as Eq {
+    fn eq(self: u64, other: u64) -> bool { return @eq_u64(self, other); }
+}
+
+extend u64 as NEq {
+    fn neq(self: u64, other: u64) -> bool { return @neq_u64(self, other); }
+}
+
+extend u64 as LEq {
+    fn leq(self: u64, other: u64) -> bool { return @leq_u64(self, other); }
+}
+
+extend u64 as GEq {
+    fn geq(self: u64, other: u64) -> bool { return @geq_u64(self, other); }
+}
+
+extend u64 as Les {
+    fn les(self: u64, other: u64) -> bool { return @les_u64(self, other); }
+}
+
+extend u64 as Gre {
+    fn gre(self: u64, other: u64) -> bool { return @gre_u64(self, other); }
+}
+
+extend f32 as Copy {
+    fn copy(self: f32) -> f32 { return @copy(self); }
+}
+
+extend f32 as Add {
+    fn add(self: f32, other: f32) -> f32 { return @add_f32(self, other); }
+}
+
+extend f32 as Sub {
+    fn sub(self: f32, other: f32) -> f32 { return @sub_f32(self, other); }
+}
+
+extend f32 as Mul {
+    fn mul(self: f32, other: f32) -> f32 { return @mul_f32(self, other); }
+}
+
+extend f32 as Div {
+    fn div(self: f32, other: f32) -> f32 { return @div_f32(self, other); }
+}
+
+extend f32 as Eq {
+    fn eq(self: f32, other: f32) -> bool { return @eq_f32(self, other); }
+}
+
+extend f32 as NEq {
+    fn neq(self: f32, other: f32) -> bool { return @neq_f32(self, other); }
+}
+
+extend f32 as LEq {
+    fn leq(self: f32, other: f32) -> bool { return @leq_f32(self, other); }
+}
+
+extend f32 as GEq {
+    fn geq(self: f32, other: f32) -> bool { return @geq_f32(self, other); }
+}
+
+extend f32 as Les {
+    fn les(self: f32, other: f32) -> bool { return @les_f32(self, other); }
+}
+
+extend f32 as Gre {
+    fn gre(self: f32, other: f32) -> bool { return @gre_f32(self, other); }
+}
+
+extend f64 as Copy {
+    fn copy(self: f64) -> f64 { return @copy(self); }
+}
+
+extend f64 as Add {
+    fn add(self: f64, other: f64) -> f64 { return @add_f64(self, other); }
+}
+
+extend f64 as Sub {
+    fn sub(self: f64, other: f64) -> f64 { return @sub_f64(self, other); }
+}
+
+extend f64 as Mul {
+    fn mul(self: f64, other: f64) -> f64 { return @mul_f64(self, other); }
+}
+
+extend f64 as Div {
+    fn div(self: f64, other: f64) -> f64 { return @div_f64(self, other); }
+}
+
+extend f64 as Eq {
+    fn eq(self: f64, other: f64) -> bool { return @eq_f64(self, other); }
+}
+
+extend f64 as NEq {
+    fn neq(self: f64, other: f64) -> bool { return @neq_f64(self, other); }
+}
+
+extend f64 as LEq {
+    fn leq(self: f64, other: f64) -> bool { return @leq_f64(self, other); }
+}
+
+extend f64 as GEq {
+    fn geq(self: f64, other: f64) -> bool { return @geq_f64(self, other); }
+}
+
+extend f64 as Les {
+    fn les(self: f64, other: f64) -> bool { return @les_f64(self, other); }
+}
+
+extend f64 as Gre {
+    fn gre(self: f64, other: f64) -> bool { return @gre_f64(self, other); }
+}

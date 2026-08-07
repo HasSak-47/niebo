@@ -1,6 +1,7 @@
 use super::{Rule, handle_qualified_name, handle_statement};
 
 use pest::iterators::Pair;
+use std::str::FromStr;
 
 use crate::{
     ast::expressions::{
@@ -8,6 +9,7 @@ use crate::{
         block::Block,
         conditional::{Conditional, ConditionalBuilder},
         init::StructInit,
+        intrinsic::IntrinsicKind,
         literal::Literal,
         loops::{LoopExpression, WhileLoop},
         operations::{BinaryOperator, UnaryOperator},
@@ -69,6 +71,38 @@ fn handle_call_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Ve
     return Ok(params);
 }
 
+fn handle_call_params<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<Expression>> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::call_params,
+        "a non Rule::call_params reached handle_call_params"
+    );
+
+    let mut params = Vec::new();
+    for innr in pair.into_inner() {
+        params.push(handle_expression(innr)?);
+    }
+
+    Ok(params)
+}
+
+fn handle_intrinsic_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::intrinsic_expression,
+        "a non Rule::intrinsic_expression reached handle_intrinsic_expression"
+    );
+
+    let mut inner = pair.into_inner();
+    let kind = IntrinsicKind::from_str(inner.next().unwrap().as_str())?;
+    let parameters = match inner.next() {
+        Some(params) => handle_call_params(params)?,
+        None => Vec::new(),
+    };
+
+    Ok(Expression::intrinsic(kind, parameters))
+}
+
 fn handle_unary_expression_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<UnaryOperator> {
     assert_eq!(
         pair.as_rule(),
@@ -100,11 +134,22 @@ fn handle_binary_expression_postfix<'a>(
     let mut inner = pair.into_inner();
     let oper = inner.next().unwrap();
     let operator = match &oper.as_rule() {
+        Rule::boolean_or => BinaryOperator::BitwiseOr,
+        Rule::boolean_and => BinaryOperator::BitwiseAnd,
         Rule::boolean_leq => BinaryOperator::LesserOrEqual,
+        Rule::boolean_geq => BinaryOperator::GreaterOrEqual,
         Rule::boolean_le => BinaryOperator::Lesser,
+        Rule::boolean_ge => BinaryOperator::Greater,
         Rule::boolean_eq => BinaryOperator::Equal,
+        Rule::boolean_neq => BinaryOperator::NotEqual,
+        Rule::bitwise_and => BinaryOperator::BitwiseAnd,
+        Rule::bitwise_or => BinaryOperator::BitwiseOr,
+        Rule::bitwise_xor => BinaryOperator::BitwiseXor,
         Rule::arithmetic_add => BinaryOperator::Addition,
+        Rule::arithmetic_sub => BinaryOperator::Substraction,
         Rule::arithmetic_mul => BinaryOperator::Multiplication,
+        Rule::arithmetic_div => BinaryOperator::Division,
+        Rule::arithmetic_mod => BinaryOperator::Module,
         un => unreachable!("{un:?}"),
     };
     let exp = handle_expression(oper.into_inner().next().unwrap())?;
@@ -283,6 +328,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             }
         }
         Rule::path => Expression::identifier(handle_qualified_name(next)?),
+        Rule::intrinsic_expression => handle_intrinsic_expression(next)?,
         Rule::block_expression => Expression::block(handle_block_expression(next)?),
         Rule::loop_expression => Expression::loop_(handle_loop_expression(next)?),
         Rule::if_expression => Expression::if_(handle_if_expression(next)?),

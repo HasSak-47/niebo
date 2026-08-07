@@ -1,6 +1,5 @@
 mod expressions;
 mod type_handling;
-pub mod validator;
 
 use expressions::{handle_block_expression, handle_expression};
 use type_handling::*;
@@ -10,7 +9,7 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        Definition, Implementation, Import, TraitImplementation, Visibility,
+        Definition, DefinitionKind, Implementation, Import, TraitImplementation, Visibility,
         expressions::Statement,
         function::FunctionBuilder,
         module::{Module, ModuleKind},
@@ -167,8 +166,52 @@ pub fn handle_fn_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definit
     return Ok(function.build_def());
 }
 
-pub fn handle_trait_definitions<'a>(_pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    todo!("implement into the trait definition ast")
+pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(pair.as_rule(), Rule::trait_definition);
+    let mut inner = pair.into_inner();
+    let ident = inner.next().unwrap().as_str().to_string();
+    let mut functions = std::collections::HashMap::new();
+
+    for item in inner {
+        match item.as_rule() {
+            Rule::template_def => {}
+            Rule::trait_body => {
+                let body = item.into_inner().next().unwrap();
+                match body.as_rule() {
+                    Rule::fn_declaration => {
+                        let builder = handle_fn_declaration(body)?;
+                        let name = builder.ident;
+                        let function = crate::ast::function::Function {
+                            constant: builder.constant,
+                            return_ty: builder.ret_ty,
+                            parameters: builder
+                                .params
+                                .into_iter()
+                                .map(|(name, ty)| (name.unwrap(), ty))
+                                .collect(),
+                            body: crate::ast::expressions::block::Block::new(),
+                        };
+                        functions.insert(name, function);
+                    }
+                    Rule::fn_definition => {
+                        let def = handle_fn_definitions(body)?;
+                        if let DefinitionKind::Function(function) = def.kind {
+                            functions.insert(def.name, function);
+                        }
+                    }
+                    Rule::type_definition | Rule::type_declaration => {}
+                    un => unreachable!("{un:?}"),
+                }
+            }
+            un => unreachable!("{un:?}"),
+        }
+    }
+
+    Ok(Definition {
+        kind: DefinitionKind::Trait(crate::ast::traits::Trait { functions }),
+        visibility: Visibility::Public,
+        name: ident,
+    })
 }
 
 pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNameSegment> {
@@ -377,6 +420,7 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::ast::expressions::intrinsic::IntrinsicKind;
     use crate::ast::expressions::literal::*;
     use crate::ast::expressions::operations::*;
     use crate::ast::expressions::*;
@@ -420,7 +464,7 @@ mod test {
     fn test_functions() -> anyhow::Result<()> {
         TokenStream::parse(
             Rule::fn_definition,
-            "func main() -> i32 {
+            "fn main() -> i32 {
     let i = 0;
     while i < 10 {
         i++;
@@ -445,7 +489,7 @@ mod test {
     fn test_traits() -> anyhow::Result<()> {
         TokenStream::parse(
             Rule::definition,
-            "inter TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfunc func() -> Type;\n}",
+            "inter TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfn func() -> Type;\n}",
         )?;
 
         TokenStream::parse(
@@ -453,7 +497,7 @@ mod test {
             "inter testTrait<T: Add<T>>{
     type TestType = i32;
     
-    func test_function<T: Add<T>>(t: T) -> T ;
+    fn test_function<T: Add<T>>(t: T) -> T ;
 }",
         )?;
 
@@ -465,7 +509,7 @@ mod test {
         TokenStream::parse(
             Rule::trait_implementation,
             "extend Vec2 as Add<Vec2> {
-    func add(other: Vec2) -> Vec2 {
+    fn add(other: Vec2) -> Vec2 {
         return self;
     }
 }",
@@ -481,11 +525,11 @@ mod test {
 
         TokenStream::parse(
             Rule::fn_declaration,
-            "func test_fn_declaration(t: T, u: U) -> U",
+            "fn test_fn_declaration(t: T, u: U) -> U",
         )?;
         TokenStream::parse(
             Rule::fn_declaration,
-            "func test_fn_declaration_template<T: global::A<T> >(t: T, u: U) -> U",
+            "fn test_fn_declaration_template<T: global::A<T> >(t: T, u: U) -> U",
         )?;
         return Ok(());
     }
@@ -493,6 +537,66 @@ mod test {
     #[test]
     fn test_call_expression() -> anyhow::Result<()> {
         TokenStream::parse(Rule::expression, "printf(\"%d\", i)")?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@add_i32(self, other)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(intrinsic.kind, IntrinsicKind::AddI { prec: 32 });
+                assert_eq!(intrinsic.parameters.len(), 2);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_conversion_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@i32_to_u32(self)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(
+                    intrinsic.kind,
+                    IntrinsicKind::IToU {
+                        src_prec: 32,
+                        out_prec: 32,
+                    }
+                );
+                assert_eq!(intrinsic.parameters.len(), 1);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_copy_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@copy(i32)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(intrinsic.kind, IntrinsicKind::Copy);
+                assert_eq!(intrinsic.parameters.len(), 1);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
 
         Ok(())
     }
@@ -574,7 +678,7 @@ mod test {
 
 type TestType = i32;
 
-func main() -> i32 {
+fn main() -> i32 {
     let i = 0;
     while i < 10 {
         printf(\"%d\", i);

@@ -2,7 +2,9 @@ pub mod expressions;
 pub mod function;
 pub mod module;
 pub mod project;
+pub mod simplify;
 pub mod traits;
+pub mod validator;
 
 use module::*;
 use std::collections::HashMap;

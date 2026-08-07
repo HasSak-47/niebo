@@ -1,19 +1,43 @@
 pub inter Copy {
-     func copy(&self) -> Self;
+    fn copy(self: Self) -> Self;
 }
 
-pub inter Add<T, R> {
-    func add(self, other: T) -> T;
+pub inter Add {
+    fn add(self: Self, other: Self) -> Self;
 }
 
-pub inter Sub<T, R> {
-    func sub(self, other: T) -> R;
+pub inter Sub {
+    fn sub(self: Self, other: Self) -> Self;
 }
 
-pub inter Mul<T, R> {
-    func mul(self, other: T) -> R;
+pub inter Mul {
+    fn mul(self: Self, other: Self) -> Self;
 }
 
-pub inter Div<T, R> {
-    func div(self, other: T) -> R;
+pub inter Div {
+    fn div(self: Self, other: Self) -> Self;
+}
+
+pub inter Eq {
+    fn eq(self: Self, other: Self) -> bool;
+}
+
+pub inter NEq {
+    fn neq(self: Self, other: Self) -> bool;
+}
+
+pub inter LEq {
+    fn leq(self: Self, other: Self) -> bool;
+}
+
+pub inter GEq {
+    fn geq(self: Self, other: Self) -> bool;
+}
+
+pub inter Les {
+    fn les(self: Self, other: Self) -> bool;
+}
+
+pub inter Gre {
+    fn gre(self: Self, other: Self) -> bool;
 }

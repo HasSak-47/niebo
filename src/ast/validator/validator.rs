@@ -2,7 +2,9 @@ use super::{Symbol, Validator};
 use anyhow::bail;
 
 use crate::{
-    ast::expressions::{Statement, loops::WhileLoop, operations::BinaryOperation},
+    ast::expressions::{
+        Statement, intrinsic::IntrinsicKind, loops::WhileLoop, operations::BinaryOperation,
+    },
     general::types::{PrimitiveType, Type},
 };
 
@@ -114,6 +116,152 @@ impl ExpressionValidator for crate::ast::expressions::call::Call {
     }
 }
 
+impl ExpressionValidator for crate::ast::expressions::intrinsic::Intrinsic {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
+        for param in &mut self.parameters {
+            param.validate(procesor)?;
+        }
+
+        let expected_params = match self.kind {
+            IntrinsicKind::Copy => return self.validate_copy(procesor),
+
+            IntrinsicKind::AddI { prec }
+            | IntrinsicKind::SubI { prec }
+            | IntrinsicKind::MulI { prec }
+            | IntrinsicKind::DivI { prec }
+            | IntrinsicKind::EqI { prec }
+            | IntrinsicKind::NEqI { prec }
+            | IntrinsicKind::LEqI { prec }
+            | IntrinsicKind::GEqI { prec }
+            | IntrinsicKind::LesI { prec }
+            | IntrinsicKind::GreI { prec } => vec![Type::int_p(prec), Type::int_p(prec)],
+
+            IntrinsicKind::AddU { prec }
+            | IntrinsicKind::SubU { prec }
+            | IntrinsicKind::MulU { prec }
+            | IntrinsicKind::DivU { prec }
+            | IntrinsicKind::EqU { prec }
+            | IntrinsicKind::NEqU { prec }
+            | IntrinsicKind::LEqU { prec }
+            | IntrinsicKind::GEqU { prec }
+            | IntrinsicKind::LesU { prec }
+            | IntrinsicKind::GreU { prec } => vec![Type::uint_p(prec), Type::uint_p(prec)],
+
+            IntrinsicKind::AddF { prec }
+            | IntrinsicKind::SubF { prec }
+            | IntrinsicKind::MulF { prec }
+            | IntrinsicKind::DivF { prec }
+            | IntrinsicKind::EqF { prec }
+            | IntrinsicKind::NEqF { prec }
+            | IntrinsicKind::LEqF { prec }
+            | IntrinsicKind::GEqF { prec }
+            | IntrinsicKind::LesF { prec }
+            | IntrinsicKind::GreF { prec } => vec![Type::Primitive(PrimitiveType::Float(prec)); 2],
+
+            IntrinsicKind::IToU { src_prec, .. } | IntrinsicKind::IToF { src_prec, .. } => {
+                vec![Type::int_p(src_prec)]
+            }
+            IntrinsicKind::UToI { src_prec, .. } | IntrinsicKind::UToF { src_prec, .. } => {
+                vec![Type::uint_p(src_prec)]
+            }
+            IntrinsicKind::FToI { src_prec, .. } | IntrinsicKind::FToU { src_prec, .. } => {
+                vec![Type::Primitive(PrimitiveType::Float(src_prec))]
+            }
+        };
+
+        if self.parameters.len() != expected_params.len() {
+            bail!(
+                "@{} expects {} parameters, got {}",
+                self.kind,
+                expected_params.len(),
+                self.parameters.len()
+            );
+        }
+
+        for (idx, expected) in expected_params.into_iter().enumerate() {
+            let actual = self.parameters[idx].resolve_ret_ty(procesor)?;
+            if actual != expected {
+                bail!(
+                    "@{} parameter {} expected {:?}, got {:?}",
+                    self.kind,
+                    idx,
+                    expected,
+                    actual
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
+        self.validate(procesor)?;
+
+        Ok(match self.kind {
+            IntrinsicKind::Copy => self.parameters[0].resolve_ret_ty(procesor)?,
+
+            IntrinsicKind::AddI { prec }
+            | IntrinsicKind::SubI { prec }
+            | IntrinsicKind::MulI { prec }
+            | IntrinsicKind::DivI { prec } => Type::int_p(prec),
+
+            IntrinsicKind::EqI { .. }
+            | IntrinsicKind::NEqI { .. }
+            | IntrinsicKind::LEqI { .. }
+            | IntrinsicKind::GEqI { .. }
+            | IntrinsicKind::LesI { .. }
+            | IntrinsicKind::GreI { .. }
+            | IntrinsicKind::EqU { .. }
+            | IntrinsicKind::NEqU { .. }
+            | IntrinsicKind::LEqU { .. }
+            | IntrinsicKind::GEqU { .. }
+            | IntrinsicKind::LesU { .. }
+            | IntrinsicKind::GreU { .. }
+            | IntrinsicKind::EqF { .. }
+            | IntrinsicKind::NEqF { .. }
+            | IntrinsicKind::LEqF { .. }
+            | IntrinsicKind::GEqF { .. }
+            | IntrinsicKind::LesF { .. }
+            | IntrinsicKind::GreF { .. } => Type::bool(),
+
+            IntrinsicKind::IToU { out_prec, .. } | IntrinsicKind::FToU { out_prec, .. } => {
+                Type::uint_p(out_prec)
+            }
+            IntrinsicKind::IToF { out_prec, .. } | IntrinsicKind::UToF { out_prec, .. } => {
+                Type::Primitive(PrimitiveType::Float(out_prec))
+            }
+            IntrinsicKind::UToI { out_prec, .. } | IntrinsicKind::FToI { out_prec, .. } => {
+                Type::int_p(out_prec)
+            }
+
+            IntrinsicKind::AddU { prec }
+            | IntrinsicKind::SubU { prec }
+            | IntrinsicKind::MulU { prec }
+            | IntrinsicKind::DivU { prec } => Type::uint_p(prec),
+
+            IntrinsicKind::AddF { prec }
+            | IntrinsicKind::SubF { prec }
+            | IntrinsicKind::MulF { prec }
+            | IntrinsicKind::DivF { prec } => Type::Primitive(PrimitiveType::Float(prec)),
+        })
+    }
+}
+
+impl crate::ast::expressions::intrinsic::Intrinsic {
+    fn validate_copy(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
+        if self.parameters.len() != 1 {
+            bail!(
+                "@{} expects 1 parameter, got {}",
+                self.kind,
+                self.parameters.len()
+            );
+        }
+
+        self.parameters[0].resolve_ret_ty(procesor)?;
+        Ok(())
+    }
+}
+
 impl ExpressionValidator for crate::general::naming::QualifiedName {
     fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         let ty = procesor
@@ -171,6 +319,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
             ExpressionKind::BinaryOperation(b_exp) => b_exp.validate(procesor),
             ExpressionKind::While(w_exp) => w_exp.validate(procesor),
             ExpressionKind::Identifier(ident) => ident.validate(procesor),
+            ExpressionKind::Intrinsic(intrinsic) => intrinsic.validate(procesor),
             ExpressionKind::Literal(lit) => lit.validate(procesor),
             ExpressionKind::Block(blk) => blk.validate(procesor),
             ExpressionKind::Call(call) => call.validate(procesor),
@@ -233,6 +382,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
                 ExpressionKind::BinaryOperation(b_exp) => b_exp.resolve_ret_ty(procesor),
                 ExpressionKind::While(w_exp) => w_exp.resolve_ret_ty(procesor),
                 ExpressionKind::Identifier(ident) => ident.resolve_ret_ty(procesor),
+                ExpressionKind::Intrinsic(intrinsic) => intrinsic.resolve_ret_ty(procesor),
                 ExpressionKind::Literal(lit) => lit.resolve_ret_ty(procesor),
                 ExpressionKind::Block(blk) => blk.resolve_ret_ty(procesor),
                 ExpressionKind::Call(call) => call.resolve_ret_ty(procesor),

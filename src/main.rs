@@ -3,10 +3,11 @@ use std::{env::current_dir, path::PathBuf};
 use clap::{Parser, ValueEnum};
 use pretty_env_logger::init_custom_env;
 
-use crate::{ast::project::Project, lowerer::compile, parser::validator::Validator};
+use crate::{ast::project::Project, ast::validator::Validator, lowerer::compile};
 
 mod ast;
 mod general;
+mod ir;
 mod lowerer;
 mod parser;
 

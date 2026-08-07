@@ -12,12 +12,27 @@ fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveTy
         Rule::primitive_type,
         "handle_primitive_type got a non primitive_type"
     );
+    let raw = pair.as_str();
     let mut inner = pair.into_inner();
-    let next = inner.next().unwrap();
+    let Some(next) = inner.next() else {
+        return Ok(match raw {
+            "bool" => PrimitiveType::Bool,
+            "int" => PrimitiveType::Int(32),
+            "uint" => PrimitiveType::Uint(32),
+            "float" => PrimitiveType::Float(32),
+            "string" => PrimitiveType::String,
+            "void" => PrimitiveType::Void,
+            un => unreachable!("{un:?}"),
+        });
+    };
     match next.as_rule() {
         Rule::int_type => {
             let prec = next.into_inner().next().unwrap().as_str().parse()?;
             return Ok(PrimitiveType::Int(prec));
+        }
+        Rule::uint_type => {
+            let prec = next.into_inner().next().unwrap().as_str().parse()?;
+            return Ok(PrimitiveType::Uint(prec));
         }
         Rule::float_type => {
             let prec = next.into_inner().next().unwrap().as_str().parse()?;

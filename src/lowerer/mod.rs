@@ -450,6 +450,12 @@ impl ExpressionIr for Expression {
             }
             ExpressionKind::Literal(lit) => return lit.to_ir_value(ctx, codegen),
             ExpressionKind::Block(b) => return b.to_ir_value(ctx, codegen),
+            ExpressionKind::Intrinsic(intrinsic) => {
+                anyhow::bail!(
+                    "compiler intrinsic lowering is not implemented: @{}",
+                    intrinsic.kind
+                )
+            }
             ExpressionKind::Call(call) => {
                 let function = match &*call.called.kind {
                     ExpressionKind::Identifier(path) => codegen.functions[path],
@@ -599,6 +605,12 @@ impl ExpressionIr for Expression {
     ) -> anyhow::Result<PointerValue<'ctx>> {
         match &*self.kind {
             ExpressionKind::Identifier(id) => id.to_ir_place(ctx, codegen),
+            ExpressionKind::Intrinsic(intrinsic) => {
+                anyhow::bail!(
+                    "compiler intrinsic cannot be used as a place: @{}",
+                    intrinsic.kind
+                )
+            }
             ExpressionKind::Index(exp, idx) => {
                 let offset = idx.to_ir_value(ctx, codegen)?.unwrap();
                 let ptr_val = exp.to_ir_value(ctx, codegen)?.unwrap().into_pointer_value();
