@@ -4,7 +4,7 @@ use std::collections::HashMap;
 pub struct TraitBuilder {
     ident: String,
     visibility: Visibility,
-    functions: HashMap<String, Function>,
+    functions: HashMap<String, FunctionDefinition>,
 }
 
 impl TraitBuilder {
@@ -30,5 +30,5 @@ impl TraitBuilder {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trait {
-    pub functions: HashMap<String, Function>,
+    pub functions: HashMap<String, FunctionDefinition>,
 }

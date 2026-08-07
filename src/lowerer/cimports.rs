@@ -26,15 +26,15 @@ fn rec_from<'a>(
     let int_from_size = |signed: bool| {
         let bits = value.get_sizeof().ok().map(|s| s * 8).unwrap_or(32);
         if signed {
-            Type::Primitive(PrimitiveType::Int(bits))
+            Type::int_p(bits)
         } else {
-            Type::Primitive(PrimitiveType::Uint(bits))
+            Type::uint_p(bits)
         }
     };
 
     let float_from_size = || {
         let bits = value.get_sizeof().ok().map(|s| s * 8).unwrap_or(32);
-        Type::Primitive(PrimitiveType::Float(bits))
+        Type::float_p(bits)
     };
 
     let kind = match value.get_kind() {
@@ -138,7 +138,7 @@ fn rec_from<'a>(
                     .map(|usr| usr.0)
                     .unwrap_or_else(|| format!("{record_kind}:{record_name}"));
                 if visiting.contains(&record_key) {
-                    return Type::r#struct(Vec::new());
+                    return Type::struct_t(Vec::new());
                 }
                 visiting.insert(record_key.clone());
                 let record_path = if parent.is_empty() {
@@ -173,10 +173,10 @@ fn rec_from<'a>(
                 visiting.remove(&record_key);
                 return match decl.get_kind() {
                     clang::EntityKind::UnionDecl => Type::union(members),
-                    _ => Type::r#struct(members),
+                    _ => Type::struct_t(members),
                 };
             }
-            Type::r#struct(Vec::new())
+            Type::struct_t(Vec::new())
         }
         td => todo!("todo: {td:?}"),
     };

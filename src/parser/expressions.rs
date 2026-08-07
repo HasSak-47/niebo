@@ -474,6 +474,13 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             }
             Operation::Call(params) => {
                 let a = get_next_val()?;
+                if let ExpressionKind::MemberAccess(access) = &*a.kind {
+                    return Ok(Expression::member_call(
+                        access.object.clone(),
+                        access.member.clone(),
+                        params,
+                    ));
+                }
 
                 return Ok(Expression::call(a, params));
             }

@@ -60,7 +60,8 @@ macro_rules! into_definition {
     };
 }
 
-into_definition!(Function);
+into_definition!(FunctionDeclaration);
+into_definition!(FunctionDefinition);
 into_definition!(Variable);
 into_definition!(Module);
 into_definition!(Trait);
@@ -71,7 +72,8 @@ into_definition!(TraitImplementation);
 pub enum DefinitionKind {
     Variable(Variable),
     Type(Type),
-    Function(Function),
+    FunctionDefinition(FunctionDefinition),
+    FunctionDeclaration(FunctionDeclaration),
     Module(Module),
     Trait(Trait),
     Implementation(Implementation),

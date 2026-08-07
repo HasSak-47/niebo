@@ -80,7 +80,7 @@ impl Display for UnaryOperator {
         match self {
             Self::Deref => write!(f, "*"),
             Self::Ref => write!(f, "&"),
-            Self::Negation => write!(f, "!"),
+            Self::Negation => write!(f, "-"),
 
             Self::Increase => write!(f, "--"),
             Self::Decrease => write!(f, "++"),

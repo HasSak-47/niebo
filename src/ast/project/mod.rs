@@ -64,7 +64,7 @@ impl Project {
 
     fn add_core_imports(module: &mut Module) {
         const CORE_TRAITS: &[&str] = &[
-            "Add", "Sub", "Mul", "Div", "Eq", "NEq", "LEq", "GEq", "Les", "Gre", "Copy",
+            "Add", "Neg", "Sub", "Mul", "Div", "Eq", "NEq", "LEq", "GEq", "Les", "Gre", "Copy",
         ];
 
         module.add_import(Self::qualified_name(&["core", "operations"]));

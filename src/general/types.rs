@@ -44,7 +44,7 @@ pub struct Template {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type {
+pub enum TypeKind {
     Primitive(PrimitiveType),
     Struct(StructType),
     Array(Box<Type>),
@@ -60,6 +60,13 @@ pub enum Type {
     Alias(Box<Type>),
     // path to a type that should be resolved later
     Named(QualifiedName),
+}
+
+pub enum Trait {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Type {
+    pub kind: TypeKind,
 }
 
 impl From<(String, Type)> for Params {
@@ -81,85 +88,143 @@ impl From<Type> for Params {
 }
 
 impl Type {
-    pub fn int() -> Self {
-        Self::Primitive(PrimitiveType::Int(32))
-    }
-
-    pub fn uint() -> Self {
-        Self::Primitive(PrimitiveType::Uint(32))
-    }
-
-    pub fn int_p(prec: usize) -> Self {
-        Self::Primitive(PrimitiveType::Int(prec))
-    }
-
-    pub fn uint_p(prec: usize) -> Self {
-        Self::Primitive(PrimitiveType::Uint(prec))
-    }
-
-    pub fn float() -> Self {
-        Self::Primitive(PrimitiveType::Float(32))
-    }
-
-    pub fn bool() -> Self {
-        Self::Primitive(PrimitiveType::Bool)
-    }
-
-    pub fn string() -> Self {
-        Self::Primitive(PrimitiveType::String)
-    }
-
-    pub fn void() -> Self {
-        Self::Primitive(PrimitiveType::Void)
-    }
-
-    pub fn r#struct(members: Vec<(String, Type)>) -> Self {
-        Self::Struct(StructType { members })
-    }
-
-    pub fn union(members: Vec<(String, Type)>) -> Self {
-        Self::Union(UnionType { members })
-    }
-
-    pub fn array(element: Type) -> Self {
-        Self::Array(Box::new(element))
-    }
-
-    pub fn pointer(ty: Type) -> Self {
-        Self::Pointer(Box::new(ty))
-    }
-
-    pub fn reference(ty: Type) -> Self {
-        Self::Reference(Box::new(ty))
-    }
-
-    pub fn function<I: Into<Params>>(params: Vec<I>, ret_ty: Type, varidic: bool) -> Self {
-        Self::Function(FunctionType {
-            params: params.into_iter().map(|a| a.into()).collect(),
-            ret_ty: Box::new(ret_ty),
-            varidic,
-        })
-    }
-
-    pub fn named(path: QualifiedName) -> Self {
-        Self::Named(path)
-    }
-
-    pub fn is_pointer(&self) -> bool {
-        match self {
-            Type::Pointer(_) => true,
-            Type::MutablePointer(_) => true,
-            _ => false,
+    pub fn alias(ty: Type) -> Self {
+        Self {
+            kind: TypeKind::Alias(Box::new(ty)),
         }
     }
 
-    pub fn sizeof(&self) -> u64 {
-        return 4;
+    pub fn primitive(p: PrimitiveType) -> Self {
+        Self {
+            kind: TypeKind::Primitive(p),
+        }
+    }
+
+    pub fn int() -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Int(32)),
+        }
+    }
+
+    pub fn uint() -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Uint(32)),
+        }
+    }
+
+    pub fn int_p(prec: usize) -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Int(prec)),
+        }
+    }
+
+    pub fn uint_p(prec: usize) -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Uint(prec)),
+        }
+    }
+
+    pub fn float() -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Float(32)),
+        }
+    }
+
+    pub fn float_p(prec: usize) -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Float(prec)),
+        }
+    }
+
+    pub fn bool() -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Bool),
+        }
+    }
+
+    pub fn string() -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::String),
+        }
+    }
+
+    pub fn void() -> Self {
+        Self {
+            kind: TypeKind::Primitive(PrimitiveType::Void),
+        }
+    }
+
+    pub fn struct_t(members: Vec<(String, Type)>) -> Self {
+        Self {
+            kind: TypeKind::Struct(StructType { members }),
+        }
+    }
+
+    pub fn union(members: Vec<(String, Type)>) -> Self {
+        Self {
+            kind: TypeKind::Union(UnionType { members }),
+        }
+    }
+
+    pub fn array(element: Type) -> Self {
+        Self {
+            kind: TypeKind::Array(Box::new(element)),
+        }
+    }
+
+    pub fn pointer(ty: Type) -> Self {
+        Self {
+            kind: TypeKind::Pointer(Box::new(ty)),
+        }
+    }
+
+    pub fn reference(ty: Type) -> Self {
+        Self {
+            kind: TypeKind::Reference(Box::new(ty)),
+        }
+    }
+
+    pub fn mutable_pointer(ty: Type) -> Self {
+        Self {
+            kind: TypeKind::MutablePointer(Box::new(ty)),
+        }
+    }
+
+    pub fn mutable_reference(ty: Type) -> Self {
+        Self {
+            kind: TypeKind::MutableReference(Box::new(ty)),
+        }
+    }
+
+    pub fn function<I: Into<Params>>(params: Vec<I>, ret_ty: Type, varidic: bool) -> Self {
+        Self {
+            kind: TypeKind::Function(FunctionType {
+                params: params.into_iter().map(|a| a.into()).collect(),
+                ret_ty: Box::new(ret_ty),
+                varidic,
+            }),
+        }
+    }
+
+    pub fn named(path: QualifiedName) -> Self {
+        Self {
+            kind: TypeKind::Named(path),
+        }
+    }
+
+    pub fn is_pointer(&self) -> bool {
+        match &self.kind {
+            TypeKind::Pointer(_) => true,
+            TypeKind::MutablePointer(_) => true,
+            _ => false,
+        }
     }
 }
 
 impl From<QualifiedName> for Type {
     fn from(path: QualifiedName) -> Self {
-        Type::Named(path)
+        Type {
+            kind: TypeKind::Named(path),
+        }
     }
 }

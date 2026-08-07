@@ -21,7 +21,7 @@ use crate::{
             intrinsic::{Intrinsic, IntrinsicKind},
             literal::Literal,
             loops::{LoopExpression, WhileLoop},
-            member_access::MemberAccess,
+            member_access::{MemberAccess, MemberCall},
             operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
     },
@@ -47,6 +47,7 @@ pub enum Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionKind {
     MemberAccess(MemberAccess),
+    MemberCall(MemberCall),
     Index(Expression, Expression),
     StructInit(StructInit),
     Block(Block),
@@ -67,6 +68,7 @@ impl Display for ExpressionKind {
         match self {
             ExpressionKind::Index(a, b) => write!(f, "{}[{}]", a, b),
             ExpressionKind::MemberAccess(a) => write!(f, "{}", a),
+            ExpressionKind::MemberCall(a) => write!(f, "{}", a),
             ExpressionKind::Block(a) => write!(f, "{}", a),
             ExpressionKind::If(a) => write!(f, "{}", a),
             ExpressionKind::Loop(a) => write!(f, "{}", a),
@@ -122,6 +124,24 @@ impl Expression {
                 member,
             })),
             constant: true,
+            ret_ty: None,
+        };
+    }
+
+    pub fn member_call<P: Into<QualifiedNameSegment>>(
+        object: Expression,
+        member: P,
+        params: Vec<Expression>,
+    ) -> Self {
+        let member = member.into();
+
+        return Expression {
+            kind: Box::new(ExpressionKind::MemberCall(MemberCall {
+                object,
+                member,
+                params,
+            })),
+            constant: false,
             ret_ty: None,
         };
     }

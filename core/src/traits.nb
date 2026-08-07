@@ -6,6 +6,10 @@ pub inter Add {
     fn add(self: Self, other: Self) -> Self;
 }
 
+pub inter Neg {
+    fn neg(self: Self) -> Self;
+}
+
 pub inter Sub {
     fn sub(self: Self, other: Self) -> Self;
 }

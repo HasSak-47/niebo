@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-};
+use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
 use clang::Clang;
@@ -76,12 +73,12 @@ impl Validator {
 
     pub fn validate_global_definition(&mut self, def: &mut Definition) -> Result<()> {
         match &mut def.kind {
-            DefinitionKind::Function(func) => {
+            DefinitionKind::FunctionDefinition(func) => {
                 self.register_global_symbol(
                     def.name.clone().into(),
                     Symbol::Function {
-                        ret_ty: func.return_ty.clone().unwrap(),
-                        params: func.parameters.iter().map(|a| a.1.clone()).collect(),
+                        ret_ty: func.def.return_ty.clone().unwrap(),
+                        params: func.def.parameters.iter().map(|a| a.1.clone()).collect(),
                     },
                 );
             }
@@ -102,12 +99,12 @@ impl Validator {
 
     pub fn validate_local_definition(&mut self, def: &mut Definition) -> Result<()> {
         match &mut def.kind {
-            DefinitionKind::Function(func) => {
+            DefinitionKind::FunctionDefinition(func) => {
                 self.register_local_symbol(
                     def.name.clone().into(),
                     Symbol::Function {
-                        ret_ty: func.return_ty.clone().unwrap(),
-                        params: func.parameters.iter().map(|a| a.1.clone()).collect(),
+                        ret_ty: func.def.return_ty.clone().unwrap(),
+                        params: func.def.parameters.iter().map(|a| a.1.clone()).collect(),
                     },
                 );
             }

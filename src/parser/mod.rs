@@ -11,7 +11,7 @@ use crate::{
     ast::{
         Definition, DefinitionKind, Implementation, Import, TraitImplementation, Visibility,
         expressions::Statement,
-        function::FunctionBuilder,
+        function::{FunctionBuilder, FunctionDeclaration},
         module::{Module, ModuleKind},
     },
     general::{
@@ -181,21 +181,23 @@ pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
                     Rule::fn_declaration => {
                         let builder = handle_fn_declaration(body)?;
                         let name = builder.ident;
-                        let function = crate::ast::function::Function {
-                            constant: builder.constant,
-                            return_ty: builder.ret_ty,
-                            parameters: builder
-                                .params
-                                .into_iter()
-                                .map(|(name, ty)| (name.unwrap(), ty))
-                                .collect(),
+                        let function = crate::ast::function::FunctionDefinition {
+                            def: FunctionDeclaration {
+                                constant: builder.constant,
+                                return_ty: builder.ret_ty,
+                                parameters: builder
+                                    .params
+                                    .into_iter()
+                                    .map(|(name, ty)| (name.unwrap(), ty))
+                                    .collect(),
+                            },
                             body: crate::ast::expressions::block::Block::new(),
                         };
                         functions.insert(name, function);
                     }
                     Rule::fn_definition => {
                         let def = handle_fn_definitions(body)?;
-                        if let DefinitionKind::Function(function) = def.kind {
+                        if let DefinitionKind::FunctionDefinition(function) = def.kind {
                             functions.insert(def.name, function);
                         }
                     }
@@ -435,10 +437,7 @@ mod test {
         let expected = Expression::binary_operation(
             BinaryOperator::Addition,
             Expression::member_access(Expression::call(Expression::identifier("a"), vec![]), "b"),
-            Expression::call(
-                Expression::member_access(Expression::identifier("c"), "d"),
-                vec![],
-            ),
+            Expression::member_call(Expression::identifier("c"), "d", vec![]),
         );
 
         assert!(parsed == expected, "{parsed} != {expected}");
@@ -456,6 +455,25 @@ mod test {
         for a in access {
             assert_eq!(a.as_rule(), Rule::expression_postfix);
         }
+
+        return Ok(());
+    }
+
+    #[test]
+    fn test_member_call_expression() -> anyhow::Result<()> {
+        let k = TokenStream::parse(Rule::expression, "c.d(10)")?
+            .next()
+            .unwrap();
+        assert_eq!(k.as_rule(), Rule::expression);
+        let parsed = handle_expression(k)?;
+
+        let expected = Expression::member_call(
+            Expression::identifier("c"),
+            "d",
+            vec![Expression::literal(Literal::integer("10", None, None))],
+        );
+
+        assert!(parsed == expected, "{parsed} != {expected}");
 
         return Ok(());
     }
@@ -575,6 +593,24 @@ mod test {
                         out_prec: 32,
                     }
                 );
+                assert_eq!(intrinsic.parameters.len(), 1);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_neg_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@neg_i32(self)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(intrinsic.kind, IntrinsicKind::NegI { prec: 32 });
                 assert_eq!(intrinsic.parameters.len(), 1);
             }
             other => panic!("expected intrinsic expression, got {other:?}"),

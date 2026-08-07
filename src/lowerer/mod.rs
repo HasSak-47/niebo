@@ -23,12 +23,12 @@ use crate::{
             literal::{Literal, LiteralInfo},
             operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
-        function::Function,
+        function::FunctionDefinition,
         project::Project,
     },
     general::{
         naming::QualifiedName,
-        types::{PrimitiveType, Type},
+        types::{PrimitiveType, Type, TypeKind},
     },
 };
 
@@ -93,15 +93,35 @@ impl TypeIr for Type {
         ctx: &'ctx Context,
         codegen: &mut CodeGen<'ctx>,
     ) -> anyhow::Result<FunctionType<'ctx>> {
+        return self.kind.make_fn_type(params, varidic, ctx, codegen);
+    }
+
+    fn to_ir_type<'ctx>(
+        &self,
+        ctx: &'ctx Context,
+        codegen: &mut CodeGen<'ctx>,
+    ) -> anyhow::Result<BasicTypeEnum<'ctx>> {
+        return self.kind.to_ir_type(ctx, codegen);
+    }
+}
+
+impl TypeIr for TypeKind {
+    fn make_fn_type<'ctx>(
+        &self,
+        params: &[BasicMetadataTypeEnum<'ctx>],
+        varidic: bool,
+        ctx: &'ctx Context,
+        codegen: &mut CodeGen<'ctx>,
+    ) -> anyhow::Result<FunctionType<'ctx>> {
         let _ = codegen;
         match self {
-            Type::Primitive(p) => match p {
+            TypeKind::Primitive(p) => match p {
                 PrimitiveType::Void => Ok(ctx.void_type().fn_type(params, varidic)),
-                p => Ok(Type::Primitive(p.clone())
+                p => Ok(TypeKind::Primitive(p.clone())
                     .to_ir_type(ctx, codegen)?
                     .fn_type(params, varidic)),
             },
-            Type::Pointer(_) => Ok(ctx
+            TypeKind::Pointer(_) => Ok(ctx
                 .ptr_type(AddressSpace::default())
                 .fn_type(params, varidic)),
             un => unimplemented!("{un:?}"),
@@ -114,16 +134,16 @@ impl TypeIr for Type {
     ) -> anyhow::Result<BasicTypeEnum<'ctx>> {
         let _ = codegen;
         match self {
-            Type::Primitive(p) => match p {
+            TypeKind::Primitive(p) => match p {
                 PrimitiveType::Int(_) => Ok(ctx.i32_type().into()),
                 PrimitiveType::String => Ok(ctx.ptr_type(AddressSpace::default()).into()),
                 PrimitiveType::Float(_) => Ok(ctx.f32_type().into()),
                 PrimitiveType::Void => unreachable!(),
                 un => unimplemented!("{un:?}"),
             },
-            Type::Pointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
-            Type::MutablePointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
-            Type::Struct(s) => {
+            TypeKind::Pointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
+            TypeKind::MutablePointer(_) => Ok(ctx.ptr_type(AddressSpace::default()).into()),
+            TypeKind::Struct(s) => {
                 let fields: Vec<_> = s
                     .members
                     .iter()
@@ -132,7 +152,7 @@ impl TypeIr for Type {
 
                 Ok(ctx.struct_type(fields.as_slice(), false).into())
             }
-            Type::Named(named) => {
+            TypeKind::Named(named) => {
                 let ty = codegen
                     .types
                     .get(named)
@@ -176,18 +196,18 @@ impl ExpressionIr for QualifiedName {
         }
 
         let ptr = self.to_ir_place(ctx, codegen)?;
-        return Ok(Some(match codegen.locals[self].1 {
-            Type::Primitive(PrimitiveType::Int(32)) => {
+        return Ok(Some(match codegen.locals[self].1.kind {
+            TypeKind::Primitive(PrimitiveType::Int(32)) => {
                 codegen
                     .builder
                     .build_load(ctx.i32_type(), ptr, "load_i32")?
             }
-            Type::Pointer(_) => codegen.builder.build_load(
+            TypeKind::Pointer(_) => codegen.builder.build_load(
                 ctx.ptr_type(AddressSpace::default()),
                 ptr,
                 "load_ptr",
             )?,
-            Type::MutablePointer(_) => codegen.builder.build_load(
+            TypeKind::MutablePointer(_) => codegen.builder.build_load(
                 ctx.ptr_type(AddressSpace::default()),
                 ptr,
                 "load_mut_ptr",
@@ -374,21 +394,22 @@ impl ExpressionIr for BinaryOperation {
             .ok_or_else(|| anyhow::anyhow!("left operand did not produce a value"))?;
 
         match (
-            self.operands[0].ret_ty.as_ref().unwrap(),
-            self.operands[1].ret_ty.as_ref().unwrap(),
+            &self.operands[0].ret_ty.as_ref().unwrap().kind,
+            &self.operands[1].ret_ty.as_ref().unwrap().kind,
         ) {
-            (Type::Pointer(_), Type::Pointer(_)) => {
+            (TypeKind::Pointer(_), TypeKind::Pointer(_)) => {
                 handle_ptr_ptr(ctx, codegen, a_val, b_val, &self.operator)
             }
-            (Type::MutablePointer(_), Type::Pointer(_)) => {
+            (TypeKind::MutablePointer(_), TypeKind::Pointer(_)) => {
                 handle_ptr_ptr(ctx, codegen, a_val, b_val, &self.operator)
             }
-            (Type::MutablePointer(_), Type::MutablePointer(_)) => {
+            (TypeKind::MutablePointer(_), TypeKind::MutablePointer(_)) => {
                 handle_ptr_ptr(ctx, codegen, a_val, b_val, &self.operator)
             }
-            (Type::Primitive(PrimitiveType::Int(_)), Type::Primitive(PrimitiveType::Int(_))) => {
-                handle_int_int(ctx, codegen, a_val, b_val, &self.operator)
-            }
+            (
+                TypeKind::Primitive(PrimitiveType::Int(_)),
+                TypeKind::Primitive(PrimitiveType::Int(_)),
+            ) => handle_int_int(ctx, codegen, a_val, b_val, &self.operator),
             todo => todo!("{todo:#?}"),
         }
     }
@@ -472,6 +493,9 @@ impl ExpressionIr for Expression {
 
                 let call = codegen.builder.build_call(function, &args, "")?;
                 return Ok(call.try_as_basic_value().basic());
+            }
+            ExpressionKind::MemberCall(call) => {
+                anyhow::bail!("member call lowering is not implemented: {call}");
             }
             ExpressionKind::Assignment(a, b) => {
                 let a = a.to_ir_place(ctx, codegen)?;
@@ -616,9 +640,9 @@ impl ExpressionIr for Expression {
                 let ptr_val = exp.to_ir_value(ctx, codegen)?.unwrap().into_pointer_value();
 
                 let offset_ptr = unsafe {
-                    let ir_ty = match exp.ret_ty.clone().unwrap() {
-                        Type::Array(r) => *r,
-                        Type::MutablePointer(r) => *r,
+                    let ir_ty = match exp.ret_ty.clone().unwrap().kind {
+                        TypeKind::Array(r) => *r,
+                        TypeKind::MutablePointer(r) => *r,
                         _ => unreachable!(),
                     }
                     .to_ir_type(ctx, codegen)?;
@@ -714,7 +738,7 @@ impl ExpressionIr for Block {
     }
 }
 
-impl StatementIr for Function {
+impl StatementIr for FunctionDefinition {
     fn to_ir<'ctx>(
         &self,
         name: String,
@@ -828,7 +852,7 @@ pub fn compile(project: Project, out: PathBuf) -> anyhow::Result<()> {
     for def in &project.root_module.definitions {
         println!("generating def {}", def.name);
         match &def.kind {
-            ast::DefinitionKind::Function(f) => {
+            ast::DefinitionKind::FunctionDefinition(f) => {
                 f.to_ir(def.name.clone(), &context, &mut codegen)?
             }
             // do jackshit the types are handled when needed

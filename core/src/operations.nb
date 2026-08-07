@@ -1,7 +1,11 @@
-import core::traits::{Add, Sub, Mul, Div, Eq, NEq, LEq, GEq, Les, Gre, Copy};
+import core::traits::{Add, Neg, Sub, Mul, Div, Eq, NEq, LEq, GEq, Les, Gre, Copy};
 
 extend i8 as Copy {
     fn copy(self: i8) -> i8 { return @copy(self); }
+}
+
+extend i8 as Neg {
+    fn neg(self: i8) -> i8 { return @neg_i8(self); }
 }
 
 extend i8 as Add {
@@ -48,6 +52,10 @@ extend i16 as Copy {
     fn copy(self: i16) -> i16 { return @copy(self); }
 }
 
+extend i16 as Neg {
+    fn neg(self: i16) -> i16 { return @neg_i16(self); }
+}
+
 extend i16 as Add {
     fn add(self: i16, other: i16) -> i16 { return @add_i16(self, other); }
 }
@@ -90,6 +98,10 @@ extend i16 as Gre {
 
 extend i32 as Copy {
     fn copy(self: i32) -> i32 { return @copy(self); }
+}
+
+extend i32 as Neg {
+    fn neg(self: i32) -> i32 { return @neg_i32(self); }
 }
 
 extend i32 as Add {
@@ -136,6 +148,10 @@ extend i64 as Copy {
     fn copy(self: i64) -> i64 { return @copy(self); }
 }
 
+extend i64 as Neg {
+    fn neg(self: i64) -> i64 { return @neg_i64(self); }
+}
+
 extend i64 as Add {
     fn add(self: i64, other: i64) -> i64 { return @add_i64(self, other); }
 }
@@ -178,6 +194,10 @@ extend i64 as Gre {
 
 extend u8 as Copy {
     fn copy(self: u8) -> u8 { return @copy(self); }
+}
+
+extend u8 as Neg {
+    fn neg(self: u8) -> u8 { return @neg_u8(self); }
 }
 
 extend u8 as Add {
@@ -224,6 +244,10 @@ extend u16 as Copy {
     fn copy(self: u16) -> u16 { return @copy(self); }
 }
 
+extend u16 as Neg {
+    fn neg(self: u16) -> u16 { return @neg_u16(self); }
+}
+
 extend u16 as Add {
     fn add(self: u16, other: u16) -> u16 { return @add_u16(self, other); }
 }
@@ -266,6 +290,10 @@ extend u16 as Gre {
 
 extend u32 as Copy {
     fn copy(self: u32) -> u32 { return @copy(self); }
+}
+
+extend u32 as Neg {
+    fn neg(self: u32) -> u32 { return @neg_u32(self); }
 }
 
 extend u32 as Add {
@@ -312,6 +340,10 @@ extend u64 as Copy {
     fn copy(self: u64) -> u64 { return @copy(self); }
 }
 
+extend u64 as Neg {
+    fn neg(self: u64) -> u64 { return @neg_u64(self); }
+}
+
 extend u64 as Add {
     fn add(self: u64, other: u64) -> u64 { return @add_u64(self, other); }
 }
@@ -356,6 +388,10 @@ extend f32 as Copy {
     fn copy(self: f32) -> f32 { return @copy(self); }
 }
 
+extend f32 as Neg {
+    fn neg(self: f32) -> f32 { return @neg_f32(self); }
+}
+
 extend f32 as Add {
     fn add(self: f32, other: f32) -> f32 { return @add_f32(self, other); }
 }
@@ -398,6 +434,10 @@ extend f32 as Gre {
 
 extend f64 as Copy {
     fn copy(self: f64) -> f64 { return @copy(self); }
+}
+
+extend f64 as Neg {
+    fn neg(self: f64) -> f64 { return @neg_f64(self); }
 }
 
 extend f64 as Add {

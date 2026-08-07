@@ -8,6 +8,7 @@ pub enum IntrinsicKind {
     Copy,
 
     // ix art intrinsics
+    NegI { prec: usize },
     AddI { prec: usize },
     SubI { prec: usize },
     MulI { prec: usize },
@@ -25,6 +26,7 @@ pub enum IntrinsicKind {
     IToF { src_prec: usize, out_prec: usize },
 
     // ux art intrinsics
+    NegU { prec: usize },
     AddU { prec: usize },
     SubU { prec: usize },
     MulU { prec: usize },
@@ -42,6 +44,7 @@ pub enum IntrinsicKind {
     UToF { src_prec: usize, out_prec: usize },
 
     // fx intrinsics
+    NegF { prec: usize },
     AddF { prec: usize },
     SubF { prec: usize },
     MulF { prec: usize },
@@ -98,120 +101,58 @@ fn format_binary_intrinsic(
 
 impl Display for IntrinsicKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IntrinsicKind::Copy => write!(f, "copy"),
-
-            IntrinsicKind::AddI { prec } => {
-                format_binary_intrinsic(f, "add", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::SubI { prec } => {
-                format_binary_intrinsic(f, "sub", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::MulI { prec } => {
-                format_binary_intrinsic(f, "mul", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::DivI { prec } => {
-                format_binary_intrinsic(f, "div", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::EqI { prec } => {
-                format_binary_intrinsic(f, "eq", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::NEqI { prec } => {
-                format_binary_intrinsic(f, "neq", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::LEqI { prec } => {
-                format_binary_intrinsic(f, "leq", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::GEqI { prec } => {
-                format_binary_intrinsic(f, "geq", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::LesI { prec } => {
-                format_binary_intrinsic(f, "les", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::GreI { prec } => {
-                format_binary_intrinsic(f, "gre", NumericKind::Int, *prec)
-            }
-            IntrinsicKind::IToU { src_prec, out_prec } => {
-                write!(f, "i{src_prec}_to_u{out_prec}")
-            }
-            IntrinsicKind::IToF { src_prec, out_prec } => {
-                write!(f, "i{src_prec}_to_f{out_prec}")
-            }
-
-            IntrinsicKind::AddU { prec } => {
-                format_binary_intrinsic(f, "add", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::SubU { prec } => {
-                format_binary_intrinsic(f, "sub", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::MulU { prec } => {
-                format_binary_intrinsic(f, "mul", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::DivU { prec } => {
-                format_binary_intrinsic(f, "div", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::EqU { prec } => {
-                format_binary_intrinsic(f, "eq", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::NEqU { prec } => {
-                format_binary_intrinsic(f, "neq", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::LEqU { prec } => {
-                format_binary_intrinsic(f, "leq", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::GEqU { prec } => {
-                format_binary_intrinsic(f, "geq", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::LesU { prec } => {
-                format_binary_intrinsic(f, "les", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::GreU { prec } => {
-                format_binary_intrinsic(f, "gre", NumericKind::Uint, *prec)
-            }
-            IntrinsicKind::UToI { src_prec, out_prec } => {
-                write!(f, "u{src_prec}_to_i{out_prec}")
-            }
-            IntrinsicKind::UToF { src_prec, out_prec } => {
-                write!(f, "u{src_prec}_to_f{out_prec}")
-            }
-
-            IntrinsicKind::AddF { prec } => {
-                format_binary_intrinsic(f, "add", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::SubF { prec } => {
-                format_binary_intrinsic(f, "sub", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::MulF { prec } => {
-                format_binary_intrinsic(f, "mul", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::DivF { prec } => {
-                format_binary_intrinsic(f, "div", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::EqF { prec } => {
-                format_binary_intrinsic(f, "eq", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::NEqF { prec } => {
-                format_binary_intrinsic(f, "neq", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::LEqF { prec } => {
-                format_binary_intrinsic(f, "leq", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::GEqF { prec } => {
-                format_binary_intrinsic(f, "geq", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::LesF { prec } => {
-                format_binary_intrinsic(f, "les", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::GreF { prec } => {
-                format_binary_intrinsic(f, "gre", NumericKind::Float, *prec)
-            }
-            IntrinsicKind::FToI { src_prec, out_prec } => {
-                write!(f, "f{src_prec}_to_i{out_prec}")
-            }
-            IntrinsicKind::FToU { src_prec, out_prec } => {
-                write!(f, "f{src_prec}_to_u{out_prec}")
-            }
+        macro_rules! build_match {
+            ( $({ $num:tt : $(($name: literal, $intrinsic: tt)),* $(,)? }),* $(,)?) => {
+                match self {
+                    $($(IntrinsicKind::$intrinsic { prec }=> format_binary_intrinsic(f, $name, NumericKind::$num, *prec),)*)*
+                    IntrinsicKind::Copy => write!(f, "copy"),
+                    IntrinsicKind::IToU { src_prec, out_prec } => {
+                        write!(f, "i{src_prec}_to_u{out_prec}")
+                    }
+                    IntrinsicKind::IToF { src_prec, out_prec } => {
+                        write!(f, "i{src_prec}_to_f{out_prec}")
+                    }
+                    IntrinsicKind::UToI { src_prec, out_prec } => {
+                        write!(f, "u{src_prec}_to_i{out_prec}")
+                    }
+                    IntrinsicKind::UToF { src_prec, out_prec } => {
+                        write!(f, "u{src_prec}_to_f{out_prec}")
+                    }
+                    IntrinsicKind::FToI { src_prec, out_prec } => {
+                        write!(f, "f{src_prec}_to_i{out_prec}")
+                    }
+                    IntrinsicKind::FToU { src_prec, out_prec } => {
+                        write!(f, "f{src_prec}_to_u{out_prec}")
+                    }
+                    #[allow(unreachable_patterns)]
+                    _ => unreachable!()
+                }
+            };
         }
+
+        build_match!(
+            {Int:
+                ("neg", NegI),
+                ("add", AddI), ("sub", SubI),
+                ("mul", MulI), ("div", DivI),
+                ("eq", EqI), ("neq", NEqI),
+                ("leq", LEqI), ("geq", GEqI),
+                ("les", LesI), ("gre", GreI)},
+            {Uint:
+                ("neg", NegU),
+                ("add", AddU), ("sub", SubU),
+                ("mul", MulU), ("div", DivU),
+                ("eq", EqU), ("neq", NEqU),
+                ("leq", LEqU), ("geq", GEqU),
+                ("les", LesU), ("gre", GreU)},
+            {Float:
+                ("neg", NegF),
+                ("add", AddF), ("sub", SubF),
+                ("mul", MulF), ("div", DivF),
+                ("eq", EqF), ("neq", NEqF),
+                ("leq", LEqF), ("geq", GEqF),
+                ("les", LesF), ("gre", GreF)},
+        )
     }
 }
 
@@ -254,41 +195,38 @@ impl FromStr for IntrinsicKind {
         let (operand_kind, operand_prec) = parse_numeric_kind(operand)
             .ok_or_else(|| anyhow::anyhow!("invalid intrinsic operand type: {operand}"))?;
 
-        match (op, operand_kind) {
-            ("add", NumericKind::Int) => Ok(Self::AddI { prec: operand_prec }),
-            ("sub", NumericKind::Int) => Ok(Self::SubI { prec: operand_prec }),
-            ("mul", NumericKind::Int) => Ok(Self::MulI { prec: operand_prec }),
-            ("div", NumericKind::Int) => Ok(Self::DivI { prec: operand_prec }),
-            ("eq", NumericKind::Int) => Ok(Self::EqI { prec: operand_prec }),
-            ("neq", NumericKind::Int) => Ok(Self::NEqI { prec: operand_prec }),
-            ("leq", NumericKind::Int) => Ok(Self::LEqI { prec: operand_prec }),
-            ("geq", NumericKind::Int) => Ok(Self::GEqI { prec: operand_prec }),
-            ("les", NumericKind::Int) => Ok(Self::LesI { prec: operand_prec }),
-            ("gre", NumericKind::Int) => Ok(Self::GreI { prec: operand_prec }),
-
-            ("add", NumericKind::Uint) => Ok(Self::AddU { prec: operand_prec }),
-            ("sub", NumericKind::Uint) => Ok(Self::SubU { prec: operand_prec }),
-            ("mul", NumericKind::Uint) => Ok(Self::MulU { prec: operand_prec }),
-            ("div", NumericKind::Uint) => Ok(Self::DivU { prec: operand_prec }),
-            ("eq", NumericKind::Uint) => Ok(Self::EqU { prec: operand_prec }),
-            ("neq", NumericKind::Uint) => Ok(Self::NEqU { prec: operand_prec }),
-            ("leq", NumericKind::Uint) => Ok(Self::LEqU { prec: operand_prec }),
-            ("geq", NumericKind::Uint) => Ok(Self::GEqU { prec: operand_prec }),
-            ("les", NumericKind::Uint) => Ok(Self::LesU { prec: operand_prec }),
-            ("gre", NumericKind::Uint) => Ok(Self::GreU { prec: operand_prec }),
-
-            ("add", NumericKind::Float) => Ok(Self::AddF { prec: operand_prec }),
-            ("sub", NumericKind::Float) => Ok(Self::SubF { prec: operand_prec }),
-            ("mul", NumericKind::Float) => Ok(Self::MulF { prec: operand_prec }),
-            ("div", NumericKind::Float) => Ok(Self::DivF { prec: operand_prec }),
-            ("eq", NumericKind::Float) => Ok(Self::EqF { prec: operand_prec }),
-            ("neq", NumericKind::Float) => Ok(Self::NEqF { prec: operand_prec }),
-            ("leq", NumericKind::Float) => Ok(Self::LEqF { prec: operand_prec }),
-            ("geq", NumericKind::Float) => Ok(Self::GEqF { prec: operand_prec }),
-            ("les", NumericKind::Float) => Ok(Self::LesF { prec: operand_prec }),
-            ("gre", NumericKind::Float) => Ok(Self::GreF { prec: operand_prec }),
-            _ => anyhow::bail!("unknown intrinsic: {value}"),
+        macro_rules! build_match {
+            ( $({ $num:tt : $(($name: literal, $intrinsic: tt)),* $(,)? }),* $(,)?) => {
+                match (op, operand_kind) {
+                    $($(($name, NumericKind::$num) => Ok(Self::$intrinsic { prec: operand_prec }),)*)*
+                    _ => anyhow::bail!("unknown intrinsic: {value}"),
+                }
+            };
         }
+
+        build_match!(
+            {Int:
+                ("neg", NegI),
+                ("add", AddI), ("sub", SubI),
+                ("mul", MulI), ("div", DivI),
+                ("eq", EqI), ("neq", NEqI),
+                ("leq", LEqI), ("geq", GEqI),
+                ("les", LesI), ("gre", GreI)},
+            {Uint:
+                ("neg", NegU),
+                ("add", AddU), ("sub", SubU),
+                ("mul", MulU), ("div", DivU),
+                ("eq", EqU), ("neq", NEqU),
+                ("leq", LEqU), ("geq", GEqU),
+                ("les", LesU), ("gre", GreU)},
+            {Float:
+                ("neg", NegF),
+                ("add", AddF), ("sub", SubF),
+                ("mul", MulF), ("div", DivF),
+                ("eq", EqF), ("neq", NEqF),
+                ("leq", LEqF), ("geq", GEqF),
+                ("les", LesF), ("gre", GreF)},
+        )
     }
 }
 
