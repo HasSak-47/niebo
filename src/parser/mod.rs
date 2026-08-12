@@ -316,7 +316,7 @@ pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     let ident = inner.next().unwrap();
 
     if inner.next().is_some() {
-        todo!("handle infine module");
+        todo!("handle infile module");
     }
 
     let mut md = Module::new();

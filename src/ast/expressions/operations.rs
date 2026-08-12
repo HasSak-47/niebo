@@ -1,6 +1,9 @@
 use std::fmt::Display;
 
-use crate::general::{naming::QualifiedName, types::Type};
+use crate::general::{
+    naming::{QualifiedName, QualifiedNameSegment},
+    types::Type,
+};
 
 use super::Expression;
 
@@ -53,15 +56,12 @@ impl Display for BinaryOperator {
 }
 
 impl BinaryOperator {
-    pub fn into_path(&self) -> QualifiedName {
-        let val = match self {
+    pub fn into_member_access(&self) -> QualifiedNameSegment {
+        return match self {
             BinaryOperator::Addition => "add",
             _ => todo!(),
         }
-        .to_string();
-        return QualifiedName {
-            v: vec![val.into(), "core".into()],
-        };
+        .into();
     }
 }
 
@@ -73,6 +73,16 @@ pub enum UnaryOperator {
     Increase,
     Decrease,
     EarlyRet,
+}
+
+impl UnaryOperator {
+    pub fn into_member_access(&self) -> QualifiedNameSegment {
+        return match self {
+            UnaryOperator::Negation => "neg",
+            _ => todo!(),
+        }
+        .into();
+    }
 }
 
 impl Display for UnaryOperator {

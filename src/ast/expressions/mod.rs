@@ -169,8 +169,8 @@ impl Expression {
         Self::new(ExpressionKind::If(conditional))
     }
 
-    pub fn loop_(loop_expression: LoopExpression) -> Self {
-        Self::new(ExpressionKind::Loop(loop_expression))
+    pub fn loop_(body: Expression, label: Option<String>) -> Self {
+        Self::new(ExpressionKind::Loop(LoopExpression { label, body }))
     }
 
     pub fn while_(while_loop: WhileLoop) -> Self {

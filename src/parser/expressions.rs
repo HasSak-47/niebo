@@ -330,7 +330,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
         Rule::path => Expression::identifier(handle_qualified_name(next)?),
         Rule::intrinsic_expression => handle_intrinsic_expression(next)?,
         Rule::block_expression => Expression::block(handle_block_expression(next)?),
-        Rule::loop_expression => Expression::loop_(handle_loop_expression(next)?),
+        Rule::loop_expression => handle_loop_expression(next)?.into(),
         Rule::if_expression => Expression::if_(handle_if_expression(next)?),
         Rule::while_expression => {
             let mut inner = next.into_inner();

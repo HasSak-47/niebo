@@ -1,3 +1,5 @@
+use std::collections::{HashMap, HashSet};
+
 use super::naming::QualifiedName;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,11 +64,16 @@ pub enum TypeKind {
     Named(QualifiedName),
 }
 
-pub enum Trait {}
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Trait {
+    functions: HashMap<String, FunctionType>,
+    types: HashMap<String, Type>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Type {
     pub kind: TypeKind,
+    pub traits: HashSet<QualifiedName>,
 }
 
 impl From<(String, Type)> for Params {
@@ -88,111 +95,136 @@ impl From<Type> for Params {
 }
 
 impl Type {
+    fn no_type() -> Type {
+        Type {
+            kind: TypeKind::Primitive(PrimitiveType::Void),
+            traits: HashSet::new(),
+        }
+    }
+
     pub fn alias(ty: Type) -> Self {
         Self {
             kind: TypeKind::Alias(Box::new(ty)),
+            ..Type::no_type()
         }
     }
 
     pub fn primitive(p: PrimitiveType) -> Self {
         Self {
             kind: TypeKind::Primitive(p),
+            ..Type::no_type()
         }
     }
 
     pub fn int() -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Int(32)),
+            ..Type::no_type()
         }
     }
 
     pub fn uint() -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Uint(32)),
+            ..Type::no_type()
         }
     }
 
     pub fn int_p(prec: usize) -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Int(prec)),
+            ..Type::no_type()
         }
     }
 
     pub fn uint_p(prec: usize) -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Uint(prec)),
+            ..Type::no_type()
         }
     }
 
     pub fn float() -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Float(32)),
+            ..Type::no_type()
         }
     }
 
     pub fn float_p(prec: usize) -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Float(prec)),
+            ..Type::no_type()
         }
     }
 
     pub fn bool() -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Bool),
+            ..Type::no_type()
         }
     }
 
     pub fn string() -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::String),
+            ..Type::no_type()
         }
     }
 
     pub fn void() -> Self {
         Self {
             kind: TypeKind::Primitive(PrimitiveType::Void),
+            ..Type::no_type()
         }
     }
 
     pub fn struct_t(members: Vec<(String, Type)>) -> Self {
         Self {
             kind: TypeKind::Struct(StructType { members }),
+            ..Type::no_type()
         }
     }
 
     pub fn union(members: Vec<(String, Type)>) -> Self {
         Self {
             kind: TypeKind::Union(UnionType { members }),
+            ..Type::no_type()
         }
     }
 
     pub fn array(element: Type) -> Self {
         Self {
             kind: TypeKind::Array(Box::new(element)),
+            ..Type::no_type()
         }
     }
 
     pub fn pointer(ty: Type) -> Self {
         Self {
             kind: TypeKind::Pointer(Box::new(ty)),
+            ..Type::no_type()
         }
     }
 
     pub fn reference(ty: Type) -> Self {
         Self {
             kind: TypeKind::Reference(Box::new(ty)),
+            ..Type::no_type()
         }
     }
 
     pub fn mutable_pointer(ty: Type) -> Self {
         Self {
             kind: TypeKind::MutablePointer(Box::new(ty)),
+            ..Type::no_type()
         }
     }
 
     pub fn mutable_reference(ty: Type) -> Self {
         Self {
             kind: TypeKind::MutableReference(Box::new(ty)),
+            ..Type::no_type()
         }
     }
 
@@ -203,12 +235,14 @@ impl Type {
                 ret_ty: Box::new(ret_ty),
                 varidic,
             }),
+            ..Type::no_type()
         }
     }
 
     pub fn named(path: QualifiedName) -> Self {
         Self {
             kind: TypeKind::Named(path),
+            ..Type::no_type()
         }
     }
 
@@ -225,6 +259,7 @@ impl From<QualifiedName> for Type {
     fn from(path: QualifiedName) -> Self {
         Type {
             kind: TypeKind::Named(path),
+            ..Type::no_type()
         }
     }
 }
