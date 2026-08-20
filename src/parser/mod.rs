@@ -1,6 +1,5 @@
 mod expressions;
 mod type_handling;
-pub mod validator;
 
 use expressions::{handle_block_expression, handle_expression};
 use type_handling::*;

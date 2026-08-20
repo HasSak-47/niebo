@@ -8,7 +8,10 @@ use clang::Clang;
 
 use crate::{
     ast::{Definition, DefinitionKind, project::Project},
-    general::{naming::QualifiedName, types::Type},
+    general::{
+        naming::QualifiedName,
+        types::{FunctionType, Type},
+    },
     ir::cimports::CCache,
 };
 
@@ -20,6 +23,12 @@ enum Symbol {
     Variable(Type),
     Type(Type),
     Function { ret_ty: Type, params: Vec<Type> },
+}
+
+pub struct TypeSpec {
+    ty: Type,
+    traits: HashSet<QualifiedName>,
+    methods: HashMap<QualifiedName, FunctionType>,
 }
 
 #[derive(Debug, Default)]
