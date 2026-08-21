@@ -15,7 +15,7 @@ use crate::{
     ir::cimports::CCache,
 };
 
-mod validator;
+pub mod validator;
 use validator::ExpressionValidator;
 
 #[derive(Debug, Clone)]
@@ -25,16 +25,19 @@ enum Symbol {
     Function { ret_ty: Type, params: Vec<Type> },
 }
 
-pub struct TypeSpec {
+#[derive(Debug)]
+struct TypeData {
     ty: Type,
-    traits: HashSet<QualifiedName>,
-    methods: HashMap<QualifiedName, FunctionType>,
+    traits: Vec<QualifiedName>,
+    methods: Vec<QualifiedName>,
 }
 
 #[derive(Debug, Default)]
 pub struct Validator {
     local_scope: Vec<HashMap<QualifiedName, Symbol>>,
     global_scope: HashMap<QualifiedName, Symbol>,
+
+    type_data: HashMap<QualifiedName, TypeData>,
 }
 
 impl Validator {
@@ -137,27 +140,6 @@ impl Validator {
 
     // NOTE: ommit templates for now do to complexity
     pub fn process_project(&mut self, mut project: Project) -> Result<Project> {
-        // - generate a registry to determine what is each Identifier/Path
-        // - determine type of all variables
-        // for example "let i = 10;" has no type in the AST but it's type should be i32
-        // and the type of "i" should be i32 and the 10? should collapse into a 10i32
-        // getting the statement "let i: i32 = 10i32;"
-        // - make sure that the path's taken are indeed valid objects
-        // for example:
-        // type TypeAlias = i32;
-        //
-        // fn foo(){
-        //     let var = TypeAlias;
-        // }
-        //
-        // TypeAlias is a valid Path but not an expression so it get's discarted
-        // - for each expression get determine it's return type
-        // - make sure that if something returns that it returns the same type
-        // - convert operations into their equivalent core::op::OP
-
-        // convert each path identifier/path into it's full path
-        // loading module imports
-        // let mut res = Resolver::default();
         let clang = Clang::new().unwrap();
         let mut ccache = CCache::new(&clang)?;
 

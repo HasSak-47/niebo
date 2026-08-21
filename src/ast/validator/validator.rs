@@ -1,4 +1,4 @@
-use super::{Symbol, Validator};
+use super::*;
 use anyhow::bail;
 
 use crate::{
@@ -6,7 +6,7 @@ use crate::{
     general::types::{PrimitiveType, Type},
 };
 
-pub(super) trait ExpressionValidator {
+pub trait ExpressionValidator {
     fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()>;
     fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type>;
 }

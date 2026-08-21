@@ -12,7 +12,7 @@ use crate::{
         loops::{LoopExpression, WhileLoop},
         operations::{BinaryOperator, UnaryOperator},
     },
-    general::naming::QualifiedNameSegment,
+    general::naming::{QualifiedName, QualifiedNameSegment},
 };
 
 fn handle_index_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
@@ -24,6 +24,35 @@ fn handle_index_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expre
     let mut inner = pair.into_inner();
     let member = inner.next().unwrap();
     return Ok(handle_expression(member)?);
+}
+
+fn handle_method_call_postfix<'a>(
+    pair: Pair<'a, Rule>,
+) -> anyhow::Result<(QualifiedNameSegment, Vec<Expression>)> {
+    assert_eq!(
+        pair.as_rule(),
+        Rule::method_call_postfix,
+        "a non Rule::method_call_postfix reached handle_member_access_postfix"
+    );
+
+    let mut inner = pair.into_inner();
+
+    // WARN: leaky interface bad!!
+    let method = QualifiedNameSegment::from(inner.next().unwrap().as_str());
+
+    let next = inner.next();
+    if let None = next {
+        return Ok((method, vec![]));
+    }
+
+    let inner = next.unwrap().into_inner();
+
+    let mut params = Vec::new();
+    for innr in inner {
+        params.push(handle_expression(innr)?);
+    }
+
+    return Ok((method, params));
 }
 
 fn handle_member_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNameSegment> {
@@ -200,6 +229,7 @@ enum Operation {
     Call(Vec<Expression>),
     Assign(Expression),
     Access(QualifiedNameSegment),
+    Method(QualifiedNameSegment, Vec<Expression>),
     Index(Expression),
     Unary(UnaryOperator),
     Binary(BinaryOperator),
@@ -225,6 +255,9 @@ impl PartialOrd for Operation {
 
             (Operation::Call(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
             (Operation::Call(_), _) => std::cmp::Ordering::Equal,
+
+            (Operation::Method(_, _), Operation::Binary(_)) => std::cmp::Ordering::Greater,
+            (Operation::Method(_, _), _) => std::cmp::Ordering::Equal,
 
             (Operation::Access(_), Operation::Binary(_)) => std::cmp::Ordering::Greater,
             (Operation::Access(_), _) => std::cmp::Ordering::Equal,
@@ -259,7 +292,8 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
     assert_eq!(
         pair.as_rule(),
         Rule::expression,
-        "a non Rule::expression reached handle_expression"
+        "a non Rule::expression reached handle_expression: {:?}",
+        pair.as_rule()
     );
     let mut inner = pair.clone().into_inner();
     let next = inner.next().unwrap();
@@ -337,6 +371,8 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             Rule::unary_expression_postfix => {}
             Rule::member_access_postfix => {}
             Rule::index_access_postfix => {}
+            Rule::method_call_postfix => {}
+
             un => unreachable!("{un:?}"),
         }
         postfix_rules.push(postfix);
@@ -372,6 +408,10 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             Rule::index_access_postfix => {
                 let ex = handle_index_access_postfix(p)?;
                 e_string.push(ExpressionString::Oper(Operation::Index(ex)));
+            }
+            Rule::method_call_postfix => {
+                let (ident, params) = handle_method_call_postfix(p)?;
+                e_string.push(ExpressionString::Oper(Operation::Method(ident, params)));
             }
             un => todo!("{un:?}:'{}'", p.as_str()),
         }
@@ -425,6 +465,11 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
                 let a = get_next_val()?;
 
                 return Ok(Expression::member_access(a, ident));
+            }
+            Operation::Method(ident, params) => {
+                let a = get_next_val()?;
+
+                return Ok(Expression::method_call(a, ident, params));
             }
             Operation::Call(params) => {
                 let a = get_next_val()?;

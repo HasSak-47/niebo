@@ -19,7 +19,7 @@ use crate::{
             init::StructInit,
             literal::Literal,
             loops::{LoopExpression, WhileLoop},
-            member_access::MemberAccess,
+            member_access::{MemberAccess, MethodCall},
             operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
         },
     },
@@ -39,11 +39,14 @@ pub enum Statement {
     Continue,
     Use(QualifiedName),
     Return(Option<Expression>),
+
+    // return value for the block expression
     Value(Option<Expression>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionKind {
+    MethodCall(MethodCall),
     MemberAccess(MemberAccess),
     Index(Expression, Expression),
     StructInit(StructInit),
@@ -62,6 +65,7 @@ pub enum ExpressionKind {
 impl Display for ExpressionKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            ExpressionKind::MethodCall(a) => write!(f, "{}", a),
             ExpressionKind::Index(a, b) => write!(f, "{}[{}]", a, b),
             ExpressionKind::MemberAccess(a) => write!(f, "{}", a),
             ExpressionKind::Block(a) => write!(f, "{}", a),
@@ -106,6 +110,24 @@ impl Expression {
             kind: Box::new(ExpressionKind::Index(val, index)),
             ret_ty: None,
             constant: false,
+        };
+    }
+
+    pub fn method_call<P: Into<QualifiedNameSegment>>(
+        object: Expression,
+        method: P,
+        params: Vec<Expression>,
+    ) -> Self {
+        let method = method.into();
+
+        return Expression {
+            kind: Box::new(ExpressionKind::MethodCall(MethodCall {
+                object,
+                method,
+                params,
+            })),
+            constant: true,
+            ret_ty: None,
         };
     }
 

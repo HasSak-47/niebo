@@ -333,6 +333,8 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
 
 #[cfg(test)]
 mod test {
+    use anyhow::bail;
+
     use super::*;
     use crate::ast::expressions::literal::*;
     use crate::ast::expressions::operations::*;
@@ -348,10 +350,7 @@ mod test {
         let expected = Expression::binary_operation(
             BinaryOperator::Addition,
             Expression::member_access(Expression::call(Expression::identifier("a"), vec![]), "b"),
-            Expression::call(
-                Expression::member_access(Expression::identifier("c"), "d"),
-                vec![],
-            ),
+            Expression::method_call(Expression::identifier("c"), "d", vec![]),
         );
 
         assert!(parsed == expected, "{parsed} != {expected}");
@@ -363,11 +362,49 @@ mod test {
     fn test_member_access() -> anyhow::Result<()> {
         //  TODO: check that the postfix is correct
         // expression postfix:call postfix:access postfix:call
-        let mut access = TokenStream::parse(Rule::expression, "a().b(10)")?;
-        let exp = access.next().unwrap();
-        assert_eq!(exp.as_rule(), Rule::expression);
-        for a in access {
-            assert_eq!(a.as_rule(), Rule::expression_postfix);
+        let access = TokenStream::parse(Rule::expression, "(a().b)(10)")?;
+        let exp = handle_expression(access.into_iter().next().unwrap())?;
+
+        if let ExpressionKind::Call(call) = &*exp.kind {
+            if let ExpressionKind::MemberAccess(member) = &*call.called.kind {
+                assert!(member.member == QualifiedNameSegment::from("b"));
+                if let ExpressionKind::Call(called2) = &*member.object.kind {
+                    assert!(matches!(
+                        &*called2.called.kind,
+                        ExpressionKind::Identifier(_)
+                    ))
+                } else {
+                    bail!("b was not a member access from a()")
+                }
+            } else {
+                bail!("called was not (a().b)")
+            }
+        } else {
+            bail!("there was no (a().b)(10) call!")
+        }
+
+        return Ok(());
+    }
+
+    #[test]
+    fn test_method_call() -> anyhow::Result<()> {
+        //  TODO: check that the postfix is correct
+        // expression postfix:call postfix:access postfix:call
+        let access = TokenStream::parse(Rule::expression, "a().b(10)")?;
+        let exp = handle_expression(access.into_iter().next().unwrap())?;
+
+        if let ExpressionKind::MethodCall(method) = &*exp.kind {
+            assert!(method.method == QualifiedNameSegment::from("b"));
+            if let ExpressionKind::Call(called2) = &*method.object.kind {
+                assert!(matches!(
+                    &*called2.called.kind,
+                    ExpressionKind::Identifier(_)
+                ))
+            } else {
+                bail!("b(10) was not a method call from a()")
+            }
+        } else {
+            bail!("there was no a().b(10) method call!")
         }
 
         return Ok(());
@@ -377,7 +414,7 @@ mod test {
     fn test_functions() -> anyhow::Result<()> {
         TokenStream::parse(
             Rule::fn_definition,
-            "func main() -> i32 {
+            "fn main() -> i32 {
     let i = 0;
     while i < 10 {
         i++;
@@ -402,7 +439,7 @@ mod test {
     fn test_traits() -> anyhow::Result<()> {
         TokenStream::parse(
             Rule::definition,
-            "inter TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfunc func() -> Type;\n}",
+            "inter TestTrait<T: A<T>>{\n\ttype DeclaredType = T;\n\ttype DefinedType = T;\n\tfn func() -> Type;\n}",
         )?;
 
         TokenStream::parse(
@@ -410,7 +447,7 @@ mod test {
             "inter testTrait<T: Add<T>>{
     type TestType = i32;
     
-    func test_function<T: Add<T>>(t: T) -> T ;
+    fn test_function<T: Add<T>>(t: T) -> T ;
 }",
         )?;
 
@@ -422,7 +459,7 @@ mod test {
         TokenStream::parse(
             Rule::trait_implementation,
             "extend Vec2 as Add<Vec2> {
-    func add(other: Vec2) -> Vec2 {
+    fn add(other: Vec2) -> Vec2 {
         return self;
     }
 }",
@@ -438,11 +475,11 @@ mod test {
 
         TokenStream::parse(
             Rule::fn_declaration,
-            "func test_fn_declaration(t: T, u: U) -> U",
+            "fn test_fn_declaration(t: T, u: U) -> U",
         )?;
         TokenStream::parse(
             Rule::fn_declaration,
-            "func test_fn_declaration_template<T: global::A<T> >(t: T, u: U) -> U",
+            "fn test_fn_declaration_template<T: global::A<T> >(t: T, u: U) -> U",
         )?;
         return Ok(());
     }
@@ -507,7 +544,7 @@ mod test {
 
 type TestType = i32;
 
-func main() -> i32 {
+fn main() -> i32 {
     let i = 0;
     while i < 10 {
         printf(\"%d\", i);

@@ -95,10 +95,12 @@ expression_postfix = {
   | index_access_postfix
   | unary_expression_postfix
   | binary_expression_postfix
+  | method_call_postfix
   | member_access_postfix
 }
 
 member_access_postfix = {"." ~ identifier }
+method_call_postfix = {"." ~ identifier ~ "(" ~ call_params? ~ ")"  }
 index_access_postfix = {"[" ~ expression ~ "]" }
 
 unary_return_error_postfix = { "?" }
