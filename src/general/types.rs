@@ -17,6 +17,18 @@ pub struct StructType {
     pub members: Vec<(String, Type)>,
 }
 
+impl StructType {
+    pub fn get_member_type(&self, name: &String) -> Option<&Type> {
+        for mem in &self.members {
+            if mem.0 == *name {
+                return Some(&mem.1);
+            }
+        }
+
+        return None;
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnionType {
     pub members: Vec<(String, Type)>,

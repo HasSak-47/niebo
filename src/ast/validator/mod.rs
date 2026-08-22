@@ -5,7 +5,10 @@ use clang::Clang;
 
 use crate::{
     ast::{Definition, DefinitionKind, project::Project},
-    general::{naming::QualifiedName, types::Type},
+    general::{
+        naming::QualifiedName,
+        types::{Trait, Type},
+    },
     lowerer::cimports::CCache,
 };
 
@@ -16,6 +19,7 @@ use validator::ExpressionValidator;
 enum Symbol {
     Variable(Type),
     Type(Type),
+    Trait(Trait),
     Function { ret_ty: Type, params: Vec<Type> },
 }
 
