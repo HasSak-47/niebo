@@ -261,7 +261,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
 
 impl ExpressionValidator for crate::ast::expressions::block::Block {
     fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
-        use crate::ast::{Definition, DefinitionKind, expressions::Statement};
+        use crate::ast::expressions::Statement;
 
         procesor.push_scope();
         for stmt in &mut self.statements {

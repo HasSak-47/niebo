@@ -1,22 +1,16 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Debug,
-};
+use std::{collections::HashMap, fmt::Debug};
 
 use anyhow::Result;
 use clang::Clang;
 
 use crate::{
     ast::{Definition, DefinitionKind, project::Project},
-    general::{
-        naming::QualifiedName,
-        types::{FunctionType, Type},
-    },
+    general::{naming::QualifiedName, types::Type},
     ir::cimports::CCache,
 };
 
-pub mod validator;
-use validator::ExpressionValidator;
+pub mod expressions;
+use expressions::ExpressionValidator;
 
 #[derive(Debug, Clone)]
 enum Symbol {
