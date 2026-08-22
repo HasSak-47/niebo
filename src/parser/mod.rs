@@ -9,9 +9,9 @@ use pest_derive::Parser;
 
 use crate::{
     ast::{
-        Definition, Implementation, Import, TraitImplementation, Visibility,
+        Definition, DefinitionKind, Implementation, Import, TraitImplementation, Visibility,
         expressions::Statement,
-        function::FunctionBuilder,
+        function::{FunctionBuilder, FunctionDeclaration},
         module::{Module, ModuleKind},
     },
     general::{
@@ -166,8 +166,54 @@ pub fn handle_fn_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definit
     return Ok(function.build_def());
 }
 
-pub fn handle_trait_definitions<'a>(_pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
-    todo!("implement into the trait definition ast")
+pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition> {
+    assert_eq!(pair.as_rule(), Rule::trait_definition);
+    let mut inner = pair.into_inner();
+    let ident = inner.next().unwrap().as_str().to_string();
+    let mut functions = std::collections::HashMap::new();
+
+    for item in inner {
+        match item.as_rule() {
+            Rule::template_def => {}
+            Rule::trait_body => {
+                let body = item.into_inner().next().unwrap();
+                match body.as_rule() {
+                    Rule::fn_declaration => {
+                        let builder = handle_fn_declaration(body)?;
+                        let name = builder.ident;
+                        let function = crate::ast::function::FunctionDefinition {
+                            def: FunctionDeclaration {
+                                constant: builder.constant,
+                                return_ty: builder.ret_ty,
+                                parameters: builder
+                                    .params
+                                    .into_iter()
+                                    .map(|(name, ty)| (name.unwrap(), ty))
+                                    .collect(),
+                            },
+                            body: crate::ast::expressions::block::Block::new(),
+                        };
+                        functions.insert(name, function);
+                    }
+                    Rule::fn_definition => {
+                        let def = handle_fn_definitions(body)?;
+                        if let DefinitionKind::FunctionDefinition(function) = def.kind {
+                            functions.insert(def.name, function);
+                        }
+                    }
+                    Rule::type_definition | Rule::type_declaration => {}
+                    un => unreachable!("{un:?}"),
+                }
+            }
+            un => unreachable!("{un:?}"),
+        }
+    }
+
+    Ok(Definition {
+        kind: DefinitionKind::Trait(crate::ast::traits::Trait { functions }),
+        visibility: Visibility::Public,
+        name: ident,
+    })
 }
 
 pub fn handle_path_ident<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<QualifiedNameSegment> {
@@ -197,6 +243,35 @@ pub fn handle_qualified_name<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Qualifi
     }
 
     return Ok(path);
+}
+
+pub fn handle_import_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<QualifiedName>> {
+    assert_eq!(pair.as_rule(), Rule::import_path);
+
+    let inner = pair.into_inner().next().unwrap();
+    return match inner.as_rule() {
+        Rule::path => Ok(vec![handle_qualified_name(inner)?]),
+        Rule::grouped_import_path => handle_grouped_import_path(inner),
+        _ => unreachable!(),
+    };
+}
+
+pub fn handle_grouped_import_path<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<QualifiedName>> {
+    assert_eq!(pair.as_rule(), Rule::grouped_import_path);
+
+    let mut inner = pair.into_inner();
+    let prefix = handle_qualified_name(inner.next().unwrap())?;
+    let group = inner.next().unwrap();
+    assert_eq!(group.as_rule(), Rule::import_group);
+
+    let mut imports = Vec::new();
+    for segment in group.into_inner() {
+        let mut path = prefix.clone();
+        path.add_segment(handle_path_ident(segment)?);
+        imports.push(path);
+    }
+
+    return Ok(imports);
 }
 
 pub fn handle_implementation<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Implementation> {
@@ -241,7 +316,7 @@ pub fn handle_module_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
     let ident = inner.next().unwrap();
 
     if inner.next().is_some() {
-        todo!("handle infine module");
+        todo!("handle infile module");
     }
 
     let mut md = Module::new();
@@ -280,18 +355,31 @@ pub fn handle_definition<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Definition>
     });
 }
 
-pub fn handle_c_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
+pub fn handle_c_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<Import>> {
     let inner = pair.into_inner().next().unwrap();
-    assert_eq!(inner.as_rule(), Rule::path);
+    assert_eq!(inner.as_rule(), Rule::import_path);
 
-    return Ok(Import::c_import(handle_qualified_name(inner)?));
+    return Ok(handle_import_path(inner)?
+        .into_iter()
+        .map(Import::c_import)
+        .collect());
 }
 
-pub fn handle_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Import> {
+pub fn handle_niebo_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<Import>> {
+    let inner = pair.into_inner().next().unwrap();
+    assert_eq!(inner.as_rule(), Rule::import_path);
+
+    return Ok(handle_import_path(inner)?
+        .into_iter()
+        .map(Import::niebo_import)
+        .collect());
+}
+
+pub fn handle_imports<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<Import>> {
     let inner = pair.into_inner().next().unwrap();
     return match inner.as_rule() {
         Rule::c_import => handle_c_imports(inner),
-        Rule::niebo_import => todo!("handle niebo imports..."),
+        Rule::niebo_import => handle_niebo_imports(inner),
         _ => unreachable!(),
     };
 }
@@ -312,7 +400,7 @@ pub fn parse_module<S: AsRef<str>>(txt: S) -> anyhow::Result<Module> {
                 md.definitions.push(handle_definition(t)?);
             }
             Rule::import => {
-                md.imports.push(handle_imports(t)?);
+                md.imports.extend(handle_imports(t)?);
             }
             Rule::impls => {
                 let def = t.into_inner().next().unwrap();
@@ -336,6 +424,7 @@ mod test {
     use anyhow::bail;
 
     use super::*;
+    use crate::ast::expressions::intrinsic::IntrinsicKind;
     use crate::ast::expressions::literal::*;
     use crate::ast::expressions::operations::*;
     use crate::ast::expressions::*;
@@ -487,6 +576,108 @@ mod test {
     #[test]
     fn test_call_expression() -> anyhow::Result<()> {
         TokenStream::parse(Rule::expression, "printf(\"%d\", i)")?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@add_i32(self, other)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(intrinsic.kind, IntrinsicKind::AddI { prec: 32 });
+                assert_eq!(intrinsic.parameters.len(), 2);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_conversion_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@i32_to_u32(self)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(
+                    intrinsic.kind,
+                    IntrinsicKind::IToU {
+                        src_prec: 32,
+                        out_prec: 32,
+                    }
+                );
+                assert_eq!(intrinsic.parameters.len(), 1);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_neg_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@neg_i32(self)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(intrinsic.kind, IntrinsicKind::NegI { prec: 32 });
+                assert_eq!(intrinsic.parameters.len(), 1);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_copy_intrinsic_expression() -> anyhow::Result<()> {
+        let expression = TokenStream::parse(Rule::expression, "@copy(i32)")?
+            .next()
+            .unwrap();
+        let parsed = handle_expression(expression)?;
+
+        match parsed.kind.as_ref() {
+            ExpressionKind::Intrinsic(intrinsic) => {
+                assert_eq!(intrinsic.kind, IntrinsicKind::Copy);
+                assert_eq!(intrinsic.parameters.len(), 1);
+            }
+            other => panic!("expected intrinsic expression, got {other:?}"),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_grouped_header_import() -> anyhow::Result<()> {
+        let module = parse_module("header stdio::{printf, scanf, };\n")?;
+
+        assert_eq!(module.imports.len(), 2);
+        assert!(module.imports.iter().all(|import| import.c_import));
+        assert_eq!(format!("{:?}", module.imports[0].path), "stdio::printf");
+        assert_eq!(format!("{:?}", module.imports[1].path), "stdio::scanf");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_grouped_niebo_import() -> anyhow::Result<()> {
+        let module = parse_module("import core::{i32, traits, };\n")?;
+
+        assert_eq!(module.imports.len(), 2);
+        assert!(module.imports.iter().all(|import| !import.c_import));
+        assert_eq!(format!("{:?}", module.imports[0].path), "core::i32");
+        assert_eq!(format!("{:?}", module.imports[1].path), "core::traits");
 
         Ok(())
     }

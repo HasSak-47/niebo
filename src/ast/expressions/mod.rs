@@ -2,6 +2,7 @@ pub mod block;
 pub mod call;
 pub mod conditional;
 pub mod init;
+pub mod intrinsic;
 pub mod literal;
 pub mod loops;
 pub mod member_access;
@@ -17,6 +18,7 @@ use crate::{
             call::Call,
             conditional::Conditional,
             init::StructInit,
+            intrinsic::{Intrinsic, IntrinsicKind},
             literal::Literal,
             loops::{LoopExpression, WhileLoop},
             member_access::{MemberAccess, MethodCall},
@@ -56,6 +58,7 @@ pub enum ExpressionKind {
     While(WhileLoop),
     Literal(Literal),
     Identifier(QualifiedName),
+    Intrinsic(Intrinsic),
     BinaryOperation(BinaryOperation),
     UnaryOperation(UnaryOperation),
     Call(Call),
@@ -74,6 +77,7 @@ impl Display for ExpressionKind {
             ExpressionKind::While(a) => write!(f, "{}", a),
             ExpressionKind::Literal(a) => write!(f, "{}", a),
             ExpressionKind::Identifier(a) => write!(f, "{}", a),
+            ExpressionKind::Intrinsic(a) => write!(f, "{}", a),
             ExpressionKind::BinaryOperation(a) => write!(f, "{}", a),
             ExpressionKind::UnaryOperation(a) => write!(f, "{}", a),
             ExpressionKind::Call(a) => write!(f, "{}", a),
@@ -167,8 +171,8 @@ impl Expression {
         Self::new(ExpressionKind::If(conditional))
     }
 
-    pub fn loop_(loop_expression: LoopExpression) -> Self {
-        Self::new(ExpressionKind::Loop(loop_expression))
+    pub fn loop_(body: Expression, label: Option<String>) -> Self {
+        Self::new(ExpressionKind::Loop(LoopExpression { label, body }))
     }
 
     pub fn while_(while_loop: WhileLoop) -> Self {
@@ -184,6 +188,10 @@ impl Expression {
     pub fn identifier<P: Into<QualifiedName>>(path: P) -> Self {
         let path = path.into();
         Self::new(ExpressionKind::Identifier(path))
+    }
+
+    pub fn intrinsic(kind: IntrinsicKind, parameters: Vec<Expression>) -> Self {
+        Self::new(ExpressionKind::Intrinsic(Intrinsic::new(kind, parameters)))
     }
 
     pub fn binary_operation(operation: BinaryOperator, a: Expression, b: Expression) -> Self {

@@ -5,8 +5,11 @@ use clang::Clang;
 
 use crate::{
     ast::{Definition, DefinitionKind, project::Project},
-    general::{naming::QualifiedName, types::Type},
-    ir::cimports::CCache,
+    general::{
+        naming::QualifiedName,
+        types::{Trait, Type},
+    },
+    lowerer::cimports::CCache,
 };
 
 pub mod expressions;
@@ -16,6 +19,7 @@ use expressions::ExpressionValidator;
 enum Symbol {
     Variable(Type),
     Type(Type),
+    Trait(Trait),
     Function { ret_ty: Type, params: Vec<Type> },
 }
 
@@ -82,12 +86,12 @@ impl Validator {
 
     pub fn validate_global_definition(&mut self, def: &mut Definition) -> Result<()> {
         match &mut def.kind {
-            DefinitionKind::Function(func) => {
+            DefinitionKind::FunctionDefinition(func) => {
                 self.register_global_symbol(
                     def.name.clone().into(),
                     Symbol::Function {
-                        ret_ty: func.return_ty.clone().unwrap(),
-                        params: func.parameters.iter().map(|a| a.1.clone()).collect(),
+                        ret_ty: func.def.return_ty.clone().unwrap(),
+                        params: func.def.parameters.iter().map(|a| a.1.clone()).collect(),
                     },
                 );
             }
@@ -108,12 +112,12 @@ impl Validator {
 
     pub fn validate_local_definition(&mut self, def: &mut Definition) -> Result<()> {
         match &mut def.kind {
-            DefinitionKind::Function(func) => {
+            DefinitionKind::FunctionDefinition(func) => {
                 self.register_local_symbol(
                     def.name.clone().into(),
                     Symbol::Function {
-                        ret_ty: func.return_ty.clone().unwrap(),
-                        params: func.parameters.iter().map(|a| a.1.clone()).collect(),
+                        ret_ty: func.def.return_ty.clone().unwrap(),
+                        params: func.def.parameters.iter().map(|a| a.1.clone()).collect(),
                     },
                 );
             }

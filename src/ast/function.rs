@@ -102,19 +102,21 @@ impl FunctionBuilder {
     pub fn build_def(self) -> Definition {
         assert!(self.body.is_some());
         let body = self.body.unwrap();
-        let f = Function {
+        let f = FunctionDefinition {
             body,
-            constant: self.constant,
-            parameters: self
-                .params
-                .into_iter()
-                .map(|(n, t)| (n.unwrap(), t))
-                .collect(),
-            return_ty: self.ret_ty,
+            def: FunctionDeclaration {
+                constant: self.constant,
+                parameters: self
+                    .params
+                    .into_iter()
+                    .map(|(n, t)| (n.unwrap(), t))
+                    .collect(),
+                return_ty: self.ret_ty,
+            },
         };
 
         return Definition {
-            kind: DefinitionKind::Function(f),
+            kind: DefinitionKind::FunctionDefinition(f),
             visibility: self.visibility,
             name: self.ident,
         };
@@ -123,11 +125,16 @@ impl FunctionBuilder {
 
 // since it lives in the AST the types are not yet resolved and are treated as paths
 #[derive(Debug, Clone, PartialEq)]
-pub struct Function {
+pub struct FunctionDefinition {
+    pub def: FunctionDeclaration,
+    pub body: Block,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FunctionDeclaration {
     pub constant: bool,
     pub return_ty: Option<Type>,
     pub parameters: Vec<(String, Type)>,
-    pub body: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]

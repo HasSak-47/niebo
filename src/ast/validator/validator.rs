@@ -117,6 +117,21 @@ impl ExpressionValidator for crate::ast::expressions::call::Call {
     }
 }
 
+impl ExpressionValidator for crate::ast::expressions::member_access::MemberCall {
+    fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
+        self.object.validate(procesor)?;
+        for param in &mut self.params {
+            param.validate(procesor)?;
+        }
+
+        return Ok(());
+    }
+
+    fn resolve_ret_ty(&mut self, _: &mut Validator) -> anyhow::Result<Type> {
+        anyhow::bail!("member call validation is not implemented: {self}");
+    }
+}
+
 impl ExpressionValidator for crate::ast::expressions::intrinsic::Intrinsic {
     fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         for param in &mut self.parameters {
@@ -332,6 +347,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
             ExpressionKind::Literal(lit) => lit.validate(procesor),
             ExpressionKind::Block(blk) => blk.validate(procesor),
             ExpressionKind::Call(call) => call.validate(procesor),
+            ExpressionKind::MemberCall(call) => call.validate(procesor),
             ExpressionKind::Assignment(a, b) => {
                 a.validate(procesor)?;
                 b.validate(procesor)?;
@@ -395,6 +411,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
                 ExpressionKind::Literal(lit) => lit.resolve_ret_ty(procesor),
                 ExpressionKind::Block(blk) => blk.resolve_ret_ty(procesor),
                 ExpressionKind::Call(call) => call.resolve_ret_ty(procesor),
+                ExpressionKind::MemberCall(call) => call.resolve_ret_ty(procesor),
 
                 ExpressionKind::Assignment(a, _) => a.resolve_ret_ty(procesor),
                 ExpressionKind::UnaryOperation(unary) => unary.resolve_ret_ty(procesor),

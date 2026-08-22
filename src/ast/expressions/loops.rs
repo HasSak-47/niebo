@@ -1,11 +1,23 @@
 use std::fmt::Display;
 
+use crate::ast::expressions::ExpressionKind;
+
 use super::Expression;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct LoopExpression {
     pub label: Option<String>,
     pub body: Expression,
+}
+
+impl From<LoopExpression> for Expression {
+    fn from(value: LoopExpression) -> Self {
+        Expression {
+            kind: Box::new(ExpressionKind::Loop(value)),
+            ret_ty: None,
+            constant: false,
+        }
+    }
 }
 
 impl LoopExpression {

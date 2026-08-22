@@ -12,12 +12,23 @@ fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveTy
         Rule::primitive_type,
         "handle_primitive_type got a non primitive_type"
     );
+    let raw = pair.as_str();
     let mut inner = pair.into_inner();
-    let next = inner.next().unwrap();
+    let Some(next) = inner.next() else {
+        return Ok(match raw {
+            "bool" => PrimitiveType::Bool,
+            "int" => PrimitiveType::Int(32),
+            un => unreachable!("{un:?}"),
+        });
+    };
     match next.as_rule() {
         Rule::int_type => {
             let prec = next.into_inner().next().unwrap().as_str().parse()?;
             return Ok(PrimitiveType::Int(prec));
+        }
+        Rule::uint_type => {
+            let prec = next.into_inner().next().unwrap().as_str().parse()?;
+            return Ok(PrimitiveType::Uint(prec));
         }
         Rule::float_type => {
             let prec = next.into_inner().next().unwrap().as_str().parse()?;
@@ -39,7 +50,7 @@ pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result
 
     return Ok(Definition::type_def(
         ident,
-        Type::Alias(Box::new(handle_type_expression(type_exp)?)),
+        Type::alias(handle_type_expression(type_exp)?),
         Visibility::Public,
     ));
 }
@@ -67,17 +78,17 @@ pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Resul
     let mut inner = pair.into_inner();
 
     let ident = inner.next().unwrap().as_str().to_string();
-    let mut s = StructType::default();
+    let mut members = Vec::new();
 
     let fields = inner.next().unwrap();
     let params = handle_params(fields)?;
     for param in params {
-        s.members.push(param);
+        members.push(param);
     }
 
     return Ok(Definition::type_def(
         ident,
-        Type::Struct(s),
+        Type::struct_t(members),
         Visibility::Public,
     ));
 }
@@ -125,20 +136,16 @@ pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> 
     let mut inner = pair.into_inner();
     let ty = inner.next().unwrap();
     return match ty.as_rule() {
-        Rule::primitive_type => Ok(Type::Primitive(handle_primitive_type(ty)?)),
+        Rule::primitive_type => Ok(Type::primitive(handle_primitive_type(ty)?)),
         Rule::mutable_reference_type => {
             let mut inner = ty.into_inner();
             let next = inner.next().unwrap();
-            Ok(Type::MutableReference(Box::new(handle_type_expression(
-                next,
-            )?)))
+            Ok(Type::mutable_reference(handle_type_expression(next)?))
         }
         Rule::mutable_pointer_type => {
             let mut inner = ty.into_inner();
             let next = inner.next().unwrap();
-            Ok(Type::MutablePointer(Box::new(handle_type_expression(
-                next,
-            )?)))
+            Ok(Type::mutable_pointer(handle_type_expression(next)?))
         }
         Rule::path => Ok(Type::named(handle_qualified_name(ty)?)),
 

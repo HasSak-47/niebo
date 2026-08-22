@@ -31,25 +31,6 @@ impl Module {
         };
     }
 
-    pub fn add_trait(&mut self, t: TraitBuilder) {
-        self.definitions.push(t.build_def());
-    }
-
-    pub fn add_function(&mut self, f: FunctionBuilder) {
-        self.definitions.push(f.build_def());
-    }
-
-    pub fn add_c_import<P: Into<QualifiedName>>(&mut self, path: P) {
-        let path = path.into();
-        // everything in c has the format header::name
-        assert!(path.v.len() == 2);
-
-        self.imports.push(Import {
-            c_import: true,
-            path,
-        });
-    }
-
     pub fn add_import(&mut self, path: QualifiedName) {
         self.imports.push(Import {
             c_import: false,

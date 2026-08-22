@@ -2,6 +2,7 @@ pub mod expressions;
 pub mod function;
 pub mod module;
 pub mod project;
+pub mod simplify;
 pub mod traits;
 pub mod validator;
 
@@ -59,7 +60,8 @@ macro_rules! into_definition {
     };
 }
 
-into_definition!(Function);
+into_definition!(FunctionDeclaration);
+into_definition!(FunctionDefinition);
 into_definition!(Variable);
 into_definition!(Module);
 into_definition!(Trait);
@@ -70,7 +72,8 @@ into_definition!(TraitImplementation);
 pub enum DefinitionKind {
     Variable(Variable),
     Type(Type),
-    Function(Function),
+    FunctionDefinition(FunctionDefinition),
+    FunctionDeclaration(FunctionDeclaration),
     Module(Module),
     Trait(Trait),
     Implementation(Implementation),
@@ -149,6 +152,13 @@ impl Import {
         assert!(path.v.len() == 2);
         return Self {
             c_import: true,
+            path,
+        };
+    }
+
+    pub fn niebo_import(path: QualifiedName) -> Self {
+        return Self {
+            c_import: false,
             path,
         };
     }
