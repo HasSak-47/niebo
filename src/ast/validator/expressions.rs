@@ -255,7 +255,7 @@ impl ExpressionValidator for crate::ast::expressions::intrinsic::Intrinsic {
 }
 
 impl crate::ast::expressions::intrinsic::Intrinsic {
-    fn validate_copy(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
+    pub fn validate_copy(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         if self.parameters.len() != 1 {
             bail!(
                 "@{} expects 1 parameter, got {}",

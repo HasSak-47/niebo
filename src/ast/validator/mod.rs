@@ -1,18 +1,27 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use clang::Clang;
 
 use crate::{
-    ast::{Definition, DefinitionKind, project::Project},
+    ast::{
+        Definition, DefinitionKind, Implementation, TraitImplementation,
+        function::{FunctionDeclaration, FunctionDefinition},
+        module::Module,
+        project::Project,
+    },
     general::{
         naming::QualifiedName,
-        types::{Trait, Type},
+        types::{FunctionType, Trait, Type},
     },
     lowerer::cimports::CCache,
 };
 
 pub mod expressions;
+pub mod validator;
 use expressions::ExpressionValidator;
 
 #[derive(Debug, Clone)]
@@ -26,8 +35,8 @@ enum Symbol {
 #[derive(Debug)]
 struct TypeData {
     ty: Type,
-    traits: Vec<QualifiedName>,
-    methods: Vec<QualifiedName>,
+    traits: HashSet<QualifiedName>,
+    methods: HashMap<String, FunctionDeclaration>,
 }
 
 #[derive(Debug, Default)]
@@ -90,8 +99,8 @@ impl Validator {
                 self.register_global_symbol(
                     def.name.clone().into(),
                     Symbol::Function {
-                        ret_ty: func.def.return_ty.clone().unwrap(),
-                        params: func.def.parameters.iter().map(|a| a.1.clone()).collect(),
+                        ret_ty: func.decl.return_ty.clone().unwrap(),
+                        params: func.decl.parameters.iter().map(|a| a.1.clone()).collect(),
                     },
                 );
             }
@@ -116,8 +125,8 @@ impl Validator {
                 self.register_local_symbol(
                     def.name.clone().into(),
                     Symbol::Function {
-                        ret_ty: func.def.return_ty.clone().unwrap(),
-                        params: func.def.parameters.iter().map(|a| a.1.clone()).collect(),
+                        ret_ty: func.decl.return_ty.clone().unwrap(),
+                        params: func.decl.parameters.iter().map(|a| a.1.clone()).collect(),
                     },
                 );
             }
@@ -136,12 +145,44 @@ impl Validator {
         return Ok(());
     }
 
+    pub fn register_impl(&mut self, i: &Implementation) {
+        if let Some(ty_data) = self.type_data.get_mut(&i.target) {
+            for def in &i.definitions {
+                if let DefinitionKind::FunctionDefinition(func) = &def.kind {
+                    ty_data.methods.insert(def.name.clone(), func.decl.clone());
+                }
+            }
+        }
+    }
+
+    pub fn register_trait_impl(&mut self, t: &TraitImplementation) -> anyhow::Result<()> {
+        if let Some(ty) = self.type_data.get_mut(&t.target) {
+            if ty.traits.contains(&t.trait_path) {
+                bail!("type {:?} already implements {}", ty.ty, t.trait_path);
+            }
+
+            ty.traits.insert(t.trait_path.clone());
+        };
+
+        return Ok(());
+    }
+
     // NOTE: ommit templates for now do to complexity
     pub fn process_project(&mut self, mut project: Project) -> Result<Project> {
         let clang = Clang::new().unwrap();
         let mut ccache = CCache::new(&clang)?;
 
-        for import in &project.root_module.imports {
+        self.process_module(&mut project.root_module, &mut ccache)?;
+
+        return Ok(project);
+    }
+
+    pub fn process_module<'a>(
+        &mut self,
+        module: &mut Module,
+        ccache: &mut CCache<'a>,
+    ) -> Result<()> {
+        for import in &module.imports {
             if import.c_import {
                 ccache.resolve_c_definitions(&import.path.get(0).ident)?;
                 let mut name = QualifiedName::new();
@@ -164,10 +205,39 @@ impl Validator {
             }
         }
 
-        for def in &mut project.root_module.definitions {
+        for def in &mut module.definitions {
+            match &def.kind {
+                DefinitionKind::Type(ty) => {
+                    self.type_data.insert(
+                        def.name.clone().into(),
+                        TypeData {
+                            ty: ty.clone(),
+                            traits: HashSet::new(),
+                            methods: HashMap::new(),
+                        },
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        for def in &mut module.definitions {
+            match &def.kind {
+                DefinitionKind::Implementation(i) => {
+                    self.register_impl(&i);
+                }
+                DefinitionKind::TraitImplementation(t) => {
+                    self.register_trait_impl(&t)?;
+                }
+                DefinitionKind::Trait(_) => {}
+                _ => {}
+            }
+        }
+
+        for def in &mut module.definitions {
             self.validate_global_definition(def)?;
         }
 
-        return Ok(project);
+        return Ok(());
     }
 }

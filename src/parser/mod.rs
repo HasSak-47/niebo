@@ -182,7 +182,7 @@ pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
                         let builder = handle_fn_declaration(body)?;
                         let name = builder.ident;
                         let function = crate::ast::function::FunctionDefinition {
-                            def: FunctionDeclaration {
+                            decl: FunctionDeclaration {
                                 constant: builder.constant,
                                 return_ty: builder.ret_ty,
                                 parameters: builder
@@ -469,7 +469,7 @@ mod test {
                 bail!("called was not (a().b)")
             }
         } else {
-            bail!("there was no (a().b)(10) call!")
+            bail!("there was no (a().b)(10) call! got {exp:?}")
         }
 
         return Ok(());

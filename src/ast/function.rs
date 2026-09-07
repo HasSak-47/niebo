@@ -104,7 +104,7 @@ impl FunctionBuilder {
         let body = self.body.unwrap();
         let f = FunctionDefinition {
             body,
-            def: FunctionDeclaration {
+            decl: FunctionDeclaration {
                 constant: self.constant,
                 parameters: self
                     .params
@@ -126,7 +126,7 @@ impl FunctionBuilder {
 // since it lives in the AST the types are not yet resolved and are treated as paths
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDefinition {
-    pub def: FunctionDeclaration,
+    pub decl: FunctionDeclaration,
     pub body: Block,
 }
 

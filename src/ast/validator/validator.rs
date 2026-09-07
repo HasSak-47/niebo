@@ -117,7 +117,7 @@ impl ExpressionValidator for crate::ast::expressions::call::Call {
     }
 }
 
-impl ExpressionValidator for crate::ast::expressions::member_access::MemberCall {
+impl ExpressionValidator for crate::ast::expressions::member_access::MethodCall {
     fn validate(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
         self.object.validate(procesor)?;
         for param in &mut self.params {
@@ -269,21 +269,6 @@ impl ExpressionValidator for crate::ast::expressions::intrinsic::Intrinsic {
     }
 }
 
-impl crate::ast::expressions::intrinsic::Intrinsic {
-    fn validate_copy(&mut self, procesor: &mut Validator) -> anyhow::Result<()> {
-        if self.parameters.len() != 1 {
-            bail!(
-                "@{} expects 1 parameter, got {}",
-                self.kind,
-                self.parameters.len()
-            );
-        }
-
-        self.parameters[0].resolve_ret_ty(procesor)?;
-        Ok(())
-    }
-}
-
 impl ExpressionValidator for crate::general::naming::QualifiedName {
     fn resolve_ret_ty(&mut self, procesor: &mut Validator) -> anyhow::Result<Type> {
         let ty = procesor
@@ -347,7 +332,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
             ExpressionKind::Literal(lit) => lit.validate(procesor),
             ExpressionKind::Block(blk) => blk.validate(procesor),
             ExpressionKind::Call(call) => call.validate(procesor),
-            ExpressionKind::MemberCall(call) => call.validate(procesor),
+            ExpressionKind::MethodCall(call) => call.validate(procesor),
             ExpressionKind::Assignment(a, b) => {
                 a.validate(procesor)?;
                 b.validate(procesor)?;
@@ -411,7 +396,7 @@ impl ExpressionValidator for crate::ast::expressions::Expression {
                 ExpressionKind::Literal(lit) => lit.resolve_ret_ty(procesor),
                 ExpressionKind::Block(blk) => blk.resolve_ret_ty(procesor),
                 ExpressionKind::Call(call) => call.resolve_ret_ty(procesor),
-                ExpressionKind::MemberCall(call) => call.resolve_ret_ty(procesor),
+                ExpressionKind::MethodCall(call) => call.resolve_ret_ty(procesor),
 
                 ExpressionKind::Assignment(a, _) => a.resolve_ret_ty(procesor),
                 ExpressionKind::UnaryOperation(unary) => unary.resolve_ret_ty(procesor),
