@@ -71,7 +71,7 @@ pub enum TypeKind {
     Function(FunctionType),
     Template(Template),
     // alias to a type
-    Alias(Box<Type>),
+    Alias { name: QualifiedName, to: Box<Type> },
     // path to a type that should be resolved later
     Named(QualifiedName),
 }
@@ -85,7 +85,6 @@ pub struct Trait {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Type {
     pub kind: TypeKind,
-    pub traits: HashSet<QualifiedName>,
 }
 
 impl From<(String, Type)> for Params {
@@ -110,13 +109,15 @@ impl Type {
     fn no_type() -> Type {
         Type {
             kind: TypeKind::Primitive(PrimitiveType::Void),
-            traits: HashSet::new(),
         }
     }
 
-    pub fn alias(ty: Type) -> Self {
+    pub fn alias(name: QualifiedName, ty: Type) -> Self {
         Self {
-            kind: TypeKind::Alias(Box::new(ty)),
+            kind: TypeKind::Alias {
+                name,
+                to: Box::new(ty),
+            },
             ..Type::no_type()
         }
     }

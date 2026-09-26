@@ -1,9 +1,6 @@
 use std::fmt::Display;
 
-use crate::general::{
-    naming::{QualifiedName, QualifiedNameSegment},
-    types::Type,
-};
+use crate::general::naming::QualifiedName;
 
 use super::Expression;
 
@@ -56,12 +53,24 @@ impl Display for BinaryOperator {
 }
 
 impl BinaryOperator {
-    pub fn into_member_access(&self) -> QualifiedNameSegment {
-        return match self {
-            BinaryOperator::Addition => "add",
+    pub fn into_operation_call(&self) -> QualifiedName {
+        let (operation, method) = match self {
+            BinaryOperator::Addition => ("Add", "add"),
+            BinaryOperator::Substraction => ("Sub", "sub"),
+            BinaryOperator::Multiplication => ("Mul", "mul"),
+            BinaryOperator::Division => ("Div", "div"),
+            BinaryOperator::Equal => ("Eq", "eq"),
+            BinaryOperator::NotEqual => ("NEq", "neq"),
+            BinaryOperator::LesserOrEqual => ("LEq", "leq"),
+            BinaryOperator::GreaterOrEqual => ("GEq", "geq"),
+            BinaryOperator::Lesser => ("Les", "les"),
+            BinaryOperator::Greater => ("Gre", "gre"),
             _ => todo!(),
-        }
-        .into();
+        };
+
+        let mut path = QualifiedName::from(operation);
+        path.add_segment(method);
+        path
     }
 }
 
@@ -76,12 +85,15 @@ pub enum UnaryOperator {
 }
 
 impl UnaryOperator {
-    pub fn into_member_access(&self) -> QualifiedNameSegment {
-        return match self {
-            UnaryOperator::Negation => "neg",
+    pub fn into_operation_call(&self) -> QualifiedName {
+        let (operation, method) = match self {
+            UnaryOperator::Negation => ("Neg", "neg"),
             _ => todo!(),
-        }
-        .into();
+        };
+
+        let mut path = QualifiedName::from(operation);
+        path.add_segment(method);
+        path
     }
 }
 

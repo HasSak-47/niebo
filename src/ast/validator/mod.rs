@@ -21,7 +21,9 @@ use crate::{
 };
 
 pub mod expressions;
+pub mod simplify;
 pub mod validator;
+
 use expressions::ExpressionValidator;
 
 #[derive(Debug, Clone)]

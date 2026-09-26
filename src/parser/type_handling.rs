@@ -49,8 +49,8 @@ pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result
     let type_exp = inner.next().unwrap();
 
     return Ok(Definition::type_def(
-        ident,
-        Type::alias(handle_type_expression(type_exp)?),
+        ident.clone(),
+        Type::alias(ident.into(), handle_type_expression(type_exp)?),
         Visibility::Public,
     ));
 }

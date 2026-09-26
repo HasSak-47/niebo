@@ -2,7 +2,7 @@ use std::{env::current_dir, path::PathBuf};
 
 use clap::{Parser, ValueEnum};
 
-use crate::ast::{project::Project, simplify::basic_simplify_project, validator::Validator};
+use crate::ast::{project::Project, validator::Validator};
 use pretty_env_logger::init_custom_env;
 
 mod ast;
@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut v = Validator::new();
     let mut project = v.process_project(project)?;
-    basic_simplify_project(&mut project);
+    v.simplify_project(&mut project);
 
     // compile(project, cli.out)?;
 
