@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
-use super::{Expression, Statement};
+use super::Expression;
+use crate::ast::statements::Statement;
 use anyhow::{Result, anyhow};
 
 #[derive(Debug, Clone, PartialEq)]

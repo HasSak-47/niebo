@@ -2,11 +2,11 @@ use pest::iterators::Pair;
 
 use crate::{
     ast::{Definition, Visibility},
-    general::types::{PrimitiveType, StructType, Type},
+    general::types::typeid::{PrimitiveTypeID, StructTypeID, TypeID},
     parser::*,
 };
 
-fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveType> {
+fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveTypeID> {
     assert_eq!(
         pair.as_rule(),
         Rule::primitive_type,
@@ -16,23 +16,23 @@ fn handle_primitive_type<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<PrimitiveTy
     let mut inner = pair.into_inner();
     let Some(next) = inner.next() else {
         return Ok(match raw {
-            "bool" => PrimitiveType::Bool,
-            "int" => PrimitiveType::Int(32),
+            "bool" => PrimitiveTypeID::Bool,
+            "int" => PrimitiveTypeID::Int(32),
             un => unreachable!("{un:?}"),
         });
     };
     match next.as_rule() {
         Rule::int_type => {
             let prec = next.into_inner().next().unwrap().as_str().parse()?;
-            return Ok(PrimitiveType::Int(prec));
+            return Ok(PrimitiveTypeID::Int(prec));
         }
         Rule::uint_type => {
             let prec = next.into_inner().next().unwrap().as_str().parse()?;
-            return Ok(PrimitiveType::Uint(prec));
+            return Ok(PrimitiveTypeID::Uint(prec));
         }
         Rule::float_type => {
             let prec = next.into_inner().next().unwrap().as_str().parse()?;
-            return Ok(PrimitiveType::Float(prec));
+            return Ok(PrimitiveTypeID::Float(prec));
         }
         un => unreachable!("{un:?}"),
     }
@@ -50,7 +50,7 @@ pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result
 
     return Ok(Definition::type_def(
         ident.clone(),
-        Type::alias(ident.into(), handle_type_expression(type_exp)?),
+        TypeID::alias(ident.into(), handle_type_expression(type_exp)?),
         Visibility::Public,
     ));
 }
@@ -88,7 +88,7 @@ pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Resul
 
     return Ok(Definition::type_def(
         ident,
-        Type::struct_t(members),
+        TypeID::struct_t(members),
         Visibility::Public,
     ));
 }
@@ -127,7 +127,7 @@ pub fn handle_type_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defin
     };
 }
 
-pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> {
+pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<TypeID> {
     assert_eq!(
         pair.as_rule(),
         Rule::type_expr,
@@ -136,18 +136,18 @@ pub fn handle_type_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Type> 
     let mut inner = pair.into_inner();
     let ty = inner.next().unwrap();
     return match ty.as_rule() {
-        Rule::primitive_type => Ok(Type::primitive(handle_primitive_type(ty)?)),
+        Rule::primitive_type => Ok(TypeID::primitive(handle_primitive_type(ty)?)),
         Rule::mutable_reference_type => {
             let mut inner = ty.into_inner();
             let next = inner.next().unwrap();
-            Ok(Type::mutable_reference(handle_type_expression(next)?))
+            Ok(TypeID::mutable_reference(handle_type_expression(next)?))
         }
         Rule::mutable_pointer_type => {
             let mut inner = ty.into_inner();
             let next = inner.next().unwrap();
-            Ok(Type::mutable_pointer(handle_type_expression(next)?))
+            Ok(TypeID::mutable_pointer(handle_type_expression(next)?))
         }
-        Rule::path => Ok(Type::named(handle_qualified_name(ty)?)),
+        Rule::path => Ok(TypeID::named(handle_qualified_name(ty)?)),
 
         un => unreachable!("{un:?}"),
     };

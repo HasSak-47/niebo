@@ -11,40 +11,22 @@ pub mod operations;
 use std::fmt::Display;
 
 use crate::{
-    ast::{
-        Definition, Import,
-        expressions::{
-            block::Block,
-            call::Call,
-            conditional::Conditional,
-            init::StructInit,
-            intrinsic::{Intrinsic, IntrinsicKind},
-            literal::Literal,
-            loops::{LoopExpression, WhileLoop},
-            member_access::{MemberAccess, MethodCall},
-            operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
-        },
+    ast::expressions::{
+        block::Block,
+        call::Call,
+        conditional::Conditional,
+        init::StructInit,
+        intrinsic::{Intrinsic, IntrinsicKind},
+        literal::Literal,
+        loops::{LoopExpression, WhileLoop},
+        member_access::{MemberAccess, MethodCall},
+        operations::{BinaryOperation, BinaryOperator, UnaryOperation, UnaryOperator},
     },
     general::{
         naming::{QualifiedName, QualifiedNameSegment},
-        types::Type,
+        types::typeid::TypeID,
     },
 };
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Statement {
-    // DefinitionKind::Module, DefinitionKind::Trait, and impl blocks not allowed
-    Import(Import),
-    Definition(Definition),
-    Expression(Expression),
-    Break(Option<String>),
-    Continue,
-    Use(QualifiedName),
-    Return(Option<Expression>),
-
-    // return value for the block expression
-    Value(Option<Expression>),
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExpressionKind {
@@ -90,7 +72,7 @@ impl Display for ExpressionKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expression {
     pub kind: Box<ExpressionKind>,
-    pub ret_ty: Option<Type>,
+    pub ret_ty: Option<TypeID>,
     pub constant: bool,
 }
 

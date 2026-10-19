@@ -10,13 +10,13 @@ use pest_derive::Parser;
 use crate::{
     ast::{
         Definition, DefinitionKind, Implementation, Import, TraitImplementation, Visibility,
-        expressions::Statement,
         function::{FunctionBuilder, FunctionDeclaration},
         module::{Module, ModuleKind},
+        statements::Statement,
     },
     general::{
         naming::{QualifiedName, QualifiedNameSegment},
-        types::Type,
+        types::typeid::TypeID,
     },
 };
 
@@ -24,7 +24,7 @@ use crate::{
 #[grammar = "./pest/tokens.pest"]
 pub struct TokenStream;
 
-pub fn handle_param<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<(String, Type)> {
+pub fn handle_param<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<(String, TypeID)> {
     assert_eq!(pair.as_rule(), Rule::param);
     let mut inner = pair.into_inner();
 
@@ -37,7 +37,7 @@ pub fn handle_param<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<(String, Type)> 
     return Ok((id_p.as_str().to_string(), handle_type_expression(pt_p)?));
 }
 
-pub fn handle_params<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<(String, Type)>> {
+pub fn handle_params<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Vec<(String, TypeID)>> {
     assert_eq!(pair.as_rule(), Rule::params);
     let inner = pair.into_inner();
     let mut v = Vec::new();

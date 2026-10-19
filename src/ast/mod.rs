@@ -2,8 +2,8 @@ pub mod expressions;
 pub mod function;
 pub mod module;
 pub mod project;
+pub mod statements;
 pub mod traits;
-pub mod validator;
 
 use module::*;
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ use anyhow::{Result, anyhow};
 
 use crate::general::{
     naming::{QualifiedName, QualifiedNameSegment},
-    types::*,
+    types::typeid::*,
 };
 use function::*;
 
@@ -33,7 +33,7 @@ pub enum Visibility {
 pub struct Variable {
     pub mutable: bool,
     pub value: Expression,
-    pub ty: Option<Type>,
+    pub ty: Option<TypeID>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -70,7 +70,7 @@ into_definition!(TraitImplementation);
 #[derive(Debug, Clone, PartialEq)]
 pub enum DefinitionKind {
     Variable(Variable),
-    Type(Type),
+    Type(TypeID),
     FunctionDefinition(FunctionDefinition),
     FunctionDeclaration(FunctionDeclaration),
     Module(Module),
@@ -99,14 +99,14 @@ impl Definition {
             visibility: Visibility::Public,
         };
     }
-    pub fn type_def<S: Into<String>>(ident: S, ty: Type, visibility: Visibility) -> Self {
+    pub fn type_def<S: Into<String>>(ident: S, ty: TypeID, visibility: Visibility) -> Self {
         return Self {
             name: ident.into(),
             kind: DefinitionKind::Type(ty),
             visibility,
         };
     }
-    pub fn variable<S: Into<String>, T: Into<Type>>(
+    pub fn variable<S: Into<String>, T: Into<TypeID>>(
         ident: S,
         value: Expression,
         mutable: bool,
@@ -123,7 +123,7 @@ impl Definition {
         });
     }
 
-    pub fn variable_with_mut<S: Into<String>, T: Into<Type>>(
+    pub fn variable_with_mut<S: Into<String>, T: Into<TypeID>>(
         ident: S,
         value: Expression,
         ty: Option<T>,

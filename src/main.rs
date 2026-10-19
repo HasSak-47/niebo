@@ -2,14 +2,13 @@ use std::{env::current_dir, path::PathBuf};
 
 use clap::{Parser, ValueEnum};
 
-use crate::ast::{project::Project, validator::Validator};
+use crate::{ast::project::Project, validator::Validator};
 use pretty_env_logger::init_custom_env;
 
 mod ast;
 mod general;
-mod ir;
-mod lowerer;
 mod parser;
+mod validator;
 
 #[derive(Parser, Debug)]
 #[command(name = "niebo")]
@@ -43,8 +42,6 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut v = Validator::new();
-    let mut project = v.process_project(project)?;
-    v.simplify_project(&mut project);
 
     // compile(project, cli.out)?;
 

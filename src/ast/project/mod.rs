@@ -10,7 +10,7 @@ use crate::{
             operations::BinaryOperation,
         },
     },
-    general::{naming::QualifiedName, types::Type},
+    general::{naming::QualifiedName, types::typeid::TypeID},
     parser::parse_module,
 };
 
@@ -211,18 +211,17 @@ mod tests {
 
         assert!(project.external_projects.contains_key("core"));
         assert!(
-            project
-                .root_module
-                .imports
-                .iter()
-                .any(|import| !import.c_import && format!("{:?}", import.path) == "core::operations")
+            project.root_module.imports.iter().any(
+                |import| !import.c_import && format!("{:?}", import.path) == "core::operations"
+            )
         );
         assert!(
             project
                 .root_module
                 .imports
                 .iter()
-                .any(|import| !import.c_import && format!("{:?}", import.path) == "core::traits::Add")
+                .any(|import| !import.c_import
+                    && format!("{:?}", import.path) == "core::traits::Add")
         );
 
         Ok(())

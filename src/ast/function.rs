@@ -2,13 +2,14 @@ use std::collections::HashMap;
 
 use super::expressions::{block::Block, *};
 use super::*;
-use crate::general::types::*;
+use crate::ast::statements::Statement;
+use crate::general::types::typeid::*;
 
 #[derive(Debug, PartialEq)]
 pub struct FunctionBuilder {
     pub ident: String,
-    pub ret_ty: Option<Type>,
-    pub params: Vec<(Option<String>, Type)>,
+    pub ret_ty: Option<TypeID>,
+    pub params: Vec<(Option<String>, TypeID)>,
     pub varidic: bool,
     pub constant: bool,
     pub body: Option<Block>,
@@ -33,7 +34,7 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn set_ret_ty<Ty: Into<Type>>(mut self, ty: Ty) -> Self {
+    pub fn set_ret_ty<Ty: Into<TypeID>>(mut self, ty: Ty) -> Self {
         self.ret_ty = Some(ty.into());
         return self;
     }
@@ -53,13 +54,13 @@ impl FunctionBuilder {
         return self;
     }
 
-    pub fn add_param<S: Into<String>, ITy: Into<Type>>(mut self, ident: S, ty: ITy) -> Self {
+    pub fn add_param<S: Into<String>, ITy: Into<TypeID>>(mut self, ident: S, ty: ITy) -> Self {
         let ident = ident.into();
         self.params.push((Some(ident), ty.into()));
         return self;
     }
 
-    pub fn add_anon_param<ITy: Into<Type>>(mut self, ty: ITy) -> Self {
+    pub fn add_anon_param<ITy: Into<TypeID>>(mut self, ty: ITy) -> Self {
         self.params.push((None, ty.into()));
 
         return self;
@@ -133,14 +134,14 @@ pub struct FunctionDefinition {
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionDeclaration {
     pub constant: bool,
-    pub return_ty: Option<Type>,
-    pub parameters: Vec<(String, Type)>,
+    pub return_ty: Option<TypeID>,
+    pub parameters: Vec<(String, TypeID)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionC {
     pub varidic: bool,
     pub constant: bool,
-    pub return_ty: Option<Type>,
-    pub parameters: Vec<(Option<String>, Type)>,
+    pub return_ty: Option<TypeID>,
+    pub parameters: Vec<(Option<String>, TypeID)>,
 }
