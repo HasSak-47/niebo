@@ -22,6 +22,10 @@ pub inter Div {
     fn div(self: Self, other: Self) -> Self;
 }
 
+pub inter Mod{
+    fn mod(self: Self, other: Self) -> Self;
+}
+
 pub inter Eq {
     fn eq(self: Self, other: Self) -> bool;
 }

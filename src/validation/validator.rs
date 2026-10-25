@@ -3,7 +3,9 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         expressions::{Expression, ExpressionKind, operations::BinaryOperator},
+        function::{FunctionDeclaration, FunctionDefinition},
         project::Project,
+        traits::Trait,
     },
     general::{
         naming::QualifiedName,
@@ -92,6 +94,36 @@ pub struct Validator {
 }
 
 impl Validator {
+    fn generate_arithmetic_binary_operation<S: ToString>(name: S) -> Trait {
+        let name = name.to_string();
+        let mut t = Trait {
+            functions: HashMap::new(),
+        };
+        t.functions.insert(
+            name,
+            FunctionDeclaration {
+                constant: false,
+                return_ty: Some(TypeID::self_()),
+                parameters: vec![
+                    ("self".to_string(), TypeID::self_()),
+                    ("other".to_string(), TypeID::self_()),
+                ],
+            },
+        );
+
+        return t;
+    }
+
+    fn generate_binary_operations() -> Vec<Trait> {
+        return vec![
+            Self::generate_arithmetic_binary_operation("add"),
+            Self::generate_arithmetic_binary_operation("sub"),
+            Self::generate_arithmetic_binary_operation("mul"),
+            Self::generate_arithmetic_binary_operation("div"),
+            Self::generate_arithmetic_binary_operation("mod"),
+        ];
+    }
+
     pub fn new() -> Validator {
         let mut v = Validator::default();
 
@@ -129,27 +161,12 @@ impl Validator {
 
         return v;
     }
+
     pub fn process_project(project: Project) -> anyhow::Result<()> {
         return Ok(());
     }
 
     pub fn determine_type(&mut self, e: &mut Expression) {
-        use ExpressionKind as EK;
-        if e.ret_ty.is_some() {
-            return;
-        }
-
-        e.ret_ty = Some(match &*e.kind {
-            EK::BinaryOperation(oper) => match oper.operator {
-                BinaryOperator::Lesser
-                | BinaryOperator::LesserOrEqual
-                | BinaryOperator::Greater
-                | BinaryOperator::GreaterOrEqual
-                | BinaryOperator::NotEqual
-                | BinaryOperator::Equal => TypeID::bool(),
-                _ => todo!(),
-            },
-            _ => todo!(),
-        });
+        todo!()
     }
 }

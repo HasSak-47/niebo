@@ -61,6 +61,7 @@ pub enum TypeIDKind {
         name: QualifiedName,
         to: Box<TypeID>,
     },
+    SelfT,
     // path to a type that should be resolved later
     Named(QualifiedName),
 }
@@ -237,6 +238,13 @@ impl TypeID {
     pub fn named(path: QualifiedName) -> Self {
         Self {
             kind: TypeIDKind::Named(path),
+            ..TypeID::no_type()
+        }
+    }
+
+    pub fn self_() -> Self {
+        Self {
+            kind: TypeIDKind::SelfT,
             ..TypeID::no_type()
         }
     }

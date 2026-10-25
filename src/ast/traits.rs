@@ -4,7 +4,7 @@ use std::collections::HashMap;
 pub struct TraitBuilder {
     ident: String,
     visibility: Visibility,
-    functions: HashMap<String, FunctionDefinition>,
+    functions: HashMap<String, FunctionDeclaration>,
 }
 
 impl TraitBuilder {
@@ -28,7 +28,24 @@ impl TraitBuilder {
     }
 }
 
+/**
+ * simple trait definition
+```niebo
+inter Foo {
+    // allowed
+    fn bar(...) -> TypeBar;
+    fn baz(...) -> TypeBaz;
+    ...
+    // disallowed
+    // shit to annoying to handle
+    fn foo(...) -> TypeFoo {
+        ...
+    }
+```
+}
+
+ */
 #[derive(Debug, Clone, PartialEq)]
 pub struct Trait {
-    pub functions: HashMap<String, FunctionDefinition>,
+    pub functions: HashMap<String, FunctionDeclaration>,
 }

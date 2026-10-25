@@ -181,25 +181,23 @@ pub fn handle_trait_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Defi
                     Rule::fn_declaration => {
                         let builder = handle_fn_declaration(body)?;
                         let name = builder.ident;
-                        let function = crate::ast::function::FunctionDefinition {
-                            decl: FunctionDeclaration {
-                                constant: builder.constant,
-                                return_ty: builder.ret_ty,
-                                parameters: builder
-                                    .params
-                                    .into_iter()
-                                    .map(|(name, ty)| (name.unwrap(), ty))
-                                    .collect(),
-                            },
-                            body: crate::ast::expressions::block::Block::new(),
+                        let function = FunctionDeclaration {
+                            constant: builder.constant,
+                            return_ty: builder.ret_ty,
+                            parameters: builder
+                                .params
+                                .into_iter()
+                                .map(|(name, ty)| (name.unwrap(), ty))
+                                .collect(),
                         };
                         functions.insert(name, function);
                     }
                     Rule::fn_definition => {
-                        let def = handle_fn_definitions(body)?;
-                        if let DefinitionKind::FunctionDefinition(function) = def.kind {
-                            functions.insert(def.name, function);
-                        }
+                        todo!()
+                        // let def = handle_fn_definitions(body)?;
+                        // if let DefinitionKind::FunctionDefinition(function) = def.kind {
+                        //     functions.insert(def.name, function);
+                        // }
                     }
                     Rule::type_definition | Rule::type_declaration => {}
                     un => unreachable!("{un:?}"),

@@ -44,7 +44,7 @@ type_definition = { struct_definition | union_definition | variant_definition | 
 fn_declaration = { "const"? ~ "fn" ~ identifier ~ template_def? ~ "(" ~ params? ~ ")" ~ ("->" ~ type_expr)? }
 fn_definition  = { fn_declaration ~ block_expression }
 
-module_definition = { "mod" ~ identifier ~ (";" | ("{" ~ stream ~ "}")) }
+module_definition = { "lib" ~ identifier ~ (";" | ("{" ~ stream ~ "}")) }
 
 block_expression = { "{" ~ statement* ~ "}" }
 
@@ -239,7 +239,7 @@ keyword = {
   | "const"
   | "mut"
   | "pub"
-  | "module"
+  | "lib"
   | "for"
   | "in"
   | "while"
