@@ -7,6 +7,7 @@ use super::Expression;
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum BinaryOperator {
     // bitwise operations
+    // IntT o IntT -> IntT
     BitShitLeft,
     BitShitRight,
     BitwiseOr,
@@ -14,6 +15,7 @@ pub enum BinaryOperator {
     BitwiseXor,
 
     // arithmetic operations
+    // T o T -> T
     Addition,
     Multiplication,
     Substraction,
@@ -21,6 +23,7 @@ pub enum BinaryOperator {
     Module,
 
     // boolean operations
+    // T o T -> bool
     Greater,
     Lesser,
     GreaterOrEqual,
@@ -74,13 +77,19 @@ impl BinaryOperator {
     }
 }
 
+// maybe I should add bitwise unary operations idk
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum UnaryOperator {
+    // T o -> U
     Deref,
+    // T o -> U
     Ref,
+    // T o -> T
     Negation,
     Increase,
     Decrease,
+
+    // T o  -> bool, O, R
     EarlyRet,
 }
 
@@ -88,6 +97,8 @@ impl UnaryOperator {
     pub fn into_operation_call(&self) -> QualifiedName {
         let (operation, method) = match self {
             UnaryOperator::Negation => ("Neg", "neg"),
+            UnaryOperator::Increase => ("Inc", "ing"),
+            UnaryOperator::Decrease => ("Dec", "dec"),
             _ => todo!(),
         };
 

@@ -94,7 +94,24 @@ pub struct Validator {
 }
 
 impl Validator {
-    fn generate_arithmetic_binary_operation<S: ToString>(name: S) -> Trait {
+    fn generate_unary_arithmetic_operation<S: ToString>(name: S) -> Trait {
+        let name = name.to_string();
+        let mut t = Trait {
+            functions: HashMap::new(),
+        };
+        t.functions.insert(
+            name,
+            FunctionDeclaration {
+                constant: false,
+                return_ty: Some(TypeID::self_()),
+                parameters: vec![("self".to_string(), TypeID::self_())],
+            },
+        );
+
+        return t;
+    }
+
+    fn generate_binary_arithmetic_operation<S: ToString>(name: S) -> Trait {
         let name = name.to_string();
         let mut t = Trait {
             functions: HashMap::new(),
@@ -114,14 +131,46 @@ impl Validator {
         return t;
     }
 
-    fn generate_binary_operations() -> Vec<Trait> {
-        return vec![
-            Self::generate_arithmetic_binary_operation("add"),
-            Self::generate_arithmetic_binary_operation("sub"),
-            Self::generate_arithmetic_binary_operation("mul"),
-            Self::generate_arithmetic_binary_operation("div"),
-            Self::generate_arithmetic_binary_operation("mod"),
-        ];
+    fn generate_binary_arithmetic_operations() -> HashMap<String, Trait> {
+        return HashMap::from_iter([
+            (
+                "Add".to_string(),
+                Self::generate_binary_arithmetic_operation("add"),
+            ),
+            (
+                "Sub".to_string(),
+                Self::generate_binary_arithmetic_operation("sub"),
+            ),
+            (
+                "Mul".to_string(),
+                Self::generate_binary_arithmetic_operation("mul"),
+            ),
+            (
+                "Div".to_string(),
+                Self::generate_binary_arithmetic_operation("div"),
+            ),
+            (
+                "Mod".to_string(),
+                Self::generate_binary_arithmetic_operation("mod"),
+            ),
+        ]);
+    }
+
+    fn generate_unary_arithmetic_operations() -> HashMap<String, Trait> {
+        return HashMap::from_iter([
+            (
+                "Neg".to_string(),
+                Self::generate_unary_arithmetic_operation("neg"),
+            ),
+            (
+                "Inc".to_string(),
+                Self::generate_unary_arithmetic_operation("inc"),
+            ),
+            (
+                "Dec".to_string(),
+                Self::generate_unary_arithmetic_operation("dec"),
+            ),
+        ]);
     }
 
     pub fn new() -> Validator {
