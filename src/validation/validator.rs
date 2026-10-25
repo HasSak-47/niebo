@@ -85,7 +85,6 @@ struct Scope {
     global: HashMap<QualifiedName, TypeID>,
     local: Vec<HashMap<QualifiedName, TypeID>>,
 }
-
 #[derive(Default)]
 pub struct Validator {
     ty_registry: TypeRegistry,
@@ -134,7 +133,7 @@ impl Validator {
         return Ok(());
     }
 
-    pub fn determine_type(validator: &mut Validator, e: &mut Expression) {
+    pub fn determine_type(&mut self, e: &mut Expression) {
         use ExpressionKind as EK;
         if e.ret_ty.is_some() {
             return;

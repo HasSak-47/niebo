@@ -3,14 +3,8 @@ use std::{collections::HashMap, fmt::Debug, fs::File, io::Read, path::PathBuf};
 use anyhow::{Result, bail};
 
 use crate::{
-    ast::{
-        Definition, DefinitionKind, Module, ModuleKind,
-        expressions::{
-            loops::{LoopExpression, WhileLoop},
-            operations::BinaryOperation,
-        },
-    },
-    general::{naming::QualifiedName, types::typeid::TypeID},
+    ast::{Definition, DefinitionKind, Module, ModuleKind},
+    general::naming::QualifiedName,
     parser::parse_module,
 };
 
@@ -48,9 +42,9 @@ pub struct Project {
     pub root_module: Module,
     pub external_projects: HashMap<String, Project>,
     pub name: String,
-    pub version: (usize, usize, usize),
+    pub _version: (usize, usize, usize),
     // edition of the compiler
-    pub edition: (usize, usize, usize),
+    pub _edition: (usize, usize, usize),
 }
 
 impl Project {
@@ -133,8 +127,8 @@ impl Project {
             root_module: root,
             external_projects: HashMap::new(),
             name: "".into(),
-            version: (0, 1, 0),
-            edition: (0, 1, 0),
+            _version: (0, 1, 0),
+            _edition: (0, 1, 0),
         };
 
         let core_path = Self::core_project_path();
@@ -185,8 +179,8 @@ impl Project {
             root_module: root,
             external_projects: HashMap::new(),
             name: chmura.project.name,
-            version: (0, 1, 0),
-            edition: (0, 1, 0),
+            _version: (0, 1, 0),
+            _edition: (0, 1, 0),
         };
 
         if include_core {

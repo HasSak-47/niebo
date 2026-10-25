@@ -6,19 +6,15 @@ pub mod statements;
 pub mod traits;
 
 use module::*;
-use std::collections::HashMap;
 
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 
-use crate::general::{
-    naming::{QualifiedName, QualifiedNameSegment},
-    types::typeid::*,
-};
+use crate::general::{naming::QualifiedName, types::typeid::*};
 use function::*;
 
 use expressions::Expression;
 
-use traits::{Trait, TraitBuilder};
+use traits::Trait;
 
 // WARN: bad default!
 #[derive(Debug, Default, Clone, PartialEq)]

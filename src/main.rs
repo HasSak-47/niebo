@@ -2,13 +2,13 @@ use std::{env::current_dir, path::PathBuf};
 
 use clap::{Parser, ValueEnum};
 
-use crate::{ast::project::Project, validator::Validator};
+use crate::{ast::project::Project, validation::validator::Validator};
 use pretty_env_logger::init_custom_env;
 
 mod ast;
 mod general;
 mod parser;
-mod validator;
+mod validation;
 
 #[derive(Parser, Debug)]
 #[command(name = "niebo")]

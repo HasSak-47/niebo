@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::general::naming::QualifiedName;
+use crate::{ast::expressions::call::Call, general::naming::QualifiedName};
 
 use super::Expression;
 
@@ -143,6 +143,13 @@ impl UnaryOperation {
     pub fn new(operator: UnaryOperator, operand: Expression) -> Self {
         Self { operator, operand }
     }
+
+    pub fn simple_desugar(&self) -> Expression {
+        return Expression::call(
+            Expression::identifier(self.operator.into_operation_call()),
+            vec![self.operand.clone()],
+        );
+    }
 }
 
 impl BinaryOperation {
@@ -151,5 +158,12 @@ impl BinaryOperation {
             operator,
             operands: [left, right],
         }
+    }
+
+    pub fn simple_desugar(&self) -> Expression {
+        return Expression::call(
+            Expression::identifier(self.operator.into_operation_call()),
+            vec![self.operands[0].clone(), self.operands[1].clone()],
+        );
     }
 }

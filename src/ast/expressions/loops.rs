@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ast::expressions::ExpressionKind;
+use crate::ast::expressions::{ExpressionKind, conditional::ConditionalBuilder};
 
 use super::Expression;
 
@@ -40,6 +40,26 @@ impl WhileLoop {
             then,
             label: None,
         }
+    }
+
+    pub fn simple_desugar(&self) -> Expression {
+        let id = self.label.clone();
+        let while_header_ = ConditionalBuilder::new(
+            self.condition.clone(),
+            Expression::block(crate::ast::expressions::block::Block {
+                statements: vec![crate::ast::statements::Statement::Break(id.clone())],
+            }),
+        );
+
+        let mut body = crate::ast::expressions::Block::new();
+        body.add_statement(crate::ast::statements::Statement::Expression(
+            Expression::if_(while_header_.build()),
+        ));
+        body.add_statement(crate::ast::statements::Statement::Expression(
+            self.then.clone(),
+        ));
+
+        return Expression::loop_(Expression::block(body), id);
     }
 }
 

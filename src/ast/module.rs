@@ -1,9 +1,6 @@
 use crate::ast::DefinitionKind;
 
-use super::{
-    Definition, FunctionBuilder, Implementation, Import, QualifiedName, TraitBuilder,
-    TraitImplementation,
-};
+use super::{Definition, Implementation, Import, QualifiedName, TraitImplementation};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ModuleKind {

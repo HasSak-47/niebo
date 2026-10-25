@@ -193,4 +193,13 @@ impl Expression {
     pub fn call(called: Expression, params: Vec<Expression>) -> Self {
         Self::new(ExpressionKind::Call(Call::new(called, params)))
     }
+
+    pub fn simple_desugar(&self) -> Self {
+        return match &*self.kind {
+            ExpressionKind::While(w) => w.simple_desugar(),
+            ExpressionKind::BinaryOperation(b) => b.simple_desugar(),
+            ExpressionKind::UnaryOperation(u) => u.simple_desugar(),
+            _ => self.clone(),
+        };
+    }
 }

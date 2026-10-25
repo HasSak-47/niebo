@@ -12,5 +12,6 @@ pub enum Statement {
     Return(Option<Expression>),
 
     // return value for the block expression
+    // no implicit returns! fuck you rust
     Value(Option<Expression>),
 }
