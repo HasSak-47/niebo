@@ -91,6 +91,9 @@ pub enum UnaryOperator {
 
     // T o  -> bool, O, R
     EarlyRet,
+
+    // T o -> bool
+    Not,
 }
 
 impl UnaryOperator {
@@ -118,6 +121,7 @@ impl Display for UnaryOperator {
             Self::Increase => write!(f, "--"),
             Self::Decrease => write!(f, "++"),
             Self::EarlyRet => write!(f, "?"),
+            Self::Not => write!(f, "!"),
         }
     }
 }

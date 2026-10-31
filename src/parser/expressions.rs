@@ -377,6 +377,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             let mut inner = next.into_inner();
             let oper = match inner.next().unwrap().as_str() {
                 "&" => UnaryOperator::Ref,
+                "!" => UnaryOperator::Not,
                 "*" => UnaryOperator::Deref,
                 "-" => UnaryOperator::Negation,
                 un => unreachable!("unreachable unary operator: {un:?}"),
