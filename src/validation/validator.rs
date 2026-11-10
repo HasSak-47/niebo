@@ -274,6 +274,38 @@ impl Validator {
         return v;
     }
 
+    fn process_expression(&mut self, exp: &mut Expression) {
+        if exp.ret_ty.is_some() {
+            return;
+        }
+        use crate::ast::expressions::ExpressionKind as EK;
+        exp.ret_ty = Some(match &mut *exp.kind {
+            EK::Literal(lit) => {
+                use crate::ast::expressions::literal::LiteralInfo as LI;
+                match lit.info {
+                    LI::Integer { .. } => TypeID::int(),
+                    LI::String => TypeID::pointer(TypeID::uint_p(8)),
+                    LI::Float { .. } => TypeID::float(),
+                    LI::NullPointer => TypeID::pointer(TypeID::void()),
+                }
+            }
+            EK::Identifier(_) => {
+                todo!()
+            }
+            EK::StructInit(init) => {
+                for param in &mut init.params {
+                    self.process_expression(&mut param.1);
+                }
+                let ty_id = TypeID::named(init.ident.clone());
+                if !self.ty_registry.types.contains_key(&ty_id) {
+                    todo!();
+                }
+                ty_id
+            }
+            td => todo!("{td:?}"),
+        })
+    }
+
     fn process_definition(&mut self, def: &mut Definition) {
         use crate::ast::DefinitionKind as DK;
         match &mut def.kind {
@@ -292,6 +324,9 @@ impl Validator {
                         ST::Definition(def) => {
                             self.process_definition(def);
                         }
+                        ST::Expression(exp) => {
+                            self.process_expression(exp);
+                        }
                         _ => todo!(),
                     }
                 }
@@ -299,13 +334,31 @@ impl Validator {
                 self.scope.local.pop();
             }
             DK::Variable(var) => {
-                todo!()
+                self.process_expression(&mut var.value);
             }
-            _ => {}
+            td => {
+                todo!("{td:?}")
+            }
         }
     }
 
+    pub fn register_definition(&mut self, def: &Definition) -> anyhow::Result<()> {
+        use crate::ast::DefinitionKind as DK;
+        match &def.kind {
+            DK::Type(ty_def) => {
+                // let ty = TypeID::named(def.name.into());
+                // self.ty_registry.types.insert(ty, ty)
+            }
+            td => todo!("{td:?}"),
+        }
+        return Ok(());
+    }
+
     pub fn process_project(&mut self, mut project: Project) -> anyhow::Result<()> {
+        for def in &mut project.root_module.definitions {
+            self.register_definition(def)?;
+        }
+
         for def in &mut project.root_module.definitions {
             self.process_definition(def);
         }

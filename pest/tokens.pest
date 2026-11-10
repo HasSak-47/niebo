@@ -218,8 +218,9 @@ prec               = @{ASCII_DIGIT+}
 int_type           =  { "i" ~ prec }
 uint_type          =  { "u" ~ prec }
 float_type         =  { "f" ~ prec }
-literal_expression =  { number | string }
+literal_expression =  { number | string | nullptr }
 
+nullptr =  @{ "nullptr" }
 number       = @{ (ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* ~ float_suffix?) | (ASCII_DIGIT+ ~ int_suffix?) }
 int_suffix   =  { ("i" | "u") ~ ASCII_DIGIT+ }
 float_suffix =  { "f" ~ ASCII_DIGIT+ }

@@ -358,6 +358,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
                     let literal = Literal::string(unescape_string_literal(literal.as_str()));
                     Expression::literal(literal)
                 }
+                Rule::nullptr => Expression::literal(Literal::nullptr()),
                 _ => unreachable!(""),
             }
         }

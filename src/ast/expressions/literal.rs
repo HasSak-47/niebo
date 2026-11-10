@@ -8,7 +8,7 @@ pub enum LiteralInfo {
     },
 
     String,
-
+    NullPointer,
     Float {
         precision: Option<u64>,
     },
@@ -46,6 +46,13 @@ impl Literal {
         return Literal {
             info: LiteralInfo::Float { precision },
             data: value,
+        };
+    }
+
+    pub fn nullptr() -> Self {
+        return Literal {
+            info: LiteralInfo::NullPointer,
+            data: String::new(),
         };
     }
 

@@ -1,2 +1,2 @@
-pub mod traits;
-pub mod operations;
+pub lib traits;
+pub lib operations;

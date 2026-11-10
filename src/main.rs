@@ -42,6 +42,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut v = Validator::new();
+    v.process_project(project)?;
 
     // compile(project, cli.out)?;
 
