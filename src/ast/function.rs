@@ -143,3 +143,13 @@ pub struct FunctionC {
     pub return_ty: Option<TypeID>,
     pub parameters: Vec<(Option<String>, TypeID)>,
 }
+
+impl FunctionDeclaration {
+    pub fn into_type(&self) -> TypeID {
+        TypeID::function(
+            self.parameters.clone(),
+            self.return_ty.clone().unwrap_or(TypeID::void()),
+            false,
+        )
+    }
+}

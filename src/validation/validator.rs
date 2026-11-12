@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Definition,
-        expressions::{Expression, ExpressionKind, operations::BinaryOperator},
+        expressions::{Expression, ExpressionKind, call::Call, operations::BinaryOperator},
         function::{FunctionDeclaration, FunctionDefinition},
         project::Project,
         traits::Trait,
@@ -83,11 +83,35 @@ struct TypeRegistry {
     types: HashMap<TypeID, TypeData>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Scope {
     global: HashMap<QualifiedName, TypeID>,
     local: Vec<HashMap<QualifiedName, TypeID>>,
 }
+
+impl Scope {
+    pub fn get_symbol_ty(&self, name: &QualifiedName) -> TypeID {
+        for scope in self.local.iter().rev() {
+            if scope.contains_key(name) {
+                return scope.get(name).unwrap().clone();
+            }
+        }
+
+        if self.global.contains_key(name) {
+            return self.global.get(name).unwrap().clone();
+        }
+
+        panic!("failed to find symbol: {name}\n{self:?}")
+    }
+    pub fn register_global(&mut self) {}
+
+    pub fn register_local(&mut self) {}
+
+    pub fn push_scope(&mut self) {}
+
+    pub fn pop_scope(&mut self) {}
+}
+
 #[derive(Default)]
 pub struct Validator {
     ty_registry: TypeRegistry,
@@ -289,9 +313,7 @@ impl Validator {
                     LI::NullPointer => TypeID::pointer(TypeID::void()),
                 }
             }
-            EK::Identifier(_) => {
-                todo!()
-            }
+            EK::Identifier(id) => self.scope.get_symbol_ty(id),
             EK::StructInit(init) => {
                 for param in &mut init.params {
                     self.process_expression(&mut param.1);
@@ -302,6 +324,13 @@ impl Validator {
                 }
                 ty_id
             }
+            EK::Call(Call { called, parameters }) => {
+                self.process_expression(called);
+                for param in parameters {
+                    self.process_expression(param);
+                }
+                called.ret_ty.clone().unwrap_or(TypeID::void())
+            }
             td => todo!("{td:?}"),
         })
     }
@@ -310,7 +339,7 @@ impl Validator {
         use crate::ast::DefinitionKind as DK;
         match &mut def.kind {
             DK::FunctionDefinition(func) => {
-                self.scope.local.push(HashMap::new());
+                self.scope.push_scope();
                 let local_scope = self.scope.local.last_mut().unwrap();
                 for (name, ty) in &func.decl.parameters {
                     local_scope.insert(name.into(), ty.clone());
@@ -331,11 +360,13 @@ impl Validator {
                     }
                 }
 
-                self.scope.local.pop();
+                self.scope.pop_scope();
             }
             DK::Variable(var) => {
                 self.process_expression(&mut var.value);
             }
+            // do nothing on types, they are handled by the registry
+            DK::Type(_) => {}
             td => {
                 todo!("{td:?}")
             }
@@ -344,10 +375,15 @@ impl Validator {
 
     pub fn register_definition(&mut self, def: &Definition) -> anyhow::Result<()> {
         use crate::ast::DefinitionKind as DK;
+        let name = def.name.clone().into();
         match &def.kind {
             DK::Type(ty_def) => {
-                // let ty = TypeID::named(def.name.into());
-                // self.ty_registry.types.insert(ty, ty)
+                let ty = TypeID::named(name);
+                let data = TypeData::new(ty_def.clone());
+                self.ty_registry.types.insert(ty, data);
+            }
+            DK::FunctionDefinition(func) => {
+                self.scope.global.insert(name, func.decl.into_type());
             }
             td => todo!("{td:?}"),
         }
@@ -355,7 +391,9 @@ impl Validator {
     }
 
     pub fn process_project(&mut self, mut project: Project) -> anyhow::Result<()> {
-        for def in &mut project.root_module.definitions {
+        for import in &project.root_module.imports {}
+
+        for def in &project.root_module.definitions {
             self.register_definition(def)?;
         }
 

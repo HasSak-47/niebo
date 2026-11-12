@@ -71,10 +71,7 @@ pub enum TypeKind {
     Function(FunctionType),
     Template(TemplateID),
     // alias to a type
-    Alias {
-        name: QualifiedName,
-        to: Box<TypeShape>,
-    },
+    Alias(Box<TypeID>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -89,13 +86,9 @@ impl TypeShape {
         }
     }
 
-    pub fn alias(name: QualifiedName, ty: TypeShape) -> Self {
-        Self {
-            kind: TypeKind::Alias {
-                name,
-                to: Box::new(ty),
-            },
-            ..TypeShape::no_type()
+    pub fn alias(id: TypeID) -> TypeShape {
+        TypeShape {
+            kind: TypeKind::Alias(Box::new(id)),
         }
     }
 

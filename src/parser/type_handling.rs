@@ -2,7 +2,10 @@ use pest::iterators::Pair;
 
 use crate::{
     ast::{Definition, Visibility},
-    general::types::typeid::{PrimitiveTypeID, StructTypeID, TypeID},
+    general::types::{
+        typeid::{PrimitiveTypeID, StructTypeID, TypeID},
+        typeshape::TypeShape,
+    },
     parser::*,
 };
 
@@ -50,7 +53,7 @@ pub fn handle_type_alias_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Result
 
     return Ok(Definition::type_def(
         ident.clone(),
-        TypeID::alias(ident.into(), handle_type_expression(type_exp)?),
+        TypeShape::alias(handle_type_expression(type_exp)?),
         Visibility::Public,
     ));
 }
@@ -88,7 +91,7 @@ pub fn handle_type_struct_definitions<'a>(pair: Pair<'a, Rule>) -> anyhow::Resul
 
     return Ok(Definition::type_def(
         ident,
-        TypeID::struct_t(members),
+        TypeShape::struct_t(members),
         Visibility::Public,
     ));
 }

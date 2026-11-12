@@ -9,7 +9,10 @@ use module::*;
 
 use anyhow::Result;
 
-use crate::general::{naming::QualifiedName, types::typeid::*};
+use crate::general::{
+    naming::QualifiedName,
+    types::{typeid::*, typeshape::TypeShape},
+};
 use function::*;
 
 use expressions::Expression;
@@ -66,7 +69,7 @@ into_definition!(TraitImplementation);
 #[derive(Debug, Clone, PartialEq)]
 pub enum DefinitionKind {
     Variable(Variable),
-    Type(TypeID),
+    Type(TypeShape),
     FunctionDefinition(FunctionDefinition),
     FunctionDeclaration(FunctionDeclaration),
     Module(Module),
@@ -95,7 +98,7 @@ impl Definition {
             visibility: Visibility::Public,
         };
     }
-    pub fn type_def<S: Into<String>>(ident: S, ty: TypeID, visibility: Visibility) -> Self {
+    pub fn type_def<S: Into<String>>(ident: S, ty: TypeShape, visibility: Visibility) -> Self {
         return Self {
             name: ident.into(),
             kind: DefinitionKind::Type(ty),

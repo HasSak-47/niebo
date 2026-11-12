@@ -44,6 +44,9 @@ pub struct TemplateID {
     pub restrictions: Vec<QualifiedName>,
 }
 
+/**
+ * this is like a QualifiedName but exclusive for types
+ */
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeIDKind {
     Primitive(PrimitiveTypeID),
@@ -56,13 +59,8 @@ pub enum TypeIDKind {
     MutableReference(Box<TypeID>),
     Function(FunctionType),
     Template(TemplateID),
-    // alias to a type
-    Alias {
-        name: QualifiedName,
-        to: Box<TypeID>,
-    },
     SelfT,
-    // path to a type that should be resolved later
+    // A Custom type, like a struct Foo, enum Bar, type Baz
     Named(QualifiedName),
 }
 
@@ -99,16 +97,6 @@ impl TypeID {
     fn no_type() -> TypeID {
         TypeID {
             kind: TypeIDKind::Primitive(PrimitiveTypeID::Void),
-        }
-    }
-
-    pub fn alias(name: QualifiedName, ty: TypeID) -> Self {
-        Self {
-            kind: TypeIDKind::Alias {
-                name,
-                to: Box::new(ty),
-            },
-            ..TypeID::no_type()
         }
     }
 
