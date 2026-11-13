@@ -96,6 +96,10 @@ impl QualifiedName {
         self.v.remove(0);
     }
 
+    pub fn pop(&mut self) {
+        self.v.pop();
+    }
+
     pub fn len(&self) -> usize {
         return self.v.len();
     }

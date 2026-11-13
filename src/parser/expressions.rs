@@ -1,4 +1,4 @@
-use super::{Rule, handle_qualified_name, handle_statement};
+use super::{Rule, handle_qualified_name, handle_statement, handle_type_expression};
 
 use pest::iterators::Pair;
 use std::str::FromStr;
@@ -14,7 +14,7 @@ use crate::{
         loops::{LoopExpression, WhileLoop},
         operations::{BinaryOperator, UnaryOperator},
     },
-    general::naming::{QualifiedName, QualifiedNameSegment},
+    general::{naming::QualifiedNameSegment, types::typeid::TypeID},
 };
 
 fn handle_index_access_postfix<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression> {
@@ -278,6 +278,7 @@ enum Operation {
     Index(Expression),
     Unary(UnaryOperator),
     Binary(BinaryOperator),
+    Casting(TypeID),
 }
 
 impl PartialEq for Operation {
@@ -313,6 +314,7 @@ impl PartialOrd for Operation {
 
             (Operation::Binary(a), Operation::Binary(b)) => a.cmp(b),
             (Operation::Binary(_), _) => std::cmp::Ordering::Less,
+            (Operation::Casting(_), _) => std::cmp::Ordering::Less,
         })
     }
 }
@@ -420,6 +422,7 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             Rule::member_access_postfix => {}
             Rule::index_access_postfix => {}
             Rule::method_call_postfix => {}
+            Rule::casting_postfix => {}
 
             un => unreachable!("{un:?}"),
         }
@@ -460,6 +463,11 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             Rule::method_call_postfix => {
                 let (ident, params) = handle_method_call_postfix(p)?;
                 e_string.push(ExpressionString::Oper(Operation::Method(ident, params)));
+            }
+            // TODO: casting postfix was not thought through
+            Rule::casting_postfix => {
+                let ty = handle_type_expression(p.into_inner().next().unwrap())?;
+                e_string.push(ExpressionString::Oper(Operation::Casting(ty)));
             }
             un => todo!("{un:?}:'{}'", p.as_str()),
         }
@@ -526,6 +534,10 @@ pub fn handle_expression<'a>(pair: Pair<'a, Rule>) -> anyhow::Result<Expression>
             Operation::Unary(o) => {
                 let a = get_next_val()?;
                 return Ok(Expression::unary_operation(o, a));
+            }
+            Operation::Casting(cast) => {
+                let a = get_next_val()?;
+                return Ok(Expression::casting_expression(a, cast));
             }
             Operation::Binary(o) => {
                 let b = get_next_val()?;

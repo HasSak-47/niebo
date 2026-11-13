@@ -45,6 +45,7 @@ pub enum ExpressionKind {
     UnaryOperation(UnaryOperation),
     Call(Call),
     Assignment(Expression, Expression),
+    Casting(Expression, TypeID),
 }
 
 impl Display for ExpressionKind {
@@ -65,6 +66,7 @@ impl Display for ExpressionKind {
             ExpressionKind::Call(a) => write!(f, "{}", a),
             ExpressionKind::Assignment(a, b) => write!(f, "({} = {})", a, b),
             ExpressionKind::StructInit(a) => write!(f, "{}", a),
+            ExpressionKind::Casting(a, b) => write!(f, "({} as {:?})", a, b),
         }
     }
 }
@@ -201,5 +203,9 @@ impl Expression {
             ExpressionKind::UnaryOperation(u) => u.simple_desugar(),
             _ => self.clone(),
         };
+    }
+
+    pub fn casting_expression(exp: Expression, ty: TypeID) -> Self {
+        return Self::new(ExpressionKind::Casting(exp, ty));
     }
 }

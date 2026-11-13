@@ -22,7 +22,7 @@ fn main() -> i32 {
 
     main_loop: loop {
         let mut i : i32 = 0;
-        scanf("%d: ", &i);
+        scanf("%d: ", &i as *mut i32);
 
         if i == 0 {
             break main_loop;

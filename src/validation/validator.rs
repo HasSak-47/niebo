@@ -84,6 +84,9 @@ struct TypeRegistry {
     types: HashMap<TypeID, TypeData>,
 }
 
+/**
+ * probably should also handle traits :p
+ */
 #[derive(Default, Debug)]
 struct Scope {
     global: HashMap<QualifiedName, TypeID>,
@@ -91,18 +94,18 @@ struct Scope {
 }
 
 impl Scope {
-    pub fn get_symbol_ty(&self, name: &QualifiedName) -> TypeID {
+    pub fn get_symbol_ty(&self, name: &QualifiedName) -> anyhow::Result<TypeID> {
         for scope in self.local.iter().rev() {
             if scope.contains_key(name) {
-                return scope.get(name).unwrap().clone();
+                return Ok(scope.get(name).unwrap().clone());
             }
         }
 
         if self.global.contains_key(name) {
-            return self.global.get(name).unwrap().clone();
+            return Ok(self.global.get(name).unwrap().clone());
         }
 
-        panic!("failed to find symbol: {name}\n{self:?}")
+        anyhow::bail!("failed to find symbol: {name}\n{self:?}");
     }
     pub fn register_global(&mut self) {}
 
@@ -244,6 +247,7 @@ impl Validator {
             Self::generate_unary_operation("not", TypeID::bool()),
         )]);
     }
+    // --- end fuckass trait definitions ---
 
     pub fn new() -> Validator {
         let mut v = Validator::default();
@@ -267,6 +271,11 @@ impl Validator {
             v.trait_registry
                 .insert(QualifiedName::from(format!("core::ops::{name}")), trait_);
         }
+
+        v.trait_registry.insert(
+            QualifiedName::from("core::ops::Ref"),
+            Self::generate_unary_operation("ref", TypeID::pointer(TypeID::self_())),
+        );
 
         // register the primitive types
         // int register
@@ -320,7 +329,21 @@ impl Validator {
                     LI::NullPointer => TypeID::pointer(TypeID::void()),
                 }
             }
-            EK::Identifier(id) => self.scope.get_symbol_ty(id),
+            EK::Identifier(id) => {
+                if let Ok(ty) = self.scope.get_symbol_ty(id) {
+                    ty
+                    // if it cannot be found as a symbol it must be a trait definition + method
+                } else {
+                    let mut trait_name = id.clone();
+                    trait_name.pop();
+                    let method_name = id.v.last().unwrap().ident.clone();
+                    let trait_ = self.trait_registry.get(&trait_name).unwrap();
+                    let method = trait_.functions.get(&method_name).unwrap();
+                    for param in method.parameters {}
+
+                    todo!()
+                }
+            }
             EK::StructInit(init) => {
                 for param in &mut init.params {
                     self.process_expression(&mut param.1);
@@ -376,7 +399,7 @@ impl Validator {
                 use crate::ast::statements::Statement as ST;
                 for stmt in &mut func.body.statements {
                     match stmt {
-                        ST::Return(Some(exp)) => self.determine_type(exp),
+                        ST::Return(Some(exp)) => self.process_expression(exp),
                         ST::Return(None) => {}
                         ST::Definition(def) => {
                             self.process_definition(def);
@@ -442,10 +465,7 @@ impl Validator {
         for def in &mut project.root_module.definitions {
             self.process_definition(def);
         }
-        return Ok(());
-    }
 
-    pub fn determine_type(&mut self, e: &mut Expression) {
-        todo!()
+        return Ok(());
     }
 }
