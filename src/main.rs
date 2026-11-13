@@ -1,8 +1,12 @@
 use std::{env::current_dir, path::PathBuf};
 
+use clang::Clang;
 use clap::{Parser, ValueEnum};
 
-use crate::{ast::project::Project, validation::validator::Validator};
+use crate::{
+    ast::project::Project,
+    validation::{clib::CCache, validator::Validator},
+};
 use pretty_env_logger::init_custom_env;
 
 mod ast;
@@ -42,7 +46,9 @@ fn main() -> anyhow::Result<()> {
     };
 
     let mut v = Validator::new();
-    v.process_project(project)?;
+    let clang = Clang::new().unwrap();
+    let mut c_cache = CCache::new(&clang)?;
+    v.process_project(project, &mut c_cache)?;
 
     // compile(project, cli.out)?;
 

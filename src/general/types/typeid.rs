@@ -84,6 +84,15 @@ impl From<(String, TypeID)> for Params {
     }
 }
 
+impl From<(Option<String>, TypeID)> for Params {
+    fn from(value: (Option<String>, TypeID)) -> Self {
+        return Params {
+            name: value.0,
+            ty: value.1,
+        };
+    }
+}
+
 impl From<TypeID> for Params {
     fn from(value: TypeID) -> Self {
         return Params {

@@ -15,6 +15,7 @@ use crate::{
             typeshape::TypeShape,
         },
     },
+    validation::clib::CCache,
 };
 
 /**
@@ -107,9 +108,13 @@ impl Scope {
 
     pub fn register_local(&mut self) {}
 
-    pub fn push_scope(&mut self) {}
+    pub fn push_scope(&mut self) {
+        self.local.push(HashMap::new());
+    }
 
-    pub fn pop_scope(&mut self) {}
+    pub fn pop_scope(&mut self) {
+        self.local.pop();
+    }
 }
 
 #[derive(Default)]
@@ -120,6 +125,7 @@ pub struct Validator {
 }
 
 impl Validator {
+    // --- begin fuckass trait definitions ---
     fn generate_unary_operation<S: ToString>(name: S, return_ty: TypeID) -> Trait {
         let name = name.to_string();
         let mut t = Trait {
@@ -302,6 +308,7 @@ impl Validator {
         if exp.ret_ty.is_some() {
             return;
         }
+        *exp = exp.simple_desugar();
         use crate::ast::expressions::ExpressionKind as EK;
         exp.ret_ty = Some(match &mut *exp.kind {
             EK::Literal(lit) => {
@@ -330,6 +337,27 @@ impl Validator {
                     self.process_expression(param);
                 }
                 called.ret_ty.clone().unwrap_or(TypeID::void())
+            }
+
+            EK::Block(block) => {
+                use crate::ast::statements::Statement as ST;
+                for stmt in &mut block.statements {
+                    match stmt {
+                        ST::Expression(exp) => self.process_expression(exp),
+                        _ => {}
+                    }
+                }
+                match block.statements.last_mut() {
+                    Some(ST::Value(Some(val))) => {
+                        self.process_expression(val);
+                        val.ret_ty.clone().unwrap()
+                    }
+                    _ => TypeID::void(),
+                }
+            }
+            EK::Loop(loop_) => {
+                self.process_expression(&mut loop_.body);
+                loop_.body.ret_ty.clone().unwrap_or(TypeID::void())
             }
             td => todo!("{td:?}"),
         })
@@ -373,7 +401,7 @@ impl Validator {
         }
     }
 
-    pub fn register_definition(&mut self, def: &Definition) -> anyhow::Result<()> {
+    pub fn register_global_definition(&mut self, def: &Definition) -> anyhow::Result<()> {
         use crate::ast::DefinitionKind as DK;
         let name = def.name.clone().into();
         match &def.kind {
@@ -385,16 +413,30 @@ impl Validator {
             DK::FunctionDefinition(func) => {
                 self.scope.global.insert(name, func.decl.into_type());
             }
+            DK::FunctionC(func) => {
+                self.scope.global.insert(name, func.into_type());
+            }
             td => todo!("{td:?}"),
         }
         return Ok(());
     }
 
-    pub fn process_project(&mut self, mut project: Project) -> anyhow::Result<()> {
-        for import in &project.root_module.imports {}
+    pub fn process_project<'a>(
+        &mut self,
+        mut project: Project,
+        ccache: &mut CCache<'a>,
+    ) -> anyhow::Result<()> {
+        for import in &project.root_module.imports {
+            if import.c_import {
+                let header = import.path.v[0].ident.clone();
+                ccache.resolve_c_definitions(header)?;
+                let def = ccache.get_definition(&import.path)?;
+                self.register_global_definition(def)?;
+            }
+        }
 
         for def in &project.root_module.definitions {
-            self.register_definition(def)?;
+            self.register_global_definition(def)?;
         }
 
         for def in &mut project.root_module.definitions {

@@ -136,6 +136,16 @@ pub struct FunctionDeclaration {
     pub parameters: Vec<(String, TypeID)>,
 }
 
+impl FunctionDeclaration {
+    pub fn into_type(&self) -> TypeID {
+        TypeID::function(
+            self.parameters.clone(),
+            self.return_ty.clone().unwrap_or(TypeID::void()),
+            false,
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionC {
     pub varidic: bool,
@@ -144,12 +154,12 @@ pub struct FunctionC {
     pub parameters: Vec<(Option<String>, TypeID)>,
 }
 
-impl FunctionDeclaration {
+impl FunctionC {
     pub fn into_type(&self) -> TypeID {
         TypeID::function(
             self.parameters.clone(),
             self.return_ty.clone().unwrap_or(TypeID::void()),
-            false,
+            true,
         )
     }
 }

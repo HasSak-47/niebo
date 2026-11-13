@@ -102,7 +102,8 @@ impl UnaryOperator {
             UnaryOperator::Negation => ("Neg", "neg"),
             UnaryOperator::Increase => ("Inc", "ing"),
             UnaryOperator::Decrease => ("Dec", "dec"),
-            _ => todo!(),
+            UnaryOperator::Ref => ("Ref", "ref"),
+            td => todo!("{td:?}"),
         };
 
         let mut path = QualifiedName::from(operation);
